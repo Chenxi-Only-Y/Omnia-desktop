@@ -339,6 +339,33 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 .board__chip[draggable="true"] { cursor: grab; }
 
+/* ─────────────────────────────────────────────────────────────
+   成员详情：雷达图与趋势
+   ───────────────────────────────────────────────────────────── */
+.radar-wrap { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+.radar { flex: 0 0 auto; }
+.radar-legend { flex: 1; min-width: 300px; }
+.radar-legend__row { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 5px; }
+.radar-legend__row .lg { margin-left: 0; }
+.lg--base { background: transparent; border: 1px dashed #6b7383; }
+.lg--dmg { background: #2BCBFF; }
+.lg--tower { background: #F0BC06; }
+.radar-legend__hint { color: var(--text-faint); font-size: 11px; margin: 8px 0; }
+
+.trend { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; padding: 8px 2px; }
+.trend__col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 54px; }
+.trend__bars { display: flex; align-items: flex-end; gap: 3px; height: 130px; }
+.trend__bar { width: 11px; border-radius: 2px 2px 0 0; display: block; }
+.trend__bar--dmg { background: linear-gradient(180deg, #4fdcff, #1c7fa0); }
+.trend__bar--tower { background: linear-gradient(180deg, #ffd257, #a87c07); }
+.trend__label { font-size: 10px; color: var(--text-faint); text-align: center; line-height: 1.2; }
+.trend__legend { align-self: center; font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.trend__legend .lg { margin-left: 0; }
+
+/* 主档里可点击查看详情的姓名 */
+.roster-name-link { cursor: pointer; color: var(--text); }
+.roster-name-link:hover { color: var(--accent); text-decoration: underline; }
+
 /* ── 出勤率条 ─────────────────────────────────────────────── */
 .ratebar {
   display: inline-block; width: 46px; height: 5px; border-radius: 3px;

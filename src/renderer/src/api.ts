@@ -5,7 +5,8 @@
 import type {
   AppInfo, AssignInput, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
-  ParticipationRow, Player, PlayerInput, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
+  ParticipationRow, Player, PlayerDetail, PlayerInput, SheetGrid, SheetList,
+  SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -54,6 +55,7 @@ export const api = {
     remove: (id: number): Promise<true> => unwrap(bridge().player.remove(id)),
     import: (rows: PlayerInput[]) => unwrap(bridge().player.import(rows)),
     export: (): Promise<PlayerInput[]> => unwrap(bridge().player.export()),
+    detail: (playerId: number): Promise<PlayerDetail> => unwrap(bridge().player.detail(playerId)),
   },
 
   match: {

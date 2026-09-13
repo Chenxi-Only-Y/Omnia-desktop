@@ -68,6 +68,7 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
   ipcMain.handle(IPC.playerImport, safe((rows: PlayerInput[]) => players.importMany(rows)));
+  ipcMain.handle(IPC.playerDetail, safe((playerId: number) => dashboard.playerDetail(playerId)));
   ipcMain.handle(IPC.playerExport, safe(() => players.list().map((p): PlayerInput => ({
     gameId: p.gameId,
     name: p.name,

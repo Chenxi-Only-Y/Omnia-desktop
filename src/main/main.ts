@@ -651,6 +651,91 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of dnd.steps) console.log('[smoke] 拖拽:', s);
     console.log('[smoke] 看板拖拽排表      :', dnd.ok ? 'PASS' : 'FAIL');
 
+    // 成员详情：个人汇总 / 雷达对比 / 页面渲染
+    const detail = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      const made = { players: [], matches: [] };
+      try {
+        const api = window.omnia;
+        const waitFor = async (fn, label, ms = 6000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+        // 主角：两场都填战报；队友：一场填、一场不填（用于验证"未填不计入数值"）
+        const a = await api.player.create({ gameId: 'smoke_pd_1', name: '详情甲', mainClass: '神相', joinedOrder: 11 });
+        const b = await api.player.create({ gameId: 'smoke_pd_2', name: '详情乙', mainClass: '素问', joinedOrder: 12 });
+        if (!a.ok || !b.ok) throw new Error('建档失败');
+        made.players.push(a.data.id, b.data.id);
+
+        const m1 = await api.match.create({ date: '2026-05-01', ourSide: '我方', oppSide: '详情队A', result: 'WIN' });
+        const m2 = await api.match.create({ date: '2026-05-08', ourSide: '我方', oppSide: '详情队B', result: 'LOSE' });
+        if (!m1.ok || !m2.ok) throw new Error('建对局失败');
+        made.matches.push(m1.data.match.id, m2.data.match.id);
+
+        // 甲：两场都有战报（有效人伤 = dmg + armor，有效击杀 = kills + fountain）
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: a.data.id, squad: '进攻一-1', state: 'PLAY',
+          stat: { kills: 20, fountainKills: 2, assists: 30, dmgPlayer: 1000, dmgPlayerArmor: 500, dmgBuilding: 300, dmgBuildingArmor: 100, healing: 0, damageTaken: 800, deaths: 2, revives: 0, boneBurn: 5 } });
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: a.data.id, squad: '进攻一-1', state: 'PLAY',
+          stat: { kills: 10, fountainKills: 1, assists: 20, dmgPlayer: 600, dmgPlayerArmor: 200, dmgBuilding: 100, dmgBuildingArmor: 0, damageTaken: 400, deaths: 1 } });
+        // 乙：第一场填，第二场只上场不填
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: b.data.id, squad: '防守一-1', state: 'PLAY',
+          stat: { assists: 40, healing: 2000, damageTaken: 300, deaths: 1 } });
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: b.data.id, squad: '防守一-1', state: 'PLAY' });
+
+        const d = await api.player.detail(a.data.id);
+        if (!d.ok) throw new Error('取详情失败: ' + d.error);
+        const t = d.data.totals;
+        steps.push('场次=' + t.matches + ' 上场=' + t.plays + ' 已填战报=' + t.statFilled);
+        steps.push('有效击杀=' + t.effKills + '（应 20+2+10+1=33）');
+        steps.push('有效人伤=' + t.effDmg + '（应 1500+800=2300）');
+        steps.push('有效塔伤=' + t.effTower + '（应 400+100=500）');
+        steps.push('助攻=' + t.assists + ' 重伤=' + t.deaths + ' 承伤=' + t.taken);
+        steps.push('逐场条数=' + d.data.matches.length + ' 首条=' + d.data.matches[0].matchLabel
+          + ' 职业=' + d.data.matches[0].classUsed + ' 状态=' + d.data.matches[0].state);
+        steps.push('雷达维度=' + d.data.radar.map(r => r.label + ':' + r.ratio.toFixed(2)).join(' '));
+        const kb = d.data.radar.find(r => r.key === 'kill');
+        const kd = d.data.radar.find(r => r.key === 'dmg');
+        steps.push('球队人均 有效击杀=' + d.data.teamAverage.effKills.toFixed(2)
+          + ' 有效人伤=' + d.data.teamAverage.effDmg.toFixed(2));
+
+        // 乙：第二场没填战报，plays=2 但 statFilled=1
+        const d2 = await api.player.detail(b.data.id);
+        steps.push('乙 上场=' + (d2.ok ? d2.data.totals.plays : '?')
+          + ' 已填战报=' + (d2.ok ? d2.data.totals.statFilled : '?') + '（应 2 / 1）');
+
+        // 页面渲染：进成员主档 → 点「详情」
+        const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.includes('成员主档'));
+        nav.click();
+        const btn = await waitFor(() => [...document.querySelectorAll('table.grid button')]
+          .find(x => x.textContent.trim() === '详情'), '「详情」按钮');
+        btn.click();
+        const radar = await waitFor(() => document.querySelector('svg.radar'), '雷达图');
+        const polygons = radar.querySelectorAll('polygon').length;
+        const labels = [...radar.querySelectorAll('text')].map(e => e.textContent);
+        const rows = document.querySelectorAll('table.grid tbody tr').length;
+        steps.push('雷达多边形=' + polygons + '（个人 + 基准圈 = 2）标签=' + labels.join('/'));
+        steps.push('雷达下方对比表行数=' + rows);
+        const back = [...document.querySelectorAll('button')].find(x => x.textContent.includes('← 成员主档'));
+        if (back) back.click();
+        await waitFor(() => document.querySelector('button') && !document.querySelector('svg.radar') ? true : null, '返回主档');
+
+        for (const id of made.matches) await api.match.remove(id);
+        for (const id of made.players) await api.player.remove(id);
+
+        const ok = t.matches === 2 && t.plays === 2 && t.statFilled === 2
+          && t.effKills === 33 && t.effDmg === 2300 && t.effTower === 500
+          && t.assists === 50 && t.deaths === 3 && t.taken === 1200
+          && d.data.matches[0].matchLabel.includes('2026-05-08')
+          && kb && kd && Math.abs(kb.self - 16.5) < 0.001 && Math.abs(kd.self - 1150) < 0.001
+          && d2.ok && d2.data.totals.plays === 2 && d2.data.totals.statFilled === 1
+          && polygons === 2 && labels.length >= 6;
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of detail.steps) console.log('[smoke] 详情:', s);
+    console.log('[smoke] 成员详情页        :', detail.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -683,7 +768,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
-      && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true && iconOk;
+      && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
+      && detail.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

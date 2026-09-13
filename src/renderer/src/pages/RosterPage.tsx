@@ -8,6 +8,8 @@ import { parseTableText, toCsv } from '../lib/importer';
 
 interface Props extends PageProps {
   onCount: (n: number) => void;
+  /** 打开成员详情 */
+  onOpenDetail: (playerId: number) => void;
 }
 
 interface Draft {
@@ -29,7 +31,7 @@ const EMPTY_DRAFT: Draft = {
 
 const STATUS_LABEL: Record<string, string> = { active: '在队', inactive: '暂离', left: '离队' };
 
-export default function RosterPage({ classes, classMap, onCount }: Props) {
+export default function RosterPage({ classes, classMap, onCount, onOpenDetail }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -365,7 +367,14 @@ export default function RosterPage({ classes, classMap, onCount }: Props) {
                     ) : (
                       <>
                         <td>{p.gameId}</td>
-                        <td>{p.name}</td>
+                        <td>
+                          <span className="roster-name-link" role="button" tabIndex={0}
+                                title="查看个人详情"
+                                onClick={() => onOpenDetail(p.id)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') onOpenDetail(p.id); }}>
+                            {p.name}
+                          </span>
+                        </td>
                         <td><ClassChip name={p.mainClass} classMap={classMap} /></td>
                         <td>{p.subClass ? <ClassChip name={p.subClass} classMap={classMap} /> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                         <td><span className="badge-mic">{p.mic || '—'}</span></td>
@@ -374,6 +383,7 @@ export default function RosterPage({ classes, classMap, onCount }: Props) {
                         <td style={{ color: 'var(--text-dim)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.remark || '—'}</td>
                         <td className="actions">
                           <div className="row-edit" style={{ justifyContent: 'flex-end' }}>
+                            <button className="btn sm" onClick={() => onOpenDetail(p.id)}>详情</button>
                             <button className="btn sm" onClick={() => startEdit(p)}>编辑</button>
                             <button className="btn sm danger" onClick={() => void handleRemove(p)}>删除</button>
                           </div>

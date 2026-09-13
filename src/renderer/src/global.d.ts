@@ -1,7 +1,8 @@
 import type {
   AppInfo, AssignInput, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput,
-  ParticipationRow, Player, PlayerInput, Match, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
+  ParticipationRow, Player, PlayerDetail, PlayerInput, Match, SheetGrid, SheetList,
+  SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 declare global {
@@ -16,6 +17,7 @@ declare global {
         remove(id: number): Promise<IpcResult<true>>;
         import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number; errors: string[] }>>;
         export(): Promise<IpcResult<PlayerInput[]>>;
+        detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
       };
       meta: {
         classes(): Promise<IpcResult<ClassInfo[]>>;

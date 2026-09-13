@@ -327,6 +327,77 @@ export interface MatchRowStat {
   statFilled: number;
 }
 
+// ── 成员详情（个人历史，不含评分算法） ───────────────────────────
+/** 个人在某一场的汇总（含原表口径的有效值） */
+export interface PlayerMatchRow {
+  matchId: number;
+  date: string;
+  indexInDay: number;
+  matchLabel: string;
+  ourSide: string;
+  oppSide: string;
+  result: string;
+  squad: string;
+  tactic: string;
+  classUsed: string;
+  state: PartState;
+  /** 是否有战报 */
+  statFilled: boolean;
+  /** 原表「击败/清泉」拆开后的合计（= 有效击杀） */
+  effKills: number;
+  assists: number;
+  /** 有效人伤 = 对玩家伤害 + 人伤卸甲 */
+  effDmg: number;
+  /** 有效塔伤 = 对建筑伤害 + 破塔卸甲 */
+  effTower: number;
+  healing: number;
+  taken: number;
+  deaths: number;
+  revives: number;
+  fountain: number;
+  bone: number;
+}
+
+/** 六维对比数据：个人 vs 球队人均 */
+export interface RadarAxis {
+  key: string;
+  label: string;
+  self: number;
+  teamAvg: number;
+  /** 归一化后的比例（self/teamAvg，1 表示持平），上限由 UI 处理 */
+  ratio: number;
+}
+
+export interface PlayerTotals {
+  matches: number;
+  plays: number;
+  benches: number;
+  leaves: number;
+  statFilled: number;
+  effKills: number;
+  assists: number;
+  effDmg: number;
+  effTower: number;
+  healing: number;
+  taken: number;
+  deaths: number;
+  revives: number;
+}
+
+export interface PlayerDetail {
+  player: Player;
+  totals: PlayerTotals;
+  /** 按日期倒序 */
+  matches: PlayerMatchRow[];
+  /** 六维雷达（仅在本人与球队都有数据时有意义） */
+  radar: RadarAxis[];
+  /** 球队基准：所有我方上场记录的人均值 */
+  teamAverage: {
+    effKills: number; assists: number; effDmg: number;
+    effTower: number; healing: number; taken: number; deaths: number;
+  };
+}
+
 export interface DashboardData {
   totals: {
     matches: number;
@@ -381,6 +452,8 @@ export interface OmniaApi {
     remove(id: number): Promise<IpcResult<true>>;
     import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number }>>;
     export(): Promise<IpcResult<PlayerInput[]>>;
+    /** 个人详情（历史 + 汇总 + 雷达） */
+    detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
   };
   meta: {
     classes(): Promise<IpcResult<ClassInfo[]>>;
@@ -425,6 +498,7 @@ export const IPC = {
   playerRemove: 'player:remove',
   playerImport: 'player:import',
   playerExport: 'player:export',
+  playerDetail: 'player:detail',
   metaClasses: 'meta:classes',
   metaSettings: 'meta:settings',
   metaSquads: 'meta:squads',

@@ -7,10 +7,21 @@
  */
 import type { SqlDatabase } from '../db';
 import type {
-  AttendanceRow, DashboardData, MatchRowStat,
+  AttendanceRow, DashboardData, MatchRowStat, PlayerDetail, PlayerMatchRow, RadarAxis,
 } from '../../shared/types';
+import { EMPTY_COMBAT_STAT, deriveEffective } from '../../shared/domain';
 
 export type { AttendanceRow, DashboardData, MatchRowStat };
+
+/** 雷达图的六个维度：取"能体现个人职责"的项，T/治疗也各有关注点 */
+const RADAR_DEF: { key: string; label: string; pick: (m: PlayerMatchRow) => number }[] = [
+  { key: 'kill', label: '有效击杀', pick: (m) => m.effKills },
+  { key: 'dmg', label: '有效人伤', pick: (m) => m.effDmg },
+  { key: 'tower', label: '有效塔伤', pick: (m) => m.effTower },
+  { key: 'assist', label: '助攻', pick: (m) => m.assists },
+  { key: 'heal', label: '治疗量', pick: (m) => m.healing },
+  { key: 'taken', label: '承伤', pick: (m) => m.taken },
+];
 
 const METRIC_LABELS: { key: string; label: string }[] = [
   { key: 'kills', label: '击败' },
@@ -30,6 +41,176 @@ const METRIC_LABELS: { key: string; label: string }[] = [
 
 export class DashboardRepo {
   constructor(private db: SqlDatabase) {}
+
+  /**
+   * 个人详情：逐场记录 + 汇总 + 六维雷达（对比球队人均）。
+   * 只统计「我方 + 上场」的记录；未填战报的场次计入出勤但不计入数值汇总。
+   */
+  playerDetail(playerId: number): PlayerDetail {
+    const pl = this.db.prepare('SELECT * FROM player WHERE id = ?').get(playerId) as unknown as {
+      id: number; game_id: string; name: string; joined_order: number | null;
+      mic: string; note_role: string; main_class: string; sub_class: string;
+      status: string; remark: string; created_at: string; updated_at: string;
+    } | undefined;
+    if (!pl) throw new Error(`成员不存在：id=${playerId}`);
+
+    const raw = this.db.prepare(`
+      SELECT m.id AS match_id, m.date, m.index_in_day, m.our_side, m.opp_side, m.result,
+             p.squad, p.tactic, p.class_used, p.state,
+             CASE WHEN cs.participation_id IS NULL THEN 0 ELSE 1 END AS has_stat,
+             COALESCE(cs.kills,0) AS kills, COALESCE(cs.fountain_kills,0) AS fountain_kills,
+             COALESCE(cs.assists,0) AS assists,
+             COALESCE(cs.dmg_player,0) AS dmg_player, COALESCE(cs.dmg_player_armor,0) AS dmg_player_armor,
+             COALESCE(cs.dmg_building,0) AS dmg_building, COALESCE(cs.dmg_building_armor,0) AS dmg_building_armor,
+             COALESCE(cs.healing,0) AS healing, COALESCE(cs.damage_taken,0) AS damage_taken,
+             COALESCE(cs.deaths,0) AS deaths, COALESCE(cs.revives,0) AS revives,
+             COALESCE(cs.bone_burn,0) AS bone_burn
+      FROM participation p
+      JOIN match m ON m.id = p.match_id
+      LEFT JOIN combat_stat cs ON cs.participation_id = p.id
+      WHERE p.player_id = ? AND p.side = 'our'
+      ORDER BY m.date DESC, m.index_in_day DESC, m.id DESC
+    `).all(playerId) as unknown as {
+      match_id: number; date: string; index_in_day: number; our_side: string; opp_side: string;
+      result: string; squad: string; tactic: string; class_used: string; state: string; has_stat: number;
+      kills: number; fountain_kills: number; assists: number;
+      dmg_player: number; dmg_player_armor: number; dmg_building: number; dmg_building_armor: number;
+      healing: number; damage_taken: number; deaths: number; revives: number; bone_burn: number;
+    }[];
+
+    const rows: PlayerMatchRow[] = raw.map((r) => {
+      const eff = deriveEffective({
+        ...EMPTY_COMBAT_STAT,
+        kills: r.kills, fountainKills: r.fountain_kills, assists: r.assists,
+        dmgPlayer: r.dmg_player, dmgPlayerArmor: r.dmg_player_armor,
+        dmgBuilding: r.dmg_building, dmgBuildingArmor: r.dmg_building_armor,
+        healing: r.healing, damageTaken: r.damage_taken, deaths: r.deaths,
+        revives: r.revives, boneBurn: r.bone_burn,
+      });
+      return {
+        matchId: r.match_id,
+        date: r.date,
+        indexInDay: Number(r.index_in_day),
+        matchLabel: `${r.date} -${r.index_in_day}`,
+        ourSide: r.our_side,
+        oppSide: r.opp_side,
+        result: r.result,
+        squad: r.squad || '',
+        tactic: r.tactic || '',
+        classUsed: r.class_used || '',
+        state: (r.state || 'PLAY') as PlayerMatchRow['state'],
+        statFilled: Number(r.has_stat) === 1,
+        effKills: eff.effKills,
+        assists: eff.assist,
+        effDmg: eff.effDmg,
+        effTower: eff.effTower,
+        healing: eff.heal,
+        taken: eff.taken,
+        deaths: eff.death,
+        revives: eff.revive,
+        fountain: eff.fountain,
+        bone: eff.bone,
+      };
+    });
+
+    // 球队人均基准：所有我方上场记录（含未填战报的 0）的人均值
+    const team = this.db.prepare(`
+      SELECT COUNT(*) AS n,
+             AVG(COALESCE(cs.kills,0) + COALESCE(cs.fountain_kills,0)) AS eff_kills,
+             AVG(COALESCE(cs.assists,0)) AS assists,
+             AVG(COALESCE(cs.dmg_player,0) + COALESCE(cs.dmg_player_armor,0)) AS eff_dmg,
+             AVG(COALESCE(cs.dmg_building,0) + COALESCE(cs.dmg_building_armor,0)) AS eff_tower,
+             AVG(COALESCE(cs.healing,0)) AS healing,
+             AVG(COALESCE(cs.damage_taken,0)) AS taken,
+             AVG(COALESCE(cs.deaths,0)) AS deaths
+      FROM participation p LEFT JOIN combat_stat cs ON cs.participation_id = p.id
+      WHERE p.side = 'our' AND p.state = 'PLAY'
+    `).get() as unknown as {
+      n: number; eff_kills: number | null; assists: number | null; eff_dmg: number | null;
+      eff_tower: number | null; healing: number | null; taken: number | null; deaths: number | null;
+    };
+    const num = (v: number | null): number => (v === null || !Number.isFinite(v) ? 0 : Number(v));
+    const teamAverage = {
+      effKills: num(team.eff_kills),
+      assists: num(team.assists),
+      effDmg: num(team.eff_dmg),
+      effTower: num(team.eff_tower),
+      healing: num(team.healing),
+      taken: num(team.taken),
+      deaths: num(team.deaths),
+    };
+
+    const filled = rows.filter((r) => r.state === 'PLAY' && r.statFilled);
+    const sum = (pick: (m: PlayerMatchRow) => number): number =>
+      filled.reduce((n, m) => n + pick(m), 0);
+
+    const totals = {
+      matches: rows.length,
+      plays: rows.filter((r) => r.state === 'PLAY').length,
+      benches: rows.filter((r) => r.state === 'BENCH').length,
+      leaves: rows.filter((r) => r.state === 'LEAVE').length,
+      statFilled: filled.length,
+      effKills: sum((m) => m.effKills),
+      assists: sum((m) => m.assists),
+      effDmg: sum((m) => m.effDmg),
+      effTower: sum((m) => m.effTower),
+      healing: sum((m) => m.healing),
+      taken: sum((m) => m.taken),
+      deaths: sum((m) => m.deaths),
+      revives: sum((m) => m.revives),
+    };
+
+    // 雷达用「本人均值 vs 球队均值」，避免场次多的人被总量拉高
+    const n = Math.max(1, filled.length);
+    const selfAvg: Record<string, number> = {
+      kill: totals.effKills / n,
+      dmg: totals.effDmg / n,
+      tower: totals.effTower / n,
+      assist: totals.assists / n,
+      heal: totals.healing / n,
+      taken: totals.taken / n,
+    };
+    const teamAvg: Record<string, number> = {
+      kill: teamAverage.effKills,
+      dmg: teamAverage.effDmg,
+      tower: teamAverage.effTower,
+      assist: teamAverage.assists,
+      heal: teamAverage.healing,
+      taken: teamAverage.taken,
+    };
+    const radar: RadarAxis[] = RADAR_DEF.map((d) => {
+      const self = selfAvg[d.key] ?? 0;
+      const base = teamAvg[d.key] ?? 0;
+      return {
+        key: d.key,
+        label: d.label,
+        self,
+        teamAvg: base,
+        ratio: base > 0 ? self / base : 0,
+      };
+    });
+
+    return {
+      player: {
+        id: pl.id,
+        gameId: pl.game_id,
+        name: pl.name,
+        joinedOrder: pl.joined_order,
+        mic: (pl.mic || '') as PlayerDetail['player']['mic'],
+        noteRole: (pl.note_role || '') as PlayerDetail['player']['noteRole'],
+        mainClass: pl.main_class || '',
+        subClass: pl.sub_class || '',
+        status: pl.status || 'active',
+        remark: pl.remark || '',
+        createdAt: pl.created_at,
+        updatedAt: pl.updated_at,
+      },
+      totals,
+      matches: rows,
+      radar,
+      teamAverage,
+    };
+  }
 
   load(): DashboardData {
     const sc = (sql: string, ...args: (string | number)[]): number => {

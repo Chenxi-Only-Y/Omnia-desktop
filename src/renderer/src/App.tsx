@@ -5,6 +5,7 @@ import RosterPage from './pages/RosterPage';
 import OverviewPage from './pages/OverviewPage';
 import MatchPage from './pages/MatchPage';
 import BoardPage from './pages/BoardPage';
+import PlayerDetailPage from './pages/PlayerDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
@@ -31,6 +32,8 @@ export default function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [playerCount, setPlayerCount] = useState<number | null>(null);
+  /** 在成员主档里点开的成员详情 */
+  const [detailId, setDetailId] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -97,7 +100,11 @@ export default function App() {
               onGo={setPage}
             />
           )}
-          {page === 'roster' && <RosterPage {...props} onCount={setPlayerCount} />}
+          {page === 'roster' && (
+            detailId === null
+              ? <RosterPage {...props} onCount={setPlayerCount} onOpenDetail={setDetailId} />
+              : <PlayerDetailPage {...props} playerId={detailId} onBack={() => setDetailId(null)} />
+          )}
           {page === 'match' && <MatchPage {...props} />}
           {page === 'board' && <BoardPage {...props} />}
           {page === 'rules' && (

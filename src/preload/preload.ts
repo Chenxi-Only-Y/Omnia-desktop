@@ -25,6 +25,7 @@ const api = {
     remove: (id: number) => invoke('player:remove', id),
     import: (rows: PlayerInput[]) => invoke('player:import', rows),
     export: () => invoke('player:export'),
+    detail: (playerId: number) => invoke('player:detail', playerId),
   },
   meta: {
     classes: () => invoke('meta:classes'),

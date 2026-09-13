@@ -117,8 +117,10 @@ lis-desktop/
 | **M8 职业图标** | ✅ 11 个图标接入界面（惊鸿缺素材） |
 | **设置页** | ✅ 战斗组与小队增删（组下有小队时禁止删组）、建制容量、数据库路径 |
 | **成员详情页** | ✅ 个人汇总（上场/替补/请假、战报完整度、有效击杀/人伤/塔伤、治疗/承伤、重伤/复活）、**六维雷达**（个人场均 vs 球队人均，虚线基准圈=1.0）、逐场趋势柱、逐场明细 |
+| **报名 / 请假** | ✅ 报名与上场名单分离（意愿 vs 排表结果，允许不一致）、逐人标记参加/替补/请假/撤回、未报名清单与批量标参加、一键按报名更新上场名单 |
 | M7 与旧 xlsx 互通 | ✅ **xlsx 直读/直写 + 应用内导入向导**（自写 OOXML 解析，无第三方依赖）；成员与战报都能直接选旧表文件导入 |
 | M1/M4 评分引擎与规则中心 | ⬜ **算法由用户后续决定**；`ScoreEngine` 接口与 `rule_set` 表已预留 |
+| 打包发布 | ✅ NSIS 安装包（88.8MB）已产出，**打包后 9 项自检全 PASS**（asar + `node:sqlite` + 图标资源） |
 | 首页主视觉 | 🔶 用户要求「大图/立绘为主视觉」；原表首页大图实测为空图，现用渐变+品牌字+职业图标阵占位，拿到立绘后填 `HERO_IMAGE` 即切换 |
 
 ### 建制结构（用户口径，非猜测）
@@ -158,6 +160,32 @@ npm run smoke
 > **实测事实（重要）**：旧表的「信息数据库」**不含职业列**（D 列 79 行全空），
 > 职业信息只存在于「数据导入」战报表。因此从该表导入成员后主职业为空是**预期行为**，
 > 需要靠战报导入或手工补齐。成员表实际可用列：C 角色ID(79) / I 麦(73) / L 备注角色(11)。
+
+---
+
+## 打包与安装验证
+
+```powershell
+npm run dist          # 出 NSIS 安装包 → release/Omnia-Setup-<version>.exe
+npm run dist:dir      # 只出免安装目录 → release/win-unpacked/
+```
+
+打包后**必须再跑一次自检**（验证 asar 路径、`node:sqlite` 与渲染资源）：
+
+```powershell
+$env:OMNIA_SMOKE='1'
+$env:OMNIA_DB_PATH="$PWD\dev-data\packaged.db"
+$env:OMNIA_SMOKE_LOG="$PWD\dev-data\packaged-smoke.log"
+& 'release\win-unpacked\万象Omnia.exe' -Wait
+Get-Content .\dev-data\packaged-smoke.log
+```
+
+> 打包后的 Windows 程序没有控制台，stdout 拿不到日志，所以自检会把全部输出写进
+> `OMNIA_SMOKE_LOG`（默认 `<数据库同目录>/omnia-smoke.log`）。
+> 仓库里留了一份历次通过的证据：`docs/packaged-smoke.log`。
+
+实测结论（0.1.0）：安装包 88.8MB；打包后 9 项自检全 PASS；
+`M8 图标 base = .../app.asar/dist/renderer/` 说明资源与内置 `node:sqlite` 在打包环境下均正常。
 
 ### xlsx 模块自测
 

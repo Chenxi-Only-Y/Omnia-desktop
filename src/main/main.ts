@@ -91,9 +91,30 @@ function bootDatabase(): boolean {
 /**
  * 自检模式（OMNIA_SMOKE=1）：渲染层真正加载后，让它把 renderer→preload→IPC→SQLite
  * 整条链路的探针结果写回主进程并打印，然后退出。
- * 这样在没有人盯着窗口时，也能验证整条链路是否真的通。
+ *
+ * 打包后的 Windows 程序没有控制台，stdout 拿不到；因此同时把全部日志写进
+ * <DB 同目录>/omnia-smoke.log，这样安装后的程序也能被验证与排障。
  */
+function makeLogger(): (...args: unknown[]) => void {
+  const explicit = env('OMNIA_SMOKE_LOG');
+  const lines: string[] = [];
+  const flush = () => {
+    try {
+      const target = explicit || path.join(path.dirname(dbFile()), 'omnia-smoke.log');
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, lines.join('\n') + '\n', 'utf8');
+    } catch { /* 写不了就算了，不影响自检结论 */ }
+  };
+  return (...args: unknown[]) => {
+    const line = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+    lines.push(line);
+    console.log(...args);
+    flush();
+  };
+}
+
 async function runSmokeTest(win: BrowserWindow): Promise<void> {
+  const log = makeLogger();
   const probe = async (): Promise<{ preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null }> => {
     const w = win.webContents;
     const has = await w.executeJavaScript('typeof window.omnia === "object" && window.omnia !== null');
@@ -150,13 +171,13 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
 
-    console.log('[smoke] preload 注入        :', r.preload);
-    console.log('[smoke] app.info()         :', r.appInfo);
-    console.log('[smoke] meta.classes() 数量 :', r.classes);
-    console.log('[smoke] player.list() 数量  :', r.players);
-    console.log('[smoke] React 已渲染字符数  :', rootHtml);
-    console.log('[smoke] 错误                :', r.error ?? '无');
-    for (const s of crud.steps) console.log('[smoke] CRUD:', s);
+    log('[smoke] preload 注入        :', r.preload);
+    log('[smoke] app.info()         :', r.appInfo);
+    log('[smoke] meta.classes() 数量 :', r.classes);
+    log('[smoke] player.list() 数量  :', r.players);
+    log('[smoke] React 已渲染字符数  :', rootHtml);
+    log('[smoke] 错误                :', r.error ?? '无');
+    for (const s of crud.steps) log('[smoke] CRUD:', s);
 
     // M3：对局 → 阵容 → 战报粘贴导入 → 校验 → 入库 → 读回
     const m3 = await win.webContents.executeJavaScript(`(async () => {
@@ -238,8 +259,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
 
-    for (const s of m3.steps) console.log('[smoke] M3:', s);
-    console.log('[smoke] M3 对局与战报      :', m3.ok ? 'PASS' : 'FAIL');
+    for (const s of m3.steps) log('[smoke] M3:', s);
+    log('[smoke] M3 对局与战报      :', m3.ok ? 'PASS' : 'FAIL');
 
     // M5：战斗组/小队建制（数据驱动）+ 排表看板渲染
     const m5 = await win.webContents.executeJavaScript(`(async () => {
@@ -322,8 +343,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && blocks === 12 && hasTarget;        return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
-    for (const s of m5.steps) console.log('[smoke] M5:', s);
-    console.log('[smoke] M5 建制与看板      :', m5.ok ? 'PASS' : 'FAIL');
+    for (const s of m5.steps) log('[smoke] M5:', s);
+    log('[smoke] M5 建制与看板      :', m5.ok ? 'PASS' : 'FAIL');
 
     // M6：看板统计 + 首页主视觉渲染
     const m6 = await win.webContents.executeJavaScript(`(async () => {
@@ -405,8 +426,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
-    for (const s of m6.steps) console.log('[smoke] M6:', s);
-    console.log('[smoke] M6 看板与首页      :', m6.ok ? 'PASS' : 'FAIL');
+    for (const s of m6.steps) log('[smoke] M6:', s);
+    log('[smoke] M6 看板与首页      :', m6.ok ? 'PASS' : 'FAIL');
 
     // M7：用真实旧表验证「列工作表 → 探测表头 → 网格 → TSV → 解析」
     // 走编译产物的核心函数（与 IPC 处理函数同一套逻辑），轻量且确定性；
@@ -499,10 +520,10 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('ERR ' + (err instanceof Error ? err.message : String(err)));
       }
       m7 = { ok, steps };
-      for (const s of m7.steps) console.log('[smoke] M7:', s);
-      console.log('[smoke] M7 真实旧表导入    :', m7.ok ? 'PASS' : 'FAIL');
+      for (const s of m7.steps) log('[smoke] M7:', s);
+      log('[smoke] M7 真实旧表导入    :', m7.ok ? 'PASS' : 'FAIL');
     } else {
-      console.log('[smoke] M7 真实旧表导入    : SKIP（未提供样本，设 OMNIA_SAMPLE_XLSX 指向旧表即可验证）');
+      log('[smoke] M7 真实旧表导入    : SKIP（未提供样本，设 OMNIA_SAMPLE_XLSX 指向旧表即可验证）');
     }
 
     // 导入向导的界面接线：切到成员主档点「从 xlsx 导入」，确认弹窗出来了
@@ -535,8 +556,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         return { ok: title.includes('导入成员主档') && hasFileBtn && hasHint && closed, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
-    for (const s of wizard.steps) console.log('[smoke] 向导:', s);
-    console.log('[smoke] 导入向导界面接线  :', wizard.ok ? 'PASS' : 'FAIL');
+    for (const s of wizard.steps) log('[smoke] 向导:', s);
+    log('[smoke] 导入向导界面接线  :', wizard.ok ? 'PASS' : 'FAIL');
 
     // 拖拽排表：用原生拖拽事件驱动看板，验证队员真的换了小队
     const dnd = await win.webContents.executeJavaScript(`(async () => {
@@ -648,8 +669,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
-    for (const s of dnd.steps) console.log('[smoke] 拖拽:', s);
-    console.log('[smoke] 看板拖拽排表      :', dnd.ok ? 'PASS' : 'FAIL');
+    for (const s of dnd.steps) log('[smoke] 拖拽:', s);
+    log('[smoke] 看板拖拽排表      :', dnd.ok ? 'PASS' : 'FAIL');
 
     // 成员详情：个人汇总 / 雷达对比 / 页面渲染
     const detail = await win.webContents.executeJavaScript(`(async () => {
@@ -733,8 +754,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
-    for (const s of detail.steps) console.log('[smoke] 详情:', s);
-    console.log('[smoke] 成员详情页        :', detail.ok ? 'PASS' : 'FAIL');
+    for (const s of detail.steps) log('[smoke] 详情:', s);
+    log('[smoke] 成员详情页        :', detail.ok ? 'PASS' : 'FAIL');
 
     // 报名 / 请假：标记 → 应用上场名单 → 校验状态流转
     const signup = await win.webContents.executeJavaScript(`(async () => {
@@ -841,8 +862,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`);
-    for (const s of signup.steps) console.log('[smoke] 报名:', s);
-    console.log('[smoke] 报名与请假        :', signup.ok ? 'PASS' : 'FAIL');
+    for (const s of signup.steps) log('[smoke] 报名:', s);
+    log('[smoke] 报名与请假        :', signup.ok ? 'PASS' : 'FAIL');
 
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
@@ -868,18 +889,18 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       return { base, results, dom: chipIcons, firstSrc };
     })()`);
     const iconOk = icons.results.every((x: { ok: boolean }) => x.ok) && icons.dom > 0;
-    console.log('[smoke] M8 图标 base       :', icons.base);
-    console.log('[smoke] M8 图标加载        :', iconOk ? 'PASS' : 'FAIL',
+    log('[smoke] M8 图标 base       :', icons.base);
+    log('[smoke] M8 图标加载        :', iconOk ? 'PASS' : 'FAIL',
       icons.results.map((x: { file: string; ok: boolean; w: number }) => `${x.file}:${x.ok ? x.w + 'px' : '失败'}`).join(' '));
-    console.log('[smoke] M8 页面渲染图标    :', icons.dom, '个，首个 src =', icons.firstSrc);
+    log('[smoke] M8 页面渲染图标    :', icons.dom, '个，首个 src =', icons.firstSrc);
 
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && iconOk;
-    console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
-    console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
+    log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
+    log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);
   });
 }
@@ -923,3 +944,4 @@ if (!app.requestSingleInstanceLock()) {
     dbHandle = null;
   });
 }
+

@@ -102,8 +102,7 @@ export interface ParticipationInput {
   stat?: Partial<CombatStat>;
 }
 
-/** 一次把多个队员放进指定小队（拖拽落点/多人调整用，单事务） */
-export interface AssignInput {
+/** 一次把多个队员放进指定小队（拖拽落点/多人调整用，单事务） */export interface AssignInput {
   matchId: number;
   playerIds: number[];
   squad: string;
@@ -297,6 +296,58 @@ export interface SheetGrid {
   previewBeforeHeader: { row: number; cells: string[] }[];
   totalRows: number;
 }
+/** 报名/请假模块（M7 旧表这块是 WPS 表单，已失效，这里做本地替代） */
+export type SignupStatus = 'JOIN' | 'LEAVE' | 'BENCH' | 'NONE';
+
+export const SIGNUP_LABEL: Record<SignupStatus, string> = {
+  JOIN: '参加', LEAVE: '请假', BENCH: '替补', NONE: '未报名',
+};
+
+export interface SignupRow {
+  playerId: number;
+  gameId: string;
+  name: string;
+  mainClass: string;
+  noteRole: string;
+  mic: Player['mic'];
+  status: Player['status'];
+  /** 入帮序，用于排序 */
+  joinedOrder: number | null;
+  /** 本场报名状态；null = 还没报名 */
+  signup: SignupStatus | null;
+  /** 报名提交时间 */
+  signupAt: string;
+  signupRemark: string;
+  /** 本场上场名单里的状态（与报名区分：报名是意愿，上场是排表结果） */
+  lineupState: PartState | null;
+  squad: string;
+}
+
+export interface SignupBoard {
+  matchId: number;
+  rows: SignupRow[];
+  stats: SignupStats;
+}
+
+export interface SignupStats {
+  /** 成员总数（作为应报名基数参考） */
+  roster: number;
+  joined: number;
+  leave: number;
+  bench: number;
+  none: number;
+  /** 在队且未报名的成员（需要提醒的人） */
+  pending: number;
+}
+
+export interface SignupInput {
+  matchId: number;
+  playerId: number;
+  /** JOIN=参加 / LEAVE=请假 / BENCH=替补 / NONE=清除报名 */
+  status: SignupStatus;
+  remark?: string;
+}
+
 // ── 数据看板（M6，先做不依赖评分算法的部分） ─────────────────────
 export interface AttendanceRow {
   playerId: number;
@@ -488,6 +539,14 @@ export interface OmniaApi {
   dashboard: {
     data(): Promise<IpcResult<DashboardData>>;
   };
+  signup: {
+    /** 某场的报名面板（含未报名的人） */
+    board(matchId: number): Promise<IpcResult<SignupBoard>>;
+    /** 设置某人的报名状态 */
+    set(input: SignupInput): Promise<IpcResult<SignupRow>>;
+    /** 把报名结果应用到上场名单（参加→上场、请假→请假、替补→替补） */
+    apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
+  };
 }
 
 export const IPC = {
@@ -519,6 +578,11 @@ export const IPC = {
   matchParticipationUpsert: 'match:participation:upsert',
   matchAssignBulk: 'match:assign:bulk',
   matchUnassign: 'match:unassign',
+
+  // 报名 / 请假
+  signupBoard: 'signup:board',
+  signupSet: 'signup:set',
+  signupApply: 'signup:apply',
   matchParticipationRemove: 'match:participation:remove',
   matchStatSave: 'match:stat:save',
   matchImportPreview: 'match:import:preview',

@@ -9,6 +9,7 @@ import LineupBoard from '../components/LineupBoard';
 import CellPicker from '../components/CellPicker';
 import AddPlayerPicker from '../components/AddPlayerPicker';
 import StatImportPanel from '../components/StatImportPanel';
+import SignupPage from './SignupPage';
 import {
   BENCH_SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
 } from '@shared/domain';
@@ -19,7 +20,7 @@ interface Props extends PageProps {
   onChanged: () => void;
 }
 
-type TabKey = 'lineup' | 'stats' | 'import';
+type TabKey = 'lineup' | 'stats' | 'import' | 'signup';
 
 /** 小队下拉选项来自建制（组件内用 catalog 计算） */
 
@@ -264,7 +265,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       </div>
 
       <div className="tabs">
-        {([['lineup', `阵容编排（${stats.assigned}/60）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['import', '批量导入战报']] as const)
+        {([['lineup', `阵容编排（${stats.assigned}/60）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['signup', '报名 / 请假'], ['import', '批量导入战报']] as const)
           .map(([k, label]) => (
             <button key={k} className={`tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{label}</button>
           ))}
@@ -467,6 +468,17 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
             数字留空按 0 处理。提示：原表里「击败/清泉」是复合列，这里已拆成两列 —— 治疗职业的「击败」若不为 0，多半是把清泉填错了位置。
           </div>
         </div>
+      )}
+
+      {tab === 'signup' && (
+        <SignupPage
+          classes={classes}
+          classMap={classMap}
+          matchId={matchId}
+          matchLabel={match ? `${match.date} 第 ${match.indexInDay} 场` : ''}
+          onBack={() => setTab('lineup')}
+          onChanged={() => { void load(); onChanged(); }}
+        />
       )}
 
       {tab === 'import' && (

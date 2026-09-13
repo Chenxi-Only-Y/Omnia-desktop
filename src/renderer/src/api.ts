@@ -6,7 +6,7 @@ import type {
   AppInfo, AssignInput, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, SheetGrid, SheetList,
-  SquadCatalog, SquadInput, SquadRow,
+  SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -84,5 +84,12 @@ export const api = {
 
   dashboard: {
     data: (): Promise<DashboardData> => unwrap(bridge().dashboard.data()),
+  },
+
+  signup: {
+    board: (matchId: number): Promise<SignupBoard> => unwrap(bridge().signup.board(matchId)),
+    set: (input: SignupInput): Promise<SignupRow> => unwrap(bridge().signup.set(input)),
+    apply: (matchId: number, playerIds: number[]): Promise<{ applied: number }> =>
+      unwrap(bridge().signup.apply(matchId, playerIds)),
   },
 };

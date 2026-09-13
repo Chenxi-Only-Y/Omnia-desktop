@@ -2,7 +2,7 @@ import type {
   AppInfo, AssignInput, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, Match, SheetGrid, SheetList,
-  SquadCatalog, SquadInput, SquadRow,
+  SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 declare global {
@@ -47,6 +47,11 @@ declare global {
       };
       shell: { openExternal(url: string): Promise<IpcResult<true>> };
       dashboard: { data(): Promise<IpcResult<DashboardData>> };
+      signup: {
+        board(matchId: number): Promise<IpcResult<SignupBoard>>;
+        set(input: SignupInput): Promise<IpcResult<SignupRow>>;
+        apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
+      };
       channels: Record<string, string>;
     };
   }

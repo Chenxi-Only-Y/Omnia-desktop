@@ -7,7 +7,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC, type AssignInput, type CombatStat, type GroupInput, type ImportPreview, type IpcResult,
-  type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type SquadInput,
+  type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type SignupInput,
+  type SquadInput,
 } from '../shared/types';
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
@@ -62,6 +63,11 @@ const api = {
   },
   dashboard: {
     data: () => invoke('dashboard:data'),
+  },
+  signup: {
+    board: (matchId: number) => invoke('signup:board', matchId),
+    set: (input: SignupInput) => invoke('signup:set', input),
+    apply: (matchId: number, playerIds: number[]) => invoke('signup:apply', matchId, playerIds),
   },
   /** 通道常量透出，便于渲染层调试时核对 */
   channels: IPC,

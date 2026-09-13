@@ -736,6 +736,114 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of detail.steps) console.log('[smoke] 详情:', s);
     console.log('[smoke] 成员详情页        :', detail.ok ? 'PASS' : 'FAIL');
 
+    // 报名 / 请假：标记 → 应用上场名单 → 校验状态流转
+    const signup = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      const made = { players: [], matches: [] };
+      try {
+        const api = window.omnia;
+        const p1 = await api.player.create({ gameId: 'smoke_sg_1', name: '报名甲', mainClass: '神相', joinedOrder: 1 });
+        const p2 = await api.player.create({ gameId: 'smoke_sg_2', name: '报名乙', mainClass: '素问', joinedOrder: 2 });
+        const p3 = await api.player.create({ gameId: 'smoke_sg_3', name: '报名丙', mainClass: '铁衣', joinedOrder: 3 });
+        const p4 = await api.player.create({ gameId: 'smoke_sg_4', name: '报名丁', mainClass: '潮光', joinedOrder: 4 });
+        if (![p1,p2,p3,p4].every(r => r.ok)) throw new Error('建档失败');
+        for (const p of [p1,p2,p3,p4]) made.players.push(p.data.id);
+
+        const m = await api.match.create({ date: '2026-06-01', ourSide: '我方', oppSide: '报名队', result: 'WIN' });
+        if (!m.ok) throw new Error('建对局失败');
+        const mid = m.data.match.id;
+        made.matches.push(mid);
+
+        // 初始：全员未报名
+        let b = await api.signup.board(mid);
+        if (!b.ok) throw new Error('取报名面板失败: ' + b.error);
+        steps.push('初始 未报名=' + b.data.stats.none + ' 参加=' + b.data.stats.joined
+          + ' 在队未报名=' + b.data.stats.pending);
+
+        // 标记：甲参加、乙替补、丙请假、丁不动
+        await api.signup.set({ matchId: mid, playerId: p1.data.id, status: 'JOIN' });
+        await api.signup.set({ matchId: mid, playerId: p2.data.id, status: 'BENCH' });
+        const leaveRow = await api.signup.set({ matchId: mid, playerId: p3.data.id, status: 'LEAVE', remark: '家里有事' });
+        if (!leaveRow.ok) throw new Error('标请假失败: ' + leaveRow.error);
+        steps.push('请假记录 备注=' + leaveRow.data.signupRemark + ' 提交时间=' + (leaveRow.data.signupAt ? '有' : '无'));
+
+        b = await api.signup.board(mid);
+        steps.push('标记后 参加=' + b.data.stats.joined + ' 替补=' + b.data.stats.bench
+          + ' 请假=' + b.data.stats.leave + ' 未报名=' + b.data.stats.none);
+        const dRow = b.data.rows.find(r => r.name === '报名丁');
+        steps.push('丁 报名=' + dRow.signup + ' 上场名单=' + dRow.lineupState);
+
+        // 撤回请假改回参加后，取最新一次面板作为断言依据（避免用过期快照）
+        await api.signup.set({ matchId: mid, playerId: p3.data.id, status: 'JOIN' });
+        const boardNow = await api.signup.board(mid);
+        if (!boardNow.ok) throw new Error('取最新面板失败');
+        steps.push('最终报名统计 参加=' + boardNow.data.stats.joined
+          + ' 替补=' + boardNow.data.stats.bench
+          + ' 请假=' + boardNow.data.stats.leave
+          + ' 未报名=' + boardNow.data.stats.none);
+
+        // 应用到场名单
+        const applied = await api.signup.apply(mid, []);
+        if (!applied.ok) throw new Error('应用失败: ' + applied.error);
+        steps.push('应用条数=' + applied.data.applied);
+
+        const parts = await api.match.participations(mid);
+        const byName = Object.fromEntries(parts.data.map(p => [p.name, p.state + '/' + (p.squad || '未分配')]));
+        steps.push('应用后 甲=' + byName['报名甲'] + ' 乙=' + byName['报名乙']
+          + ' 丙=' + byName['报名丙'] + ' 丁=' + byName['报名丁']);
+
+        // 甲先排进小队，再"应用一次"应该保留小队（只有状态被拉回上场）
+        await api.match.upsertParticipation({ matchId: mid, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY' });
+        await api.signup.apply(mid, [p1.data.id]);
+        const parts2 = await api.match.participations(mid);
+        const jia = parts2.data.find(p => p.name === '报名甲');
+        steps.push('再次应用后 甲 squad=' + jia.squad + '（应保留 防守一-1）');
+
+        // 界面渲染
+        const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.includes('对局与战报'));
+        nav.click();
+        const waitFor = async (fn, label, ms = 8000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+        // 可能停在列表，也可能自动进入详情
+        const tEnter = Date.now();
+        while (Date.now() - tEnter < 6000) {
+          const btn = [...document.querySelectorAll('table.grid button')].find(x => x.textContent.trim() === '进入');
+          if (btn) { btn.click(); break; }
+          if (document.querySelector('button.tab')) break;
+          await new Promise(res => setTimeout(res, 150));
+        }
+        const tab = await waitFor(() => [...document.querySelectorAll('button.tab')]
+          .find(x => x.textContent.includes('报名')), '报名页签');
+        tab.click();
+        // 等报名表真的出现数据（只看 table 存在会太早）
+        await waitFor(() => document.querySelector('.row-edit') ? true : null, '报名行（标记按钮组）');
+        const rows = document.querySelectorAll('table.grid tbody tr').length;
+        const marks = document.querySelectorAll('table.grid .row-edit').length;
+        const title = (document.querySelector('.card h3')?.textContent ?? '');
+        steps.push('报名页 行数=' + rows + ' 每行标记按钮组=' + marks + ' 标题=' + JSON.stringify(title));
+
+        for (const id of made.matches) await api.match.remove(id);
+        for (const id of made.players) await api.player.remove(id);
+
+        // 甲 JOIN、乙 BENCH、丙 LEAVE→改回 JOIN ⇒ 参加 2 / 替补 1 / 请假 0 / 未报名 2（另含探针成员）
+        const ok = boardNow.data.stats.joined === 2 && boardNow.data.stats.bench === 1
+          && boardNow.data.stats.leave === 0 && boardNow.data.stats.none === 2
+          && dRow.signup === null && dRow.lineupState === null
+          && byName['报名甲'] === 'PLAY/未分配'
+          && byName['报名乙'] === 'BENCH/未分配'
+          && byName['报名丙'] === 'PLAY/未分配'
+          && byName['报名丁'] === undefined
+          && jia.squad === '防守一-1'
+          && rows >= 4 && marks >= 4;
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of signup.steps) console.log('[smoke] 报名:', s);
+    console.log('[smoke] 报名与请假        :', signup.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -769,7 +877,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
-      && detail.ok === true && iconOk;
+      && detail.ok === true && signup.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

@@ -301,6 +301,26 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 5,
+    name: 'signup',
+    up: (db) => {
+      // 报名/请假与"上场名单"分开：报名是意愿（参加/请假/替补/未报名），
+      // 上场名单是排表结果，两者可以不一致（人工调整后会有差异）。
+      db.exec(`
+        CREATE TABLE signup (
+          match_id    INTEGER NOT NULL REFERENCES match(id) ON DELETE CASCADE,
+          player_id   INTEGER NOT NULL REFERENCES player(id) ON DELETE CASCADE,
+          status      TEXT NOT NULL DEFAULT 'JOIN',
+          remark      TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+          updated_at  TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+          PRIMARY KEY (match_id, player_id)
+        );
+        CREATE INDEX idx_signup_match ON signup(match_id);
+      `);
+    },
+  },
 ];
 
 export interface DbHandle {

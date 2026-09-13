@@ -5,7 +5,7 @@
  */
 import { app, ipcMain, shell } from 'electron';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
-import type { MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput, SquadInput } from '../shared/types';
+import type { MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput, SquadInput, SignupInput } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import type { DbHandle } from './db';
@@ -13,6 +13,7 @@ import { PlayerRepo } from './repositories/playerRepo';
 import { MatchRepo } from './repositories/matchRepo';
 import { SquadRepo } from './repositories/squadRepo';
 import { DashboardRepo } from './repositories/dashboardRepo';
+import { SignupRepo } from './repositories/signupRepo';
 
 export interface IpcContext {
   handle: DbHandle;
@@ -40,6 +41,7 @@ export function registerIpc(ctx: IpcContext): void {
   const matches = new MatchRepo(ctx.handle.db);
   const squads = new SquadRepo(ctx.handle.db);
   const dashboard = new DashboardRepo(ctx.handle.db);
+  const signup = new SignupRepo(ctx.handle.db);
 
   const rosterEntries = (): RosterEntry[] =>
     (ctx.handle.db.prepare('SELECT id, game_id, name, main_class FROM player')
@@ -195,6 +197,13 @@ export function registerIpc(ctx: IpcContext): void {
     if (!squads.removeSquad(id)) throw new Error(`小队不存在：id=${id}`);
     return true as const;
   }));
+
+  // ── 报名 / 请假 ────────────────────────────────────────────────
+  ipcMain.handle(IPC.signupBoard, safe((matchId: number) => signup.board(matchId)));
+  ipcMain.handle(IPC.signupSet, safe((input: SignupInput) => signup.set(input)));
+  ipcMain.handle(IPC.signupApply, safe((matchId: number, playerIds: number[]) => ({
+    applied: signup.apply(matchId, playerIds),
+  })));
 
   // ── 数据看板（M6） ─────────────────────────────────────────────
   ipcMain.handle(IPC.dashboardData, safe(() => dashboard.load()));

@@ -322,6 +322,89 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of m5.steps) console.log('[smoke] M5:', s);
     console.log('[smoke] M5 建制与看板      :', m5.ok ? 'PASS' : 'FAIL');
 
+    // M6：看板统计 + 首页主视觉渲染
+    const m6 = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      const created = { players: [], matches: [] };
+      try {
+        const api = window.omnia;
+        // 造两场对局、3 名成员，其中 1 场只填一半战报，用于验证完整度统计
+        const p1 = await api.player.create({ gameId: 'smoke_dash_1', name: '统计甲', mainClass: '神相', mic: '有', joinedOrder: 1 });
+        const p2 = await api.player.create({ gameId: 'smoke_dash_2', name: '统计乙', mainClass: '素问', mic: '有', joinedOrder: 2 });
+        const p3 = await api.player.create({ gameId: 'smoke_dash_3', name: '统计丙', mainClass: '铁衣', mic: '无', joinedOrder: 3 });
+        for (const p of [p1, p2, p3]) if (p.ok) created.players.push(p.data.id);
+
+        const m1 = await api.match.create({ date: '2026-03-01', ourSide: '我方', oppSide: '甲队', result: 'WIN' });
+        const m2 = await api.match.create({ date: '2026-03-08', ourSide: '我方', oppSide: '乙队', result: 'LOSE' });
+        for (const m of [m1, m2]) if (m.ok) created.matches.push(m.data.match.id);
+
+        // 第一场：3 人上场，全部填战报
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY', stat: { kills: 20, assists: 30, dmgPlayer: 1000, deaths: 1 } });
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p2.data.id, squad: '防守一-1', state: 'PLAY', stat: { assists: 50, healing: 5000, deaths: 0 } });
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p3.data.id, squad: '防守一-1', state: 'PLAY', stat: { assists: 10, damageTaken: 9000, deaths: 4 } });
+        // 第二场：3 人上场，只填 1 人（完整度应为 1/3）
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p1.data.id, squad: '进攻一-1', state: 'PLAY', stat: { kills: 5, deaths: 2 } });
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p2.data.id, squad: '进攻一-1', state: 'PLAY' });
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p3.data.id, state: 'LEAVE' });
+
+        const d = await api.dashboard.data();
+        if (!d.ok) throw new Error('看板取数失败: ' + d.error);
+        const t = d.data.totals;
+        steps.push('总场次=' + t.matches + ' 成员=' + t.players + ' 参战记录=' + t.participations);
+        steps.push('战报完整度=' + t.statFilled + '/' + t.statSlots + ' = ' + Math.round(t.statRate * 100) + '%');
+        steps.push('场均上场=' + t.avgLineup.toFixed(2));
+        steps.push('出勤前三=' + d.data.attendance.slice(0, 3).map(a => a.name + '(' + a.plays + '/' + a.matches + ')').join(' '));
+        steps.push('职业出场=' + d.data.classPlayCount.map(c => c.name + ':' + c.plays).join(' '));
+        steps.push('小队使用=' + d.data.squadUsage.map(s => s.squad + ':' + s.plays + '[' + s.kind + ']').join(' '));
+        const cov = d.data.metricCoverage.find(m => m.key === 'healing');
+        steps.push('治疗值覆盖=' + (cov ? cov.nonZero + '/' + cov.total : 'n/a'));
+
+        // 首页主视觉渲染
+        const navHome = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('总览'));
+        if (navHome) navHome.click();
+        const waitFor = async (fn, label, ms = 6000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+        await waitFor(() => document.querySelector('.hero') ? true : null, '首页主视觉');
+        const heroBrand = document.querySelector('.hero__brand')?.textContent || '';
+        const heroClasses = document.querySelectorAll('.hero__class').length;
+        const heroButtons = document.querySelectorAll('.hero__btn').length;
+        steps.push('主视觉 品牌字=' + JSON.stringify(heroBrand) + ' 职业图标=' + heroClasses + ' 快捷按钮=' + heroButtons);
+
+        // 看板页渲染
+        const navBoard = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('数据看板'));
+        if (navBoard) navBoard.click();
+        await waitFor(() => document.querySelector('table.grid') ? true : null, '看板表格');
+        const rows = document.querySelectorAll('table.grid tbody tr').length;
+        const tabs = document.querySelectorAll('button.tab').length;
+        steps.push('看板页 行数=' + rows + ' 页签=' + tabs);
+
+        // 设置页渲染
+        const navSet = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('设置'));
+        if (navSet) navSet.click();
+        await waitFor(() => [...document.querySelectorAll('h3')].some(h => h.textContent.includes('战斗组')) ? true : null, '设置页战斗组区块');
+        const groupRows = document.querySelectorAll('table.grid tbody tr').length;
+        steps.push('设置页 战斗组表行数=' + groupRows);
+
+        // 清理
+        for (const id of created.matches) await api.match.remove(id);
+        for (const id of created.players) await api.player.remove(id);
+        const after = await api.dashboard.data();
+        steps.push('清理后场次=' + (after.ok ? after.data.totals.matches : '?') + ' 成员=' + (after.ok ? after.data.totals.players : '?'));
+
+        const ok = t.statSlots === 5 && t.statFilled === 4
+          && Math.abs(t.statRate - 4 / 5) < 1e-6
+          && d.data.classPlayCount.length >= 3
+          && d.data.squadUsage.some(s => s.squad === '防守一-1' && s.kind === 'defend')
+          && heroBrand.includes('Omnia') && heroClasses === 12 && heroButtons === 4;
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of m6.steps) console.log('[smoke] M6:', s);
+    console.log('[smoke] M6 看板与首页      :', m6.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -353,7 +436,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
-      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true && iconOk;
+      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
+      && m6.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

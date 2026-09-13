@@ -323,3 +323,101 @@ textarea.input { resize: vertical; line-height: 1.5; }
   writing-mode: vertical-rl; letter-spacing: 3px;
   color: #9aa6bd; background: #262b38 !important; font-size: 10px;
 }
+
+/* ── 出勤率条 ─────────────────────────────────────────────── */
+.ratebar {
+  display: inline-block; width: 46px; height: 5px; border-radius: 3px;
+  background: #171a22; margin-left: 6px; vertical-align: middle; overflow: hidden;
+}
+.ratebar--wide { display: block; width: 100%; height: 10px; margin-left: 0; }
+.ratebar > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+
+/* ── 弹窗（选人面板） ─────────────────────────────────────── */
+.modal {
+  position: fixed; inset: 0; background: rgba(8, 10, 14, .62);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 8vh; z-index: 50;
+}
+.modal__box {
+  width: min(760px, 92vw); max-height: 76vh; overflow: auto;
+  background: var(--bg-panel); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 14px 16px; box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+}
+.modal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.modal__head h3 { margin: 0; font-size: 14px; }
+.picker-item__where {
+  font-size: 10px; color: var(--warn); border: 1px solid #6b5a22;
+  border-radius: 4px; padding: 0 4px; margin-left: 2px;
+}
+
+/* ── 未分配人员条 ─────────────────────────────────────────── */
+.board__unassigned {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  border-top: 1px dashed var(--border); padding-top: 8px;
+}
+.board__unassigned-title { color: var(--warn); font-size: 12px; }
+.board__chip {
+  background: #2b2433; border: 1px solid #5a4a6b; color: #e6d9f5;
+  border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer;
+}
+.board__chip:hover { background: #3a2f45; }
+
+.half__group { display: flex; flex-direction: column; gap: 6px; }
+.half__groupname { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; padding-left: 2px; }
+.half__emptygroup { color: var(--text-faint); font-size: 11px; padding: 6px 2px; }
+
+/* ─────────────────────────────────────────────────────────────
+   首页主视觉（Hero）
+   素材说明：原表首页大图实测为空图，这里用渐变 + 品牌字 + 职业图标阵占位；
+   拿到立绘后在 OverviewPage.tsx 填 HERO_IMAGE 即会覆盖为真实大图。
+   ───────────────────────────────────────────────────────────── */
+.hero {
+  position: relative; overflow: hidden;
+  border-radius: 12px; border: 1px solid var(--border);
+  min-height: 300px; padding: 30px 30px 22px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  background:
+    radial-gradient(1100px 380px at 12% -12%, rgba(43, 203, 255, .20), transparent 62%),
+    radial-gradient(900px 340px at 92% 8%, rgba(176, 134, 215, .18), transparent 60%),
+    radial-gradient(700px 300px at 50% 120%, rgba(50, 204, 151, .12), transparent 60%),
+    linear-gradient(160deg, #171b24 0%, #12151c 55%, #0e1016 100%);
+}
+.hero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero__veil {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(10, 12, 16, .82) 0%, rgba(10, 12, 16, .42) 55%, rgba(10, 12, 16, .1) 100%);
+}
+.hero__body { position: relative; z-index: 1; }
+.hero__brand {
+  font-size: 40px; font-weight: 700; letter-spacing: 2px; line-height: 1.1;
+  text-shadow: 0 2px 24px rgba(43, 203, 255, .28);
+}
+.hero__brand .dot-sep { color: var(--accent); margin: 0 2px; }
+.hero__slogan { color: #b9c4d6; font-size: 15px; font-style: italic; margin-top: 6px; letter-spacing: .5px; }
+.hero__slogan--cn { font-style: normal; color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+
+.hero__cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+.hero__btn {
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .16);
+  color: #e8edf6; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+.hero__btn:hover { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .3); }
+.hero__btn--primary {
+  background: linear-gradient(135deg, #1d6f8f, #1b4f78);
+  border-color: #2f8fb5; color: #eaf9ff; font-weight: 600;
+}
+.hero__btn--primary:hover { background: linear-gradient(135deg, #22809f, #1f5c88); }
+
+.hero__classes {
+  position: relative; z-index: 1;
+  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px;
+  padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, .07);
+}
+.hero__class {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
+  width: 52px; opacity: .9;
+}
+.hero__class img { width: 26px; height: 26px; object-fit: contain; }
+.hero__class i { width: 26px; height: 26px; border-radius: 50%; display: block; opacity: .85; }
+.hero__class em { font-style: normal; font-size: 10px; }

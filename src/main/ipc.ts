@@ -11,6 +11,7 @@ import type { DbHandle } from './db';
 import { PlayerRepo } from './repositories/playerRepo';
 import { MatchRepo } from './repositories/matchRepo';
 import { SquadRepo } from './repositories/squadRepo';
+import { DashboardRepo } from './repositories/dashboardRepo';
 
 export interface IpcContext {
   handle: DbHandle;
@@ -37,6 +38,7 @@ export function registerIpc(ctx: IpcContext): void {
   const players = new PlayerRepo(ctx.handle.db);
   const matches = new MatchRepo(ctx.handle.db);
   const squads = new SquadRepo(ctx.handle.db);
+  const dashboard = new DashboardRepo(ctx.handle.db);
 
   const rosterEntries = (): RosterEntry[] =>
     (ctx.handle.db.prepare('SELECT id, game_id, name, main_class FROM player')
@@ -184,6 +186,9 @@ export function registerIpc(ctx: IpcContext): void {
     if (!squads.removeSquad(id)) throw new Error(`小队不存在：id=${id}`);
     return true as const;
   }));
+
+  // ── 数据看板（M6） ─────────────────────────────────────────────
+  ipcMain.handle(IPC.dashboardData, safe(() => dashboard.load()));
 
   // 外部链接走系统浏览器，而不是在应用内开窗
   ipcMain.handle('shell:openExternal', safe((url: string) => {

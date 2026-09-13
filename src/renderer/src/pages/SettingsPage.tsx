@@ -1,0 +1,177 @@
+import { useCallback, useEffect, useState } from 'react';
+import type { AppInfo, SquadCatalog } from '@shared/types';
+import { api, ApiError } from '../api';
+import type { PageProps } from '../App';
+import { TACTICS } from '@shared/domain';
+
+interface Props extends PageProps {
+  info: AppInfo | null;
+}
+
+export default function SettingsPage({ info }: Props) {
+  const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [newGroup, setNewGroup] = useState({ name: '', kind: 'attack' as 'attack' | 'defend' });
+
+  const load = useCallback(async () => {
+    try {
+      setCatalog(await api.meta.squads());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function run(fn: () => Promise<unknown>, okMsg: string) {
+    try {
+      await fn();
+      setError(null);
+      setNotice(okMsg);
+      await load();
+    } catch (err) {
+      setNotice(null);
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
+
+  const groups = catalog?.groups ?? [];
+  const squads = catalog?.squads ?? [];
+
+  return (
+    <>
+      {error && <div className="msg error">{error}</div>}
+      {notice && <div className="msg ok">{notice}</div>}
+
+      <div className="card">
+        <h3>战斗组（可新增）</h3>
+        <div className="toolbar">
+          <input className="input" style={{ width: 160 }} placeholder="新战斗组名称，如 演练组"
+                 value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} />
+          <label className="field"><span>类别</span>
+            <select className="select" value={newGroup.kind}
+                    onChange={(e) => setNewGroup({ ...newGroup, kind: e.target.value as 'attack' | 'defend' })}>
+              <option value="attack">进攻</option>
+              <option value="defend">防守</option>
+            </select>
+          </label>
+          <button className="btn primary" disabled={!newGroup.name.trim()}
+                  onClick={() => void run(
+                    () => api.meta.createGroup({ name: newGroup.name.trim(), kind: newGroup.kind }),
+                    `已新增战斗组「${newGroup.name.trim()}」`,
+                  ).then(() => setNewGroup({ name: '', kind: newGroup.kind }))}>
+            新增战斗组
+          </button>
+          <span className="hint" style={{ margin: 0 }}>
+            组内第 N 支小队会自动命名为「组名-N」（如 防守二-3）
+          </span>
+        </div>
+
+        <div className="table-wrap">
+          <table className="grid">
+            <thead>
+              <tr>
+                <th style={{ width: 160 }}>战斗组</th>
+                <th style={{ width: 80 }}>类别</th>
+                <th style={{ width: 90 }}>小队数</th>
+                <th style={{ width: 100 }}>槽位</th>
+                <th>小队</th>
+                <th style={{ width: 90 }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.length === 0 && <tr><td className="empty" colSpan={6}>还没有战斗组</td></tr>}
+              {groups.map((g) => {
+                const list = squads.filter((s) => s.groupId === g.id);
+                return (
+                  <tr key={g.id}>
+                    <td>{g.name}</td>
+                    <td style={{ color: g.kind === 'defend' ? '#7aa7e0' : '#e0a97a' }}>
+                      {g.kind === 'defend' ? '防守' : '进攻'}
+                    </td>
+                    <td className="num">{list.length}</td>
+                    <td className="num">{list.reduce((n, s) => n + s.size, 0)}</td>
+                    <td style={{ color: 'var(--text-dim)' }}>
+                      {list.length ? list.map((s) => s.name).join('、') : '—'}
+                    </td>
+                    <td className="actions">
+                      <div className="row-edit" style={{ justifyContent: 'flex-end' }}>
+                        <button className="btn sm" onClick={() => void run(
+                          () => api.meta.createSquad({ groupId: g.id }),
+                          `已在「${g.name}」新增小队`,
+                        )}>加一队</button>
+                        <button className="btn sm danger" disabled={list.length > 0}
+                                title={list.length ? '请先删掉该组下的小队' : '删除战斗组'}
+                                onClick={() => void run(() => api.meta.removeGroup(g.id), `已删除「${g.name}」`)}>
+                          删除
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>小队明细</h3>
+        <div className="table-wrap" style={{ maxHeight: '40vh' }}>
+          <table className="grid">
+            <thead>
+              <tr>
+                <th style={{ width: 150 }}>小队</th>
+                <th style={{ width: 110 }}>战斗组</th>
+                <th style={{ width: 110 }}>战术</th>
+                <th style={{ width: 70 }}>人数</th>
+                <th style={{ width: 70 }}>序号</th>
+                <th style={{ width: 90 }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {squads.length === 0 && <tr><td className="empty" colSpan={6}>还没有小队</td></tr>}
+              {squads.map((s) => (
+                <tr key={s.id}>
+                  <td>{s.name}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{s.groupName}</td>
+                  <td style={{ color: 'var(--text-dim)' }}>{s.tactic || '—'}</td>
+                  <td className="num">{s.size}</td>
+                  <td className="num">{s.indexInGroup}</td>
+                  <td className="actions">
+                    <button className="btn sm danger" onClick={() => void run(
+                      () => api.meta.removeSquad(s.id), `已删除小队「${s.name}」`,
+                    )}>删除</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="hint">
+          战术可选：{TACTICS.join(' / ')}。删除小队不会影响已录入的历史战报（历史数据保留小队名文本）。
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>数据与兼容</h3>
+        <div className="stat-grid">
+          <div className="stat">
+            <div className="k">数据库文件</div>
+            <div className="v" style={{ fontSize: 12, wordBreak: 'break-all' }}>{info?.dbPath ?? '—'}</div>
+          </div>
+          <div className="stat">
+            <div className="k">建制容量</div>
+            <div className="v">{catalog?.capacity ?? 0}<small> 槽（{squads.length} 队）</small></div>
+          </div>
+        </div>
+        <div className="hint">
+          与旧表互通：成员主档在「成员主档 → 导入 CSV / JSON」，战报在「对局与战报 → 批量导入战报」里粘贴 Excel 区域或选文件。
+          旧表 xlsx 可直接读取（表头不在第一行时用 headerRow 指定，命令行见 README）。
+        </div>
+      </div>
+    </>
+  );
+}

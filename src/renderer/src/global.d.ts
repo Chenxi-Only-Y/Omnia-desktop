@@ -1,6 +1,6 @@
 import type {
-  AppInfo, ClassInfo, CombatStat, CombatGroupRow, GroupInput, ImportPreview, IpcResult, JoinMode,
-  MatchInput, MatchSummary, OmniaApi, ParticipationInput, ParticipationRow,
+  AppInfo, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput, ImportPreview,
+  IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput, ParticipationRow,
   Player, PlayerInput, Match, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
@@ -40,6 +40,7 @@ declare global {
         importCommit(matchId: number, preview: ImportPreview): Promise<IpcResult<{ written: number; created: number }>>;
       };
       shell: { openExternal(url: string): Promise<IpcResult<true>> };
+      dashboard: { data(): Promise<IpcResult<DashboardData>> };
       channels: Record<string, string>;
     };
   }

@@ -3,8 +3,8 @@
  * 这样调用方可以用普通的 try/catch，而不用每处判断 ok。
  */
 import type {
-  AppInfo, ClassInfo, CombatGroupRow, CombatStat, GroupInput, ImportPreview, IpcResult, JoinMode,
-  Match, MatchInput, MatchSummary, ParticipationInput, ParticipationRow,
+  AppInfo, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput, ImportPreview,
+  IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput, ParticipationRow,
   Player, PlayerInput, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
@@ -72,5 +72,9 @@ export const api = {
       unwrap(bridge().match.importPreview(text, mode)),
     importCommit: (matchId: number, preview: ImportPreview) =>
       unwrap(bridge().match.importCommit(matchId, preview)),
+  },
+
+  dashboard: {
+    data: (): Promise<DashboardData> => unwrap(bridge().dashboard.data()),
   },
 };

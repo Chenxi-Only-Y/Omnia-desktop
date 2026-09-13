@@ -54,6 +54,9 @@ const api = {
   shell: {
     openExternal: (url: string) => invoke('shell:openExternal', url),
   },
+  dashboard: {
+    data: () => invoke('dashboard:data'),
+  },
   /** 通道常量透出，便于渲染层调试时核对 */
   channels: IPC,
 };

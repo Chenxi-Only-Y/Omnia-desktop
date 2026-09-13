@@ -4,6 +4,8 @@ import { api, ApiError } from './api';
 import RosterPage from './pages/RosterPage';
 import OverviewPage from './pages/OverviewPage';
 import MatchPage from './pages/MatchPage';
+import BoardPage from './pages/BoardPage';
+import SettingsPage from './pages/SettingsPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 
 export interface PageProps {
@@ -11,16 +13,15 @@ export interface PageProps {
   classMap: Map<string, ClassInfo>;
 }
 
-type PageKey = 'overview' | 'roster' | 'match' | 'lineup' | 'board' | 'rules' | 'settings';
+type PageKey = 'overview' | 'roster' | 'match' | 'board' | 'rules' | 'settings';
 
 const NAV: { key: PageKey; label: string; icon: string; ready: boolean }[] = [
   { key: 'overview', label: '总览', icon: '◈', ready: true },
   { key: 'roster', label: '成员主档', icon: '☰', ready: true },
   { key: 'match', label: '对局与战报', icon: '⚔', ready: true },
-  { key: 'lineup', label: '阵容编排', icon: '⊞', ready: false },
-  { key: 'board', label: '数据看板', icon: '◱', ready: false },
+  { key: 'board', label: '数据看板', icon: '◱', ready: true },
   { key: 'rules', label: '权重与规则', icon: '⚙', ready: false },
-  { key: 'settings', label: '设置', icon: '⚒', ready: false },
+  { key: 'settings', label: '设置', icon: '⚒', ready: true },
 ];
 
 export default function App() {
@@ -93,35 +94,12 @@ export default function App() {
               {...props}
               info={info}
               onCount={setPlayerCount}
-              onGoRoster={() => setPage('roster')}
+              onGo={setPage}
             />
           )}
           {page === 'roster' && <RosterPage {...props} onCount={setPlayerCount} />}
           {page === 'match' && <MatchPage {...props} />}
-          {page === 'lineup' && (
-            <PlaceholderPage
-              title="阵容编排"
-              icon="⊞"
-              todo={[
-                '拖拽 10 支小队 × 6 人（防守一/二 各 2 支，进攻一/二 各 3 支）',
-                '战术类型选择：塔后拆 / 塔前拆 / 保镖 / 防守',
-                '校验：职业构成、指挥与统战是否到场、麦克风、请假与替补',
-              ]}
-              note="小队结构已是数据库实体（combat_group / squad），可在设置里新增战斗组与小队。"
-            />
-          )}
-          {page === 'board' && (
-            <PlaceholderPage
-              title="数据看板"
-              icon="◱"
-              todo={[
-                '职业分布、出场率、请假率',
-                '推塔/守塔趋势、胜率、对位差',
-                '个人贡献雷达与队内 Top 榜',
-              ]}
-              note="原表「大盘数据可视化」是空表，需从零设计；先等评分算法确定。"
-            />
-          )}
+          {page === 'board' && <BoardPage {...props} />}
           {page === 'rules' && (
             <PlaceholderPage
               title="权重与规则"
@@ -135,14 +113,7 @@ export default function App() {
               note="评分算法由你后续决定；rule_set 表与默认值已就位。"
             />
           )}
-          {page === 'settings' && (
-            <PlaceholderPage
-              title="设置"
-              icon="⚒"
-              todo={['数据库路径与备份', '与旧 xlsx 双向导入导出', '赛季管理']}
-              note="当前数据库路径见「总览」页。"
-            />
-          )}
+          {page === 'settings' && <SettingsPage {...props} info={info} />}
         </section>
       </main>
     </div>

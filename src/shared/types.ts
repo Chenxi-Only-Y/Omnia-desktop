@@ -269,6 +269,53 @@ export interface SquadInput {
   size?: number;
 }
 
+// ── 数据看板（M6，先做不依赖评分算法的部分） ─────────────────────
+export interface AttendanceRow {
+  playerId: number;
+  gameId: string;
+  name: string;
+  mainClass: string;
+  noteRole: string;
+  status: string;
+  /** 有记录的场次数 */
+  matches: number;
+  plays: number;
+  benches: number;
+  leaves: number;
+  /** 参战次数 / 场次 */
+  rate: number;
+  /** 已填战报的场次 */
+  filled: number;
+}
+
+export interface MatchRowStat {
+  matchId: number;
+  label: string;
+  date: string;
+  result: string;
+  ourSide: string;
+  oppSide: string;
+  ourCount: number;
+  statFilled: number;
+}
+
+export interface DashboardData {
+  totals: {
+    matches: number;
+    players: number;
+    participations: number;
+    statFilled: number;
+    statSlots: number;
+    statRate: number;
+    avgLineup: number;
+  };
+  matches: MatchRowStat[];
+  attendance: AttendanceRow[];
+  classPlayCount: { name: string; color: string; plays: number }[];
+  squadUsage: { squad: string; group: string; kind: string; plays: number }[];
+  metricCoverage: { key: string; label: string; nonZero: number; total: number }[];
+}
+
 // ── IPC 契约 ─────────────────────────────────────────────────────
 export interface AppInfo {
   version: string;
@@ -330,6 +377,9 @@ export interface OmniaApi {
     importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;
     importCommit(matchId: number, preview: ImportPreview): Promise<IpcResult<{ written: number; created: number }>>;
   };
+  dashboard: {
+    data(): Promise<IpcResult<DashboardData>>;
+  };
 }
 
 export const IPC = {
@@ -360,4 +410,7 @@ export const IPC = {
   matchStatSave: 'match:stat:save',
   matchImportPreview: 'match:import:preview',
   matchImportCommit: 'match:import:commit',
+
+  // M6 看板
+  dashboardData: 'dashboard:data',
 } as const;

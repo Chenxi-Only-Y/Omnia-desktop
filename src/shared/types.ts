@@ -371,6 +371,32 @@ export interface RuleSetValidation {
   issues: { level: 'error' | 'warn'; field: string; message: string }[];
 }
 
+// ── 赛季 ─────────────────────────────────────────────────────────
+export interface Season {
+  id: number;
+  name: string;
+  startedAt: string;
+  endedAt: string;
+  remark: string;
+}
+
+export interface SeasonInput {
+  name: string;
+  startedAt?: string;
+  endedAt?: string;
+  remark?: string;
+}
+
+export interface SeasonSummary extends Season {
+  active: boolean;
+  /** 归属该赛季的对局数 */
+  matchCount: number;
+  /** 归属该赛季的规则集数 */
+  ruleSetCount: number;
+  firstDate: string;
+  lastDate: string;
+}
+
 // ── 评分结果 ─────────────────────────────────────────────────────
 export interface SavedScore {
   participationId: number;
@@ -623,6 +649,16 @@ export interface OmniaApi {
     /** 校验但不保存（界面实时提示用） */
     validate(input: RuleSetInput): Promise<IpcResult<RuleSetValidation>>;
   };
+  season: {
+    list(): Promise<IpcResult<SeasonSummary[]>>;
+    active(): Promise<IpcResult<Season>>;
+    create(input: SeasonInput): Promise<IpcResult<Season>>;
+    update(id: number, patch: Partial<SeasonInput>): Promise<IpcResult<Season>>;
+    setActive(id: number): Promise<IpcResult<Season>>;
+    remove(id: number): Promise<IpcResult<true>>;
+    /** 把若干对局划到某赛季 */
+    assignMatches(seasonId: number, matchIds: number[]): Promise<IpcResult<{ moved: number }>>;
+  };
 }
 
 export const IPC = {
@@ -670,6 +706,15 @@ export const IPC = {
   rulesSetActive: 'rules:setActive',
   rulesRemove: 'rules:remove',
   rulesValidate: 'rules:validate',
+
+  // 赛季
+  seasonList: 'season:list',
+  seasonActive: 'season:active',
+  seasonCreate: 'season:create',
+  seasonUpdate: 'season:update',
+  seasonSetActive: 'season:setActive',
+  seasonRemove: 'season:remove',
+  seasonAssignMatches: 'season:assignMatches',
   matchParticipationRemove: 'match:participation:remove',
   matchStatSave: 'match:stat:save',
   matchImportPreview: 'match:import:preview',

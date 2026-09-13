@@ -6,7 +6,7 @@ import type {
   AppInfo, AssignInput, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, RuleSet, RuleSetInput, RuleSetValidation,
-  SavedScore, ScoreRunSummary, SheetGrid, SheetList,
+  SavedScore, ScoreRunSummary, Season, SeasonInput, SeasonSummary, SheetGrid, SheetList,
   SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
@@ -108,5 +108,16 @@ export const api = {
     setActive: (id: number): Promise<RuleSet> => unwrap(bridge().rules.setActive(id)),
     remove: (id: number): Promise<true> => unwrap(bridge().rules.remove(id)),
     validate: (input: RuleSetInput): Promise<RuleSetValidation> => unwrap(bridge().rules.validate(input)),
+  },
+
+  season: {
+    list: (): Promise<SeasonSummary[]> => unwrap(bridge().season.list()),
+    active: (): Promise<Season> => unwrap(bridge().season.active()),
+    create: (input: SeasonInput): Promise<Season> => unwrap(bridge().season.create(input)),
+    update: (id: number, patch: Partial<SeasonInput>): Promise<Season> => unwrap(bridge().season.update(id, patch)),
+    setActive: (id: number): Promise<Season> => unwrap(bridge().season.setActive(id)),
+    remove: (id: number): Promise<true> => unwrap(bridge().season.remove(id)),
+    assignMatches: (seasonId: number, matchIds: number[]): Promise<{ moved: number }> =>
+      unwrap(bridge().season.assignMatches(seasonId, matchIds)),
   },
 };

@@ -119,6 +119,13 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .btn.danger { border-color: #6d2b36; color: #ffc4cd; }
 .btn.danger:hover { background: #38202a; }
 .btn.sm { padding: 3px 8px; font-size: 12px; }
+/* 禁用态必须压住主按钮/危险按钮配色：同优先级下后者写在后面，否则「不能点」的按钮还是红的/蓝的，
+   看起来像能点。禁用时统一退成灰底灰字 + 更低的透明度。 */
+.btn.primary:disabled, .btn.danger:disabled {
+  background: var(--bg-panel-2); border-color: var(--border-strong);
+  color: var(--text-dim); opacity: .5;
+}
+.btn:disabled:hover { background: var(--bg-panel-2); border-color: var(--border-strong); }
 
 .input, .select {
   background: #171a22; border: 1px solid var(--border-strong);

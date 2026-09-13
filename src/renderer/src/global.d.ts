@@ -2,7 +2,8 @@ import type {
   AppInfo, AssignInput, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, Match, RuleSet, RuleSetInput,
-  RuleSetValidation, SavedScore, ScoreRunSummary, SheetGrid, SheetList,
+  RuleSetValidation, SavedScore, ScoreRunSummary, Season, SeasonInput, SeasonSummary,
+  SheetGrid, SheetList,
   SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
@@ -65,6 +66,15 @@ declare global {
         setActive(id: number): Promise<IpcResult<RuleSet>>;
         remove(id: number): Promise<IpcResult<true>>;
         validate(input: RuleSetInput): Promise<IpcResult<RuleSetValidation>>;
+      };
+      season: {
+        list(): Promise<IpcResult<SeasonSummary[]>>;
+        active(): Promise<IpcResult<Season>>;
+        create(input: SeasonInput): Promise<IpcResult<Season>>;
+        update(id: number, patch: Partial<SeasonInput>): Promise<IpcResult<Season>>;
+        setActive(id: number): Promise<IpcResult<Season>>;
+        remove(id: number): Promise<IpcResult<true>>;
+        assignMatches(seasonId: number, matchIds: number[]): Promise<IpcResult<{ moved: number }>>;
       };
       channels: Record<string, string>;
     };

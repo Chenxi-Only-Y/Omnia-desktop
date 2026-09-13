@@ -117,6 +117,27 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
   const log = makeLogger();
 
   /**
+   * 可选截图：设置 OMNIA_SMOKE_SHOTS=<目录> 时，把界面真实样子写成 PNG。
+   * 用途是"别只看断言通过，要看一眼长什么样"——尤其是排表/赛季这类布局密集的页面。
+   */
+  const shot = async (name: string): Promise<void> => {
+    const dir = env('OMNIA_SMOKE_SHOTS');
+    if (!dir) return;
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      // 后台窗口的合成帧会滞后：先要一帧、再等一下，否则截到的是上一个页面的画面
+      win.webContents.invalidate();
+      await new Promise((r) => setTimeout(r, 600));
+      const img = await win.webContents.capturePage();
+      const file = path.join(dir, `${name}.png`);
+      fs.writeFileSync(file, img.toPNG());
+      log('[smoke] 截图:', file, `${img.getSize().width}x${img.getSize().height}`);
+    } catch (err) {
+      log('[smoke] 截图失败:', name, String(err));
+    }
+  };
+
+  /**
    * 执行渲染层探针并兜底。
    * 关键：executeJavaScript 在脚本抛错时会**拒绝 Promise**；不接住的话自检函数
    * 既不退出也不继续（表现为挂死到外部超时）。这里统一接住并限时，
@@ -1257,6 +1278,118 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of scoring.steps) log('[smoke] 评分:', s);
     log('[smoke] 评分引擎          :', scoring.ok ? 'PASS' : 'FAIL');
 
+    // M8：赛季——口径隔离的载体（对局/规则集打标，成员与建制跨赛季）
+    const season = await guarded(`(async () => {
+      const steps = [];
+      try {
+        const api = window.omnia;
+        const active0 = await api.season.active();
+        if (!active0.ok) throw new Error('取当前赛季失败: ' + active0.error);
+        steps.push('初始当前赛季=' + active0.data.name + '（id=' + active0.data.id + '）');
+
+        const created = await api.season.create({ name: '__smoke_s1__', startedAt: '2025-01-01', endedAt: '2025-03-31' });
+        if (!created.ok) throw new Error('新建赛季失败: ' + created.error);
+        steps.push('新建赛季 id=' + created.data.id + ' 名称=' + created.data.name);
+
+        const dupName = await api.season.create({ name: '__smoke_s1__' });
+        steps.push('重名赛季被拦=' + (dupName.ok ? '否（异常！）' : '是'));
+
+        const emptyName = await api.season.create({ name: '   ' });
+        steps.push('空名赛季被拦=' + (emptyName.ok ? '否（异常！）' : '是'));
+
+        const setAct = await api.season.setActive(created.data.id);
+        if (!setAct.ok) throw new Error('切换赛季失败: ' + setAct.error);
+        const listA = await api.season.list();
+        const actCount = listA.data.filter(s => s.active).length;
+        steps.push('切换后 使用中数量=' + actCount + ' 当前=' + listA.data.find(s => s.active).name);
+
+        const delActive = await api.season.remove(created.data.id);
+        steps.push('删除当前赛季被拦=' + (delActive.ok ? '否（异常！）' : '是'));
+
+        // 造一场对局并归档到新赛季，验证计数与区间
+        // 注意：match.create 会把新对局登记到「当前赛季」下，所以这里先验证这一点，
+        // 再用 assignMatches 把它搬到另一个赛季（历史数据纠偏就是这条路）。
+        const p = await api.player.create({ gameId: '__season_probe__', name: '赛季探针' });
+        const m = await api.match.create({ date: '2025-02-14', ourSide: '本帮', oppSide: '__赛季归属__' });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        // 注意：match.create 返回 { match, inherited }，不是对局本身
+        const mid = m.data.match.id;
+        const born = await api.match.get(mid);
+        steps.push('新对局自动归属当前赛季=' + (born.ok && born.data.seasonId === created.data.id)
+          + '（seasonId=' + (born.ok ? born.data.seasonId : 'ERR') + '，当前赛季=' + created.data.id + '）');
+
+        // 再建一个赛季，把对局从 s1 搬到 s2，验证 assignMatches 真的改归属
+        const s2 = await api.season.create({ name: '__smoke_s2__' });
+        if (!s2.ok) throw new Error('新建赛季2失败: ' + s2.error);
+        const assigned = await api.season.assignMatches(s2.data.id, [mid]);
+        const moved = await api.match.get(mid);
+        steps.push('归档对局 移动数=' + (assigned.ok ? assigned.data.moved : 'ERR:' + assigned.error)
+          + ' 归属=' + (moved.ok ? moved.data.seasonId : 'ERR:' + moved.error) + '（应=' + s2.data.id + '）');
+        const wasMoved = moved.ok && moved.data.seasonId === s2.data.id;
+        const listB = await api.season.list();
+        const s1b = listB.data.find(s => s.id === created.data.id);
+        steps.push('归档后 s1 对局数=' + s1b.matchCount + '（应=0，已搬走）数据区间='
+          + (s1b.firstDate || '—') + '→' + (s1b.lastDate || '—'));
+
+        // 切回原赛季后删掉探针赛季 s2（对局此刻正挂在 s2 上）：
+        // 赛季记录要消失，但对局不能被连带删掉，只解除归属
+        await api.season.setActive(active0.data.id);
+        const delOk = await api.season.remove(s2.data.id);
+        const afterMatch = await api.match.get(mid);
+        const afterSeason = await api.season.list();
+        const s2Gone = !afterSeason.data.some(s => s.id === s2.data.id);
+        steps.push('删除探针赛季 s2=' + (delOk.ok ? '成功' : '失败:' + delOk.error)
+          + ' 赛季已移除=' + s2Gone
+          + ' 对局仍在=' + afterMatch.ok
+          + ' 归属=' + (afterMatch.ok ? JSON.stringify(afterMatch.data.seasonId) : 'ERR'));
+
+        // 界面：切到赛季页，确认表格渲染出行且当前赛季有标记
+        const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.indexOf('赛季') >= 0);
+        if (nav) nav.click();
+        await new Promise(res => setTimeout(res, 800));
+        const rows = document.querySelectorAll('table.grid tbody tr').length;
+        const activeMark = document.body.textContent.indexOf('当前') >= 0;
+        const hasCreate = [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '新建赛季');
+        const activeNav = document.querySelector('button.nav-item.active')?.textContent?.trim() ?? '（无）';
+        const cards = [...document.querySelectorAll('.card h3')].map(h => h.textContent).join('|');
+        steps.push('赛季页 表格行=' + rows + ' 有当前标记=' + activeMark + ' 有新建按钮=' + hasCreate);
+        steps.push('当前导航=' + JSON.stringify(activeNav) + ' 卡片标题=' + cards);
+
+        const cond = {
+          created: created.ok === true,
+          dupBlocked: !dupName.ok,
+          emptyBlocked: !emptyName.ok,
+          singleActive: actCount === 1,
+          delActiveBlocked: !delActive.ok,
+          autoTaggedActive: born.ok === true && born.data.seasonId === created.data.id,
+          assigned: assigned.ok === true && assigned.data.moved === 1 && wasMoved,
+          counted: s1b.matchCount === 0,
+          unassignKeepsMatch: delOk.ok === true && s2Gone && afterMatch.ok === true && afterMatch.data.seasonId === null,
+          ui: rows >= 1 && activeMark && hasCreate,
+        };
+        steps.push('判定明细=' + JSON.stringify(cond));
+        // 清理交给外层：截图要在数据还在的时候拍
+        return {
+          ok: Object.values(cond).every(Boolean),
+          steps,
+          cleanup: { playerId: p.data.id, seasonIds: [created.data.id, s2.data.id] },
+        };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`, '赛季');
+    for (const s of season.steps) log('[smoke] 赛季:', s);
+    log('[smoke] 赛季模块          :', season.ok ? 'PASS' : 'FAIL');
+    // 先截图再清理，这样截图里能看到完整的赛季列表（含探针赛季）
+    await shot('season');
+    {
+      const cleanup = (season.value as { cleanup?: { playerId: number; seasonIds: number[] } } | undefined)?.cleanup;
+      for (const id of cleanup?.seasonIds ?? []) {
+        await guarded(`window.omnia.season.remove(${id}).catch(() => {})`, `清理赛季${id}`);
+      }
+      if (cleanup?.playerId) {
+        await guarded(`window.omnia.player.remove(${cleanup.playerId}).catch(() => {})`, '清理探针成员');
+      }
+    }
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const iconProbe = await guarded(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -1294,7 +1427,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
-      && scoring.ok === true && iconOk;
+      && scoring.ok === true && season.ok === true && iconOk;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

@@ -38,6 +38,9 @@ const child = spawn(electronBin, ['.'], {
     // 有旧表样本就顺带验证真实 xlsx 导入路径（没有则该项 SKIP）
     OMNIA_SAMPLE_XLSX: process.env.OMNIA_SAMPLE_XLSX
       || path.resolve(ROOT, '..', 'work', 'LIS_original.xlsx'),
+    // 每轮自检顺手把界面截下来，方便人肉看真实观感（不设则不截）
+    OMNIA_SMOKE_SHOTS: process.env.OMNIA_SMOKE_SHOTS === '' ? ''
+      : (process.env.OMNIA_SMOKE_SHOTS || path.join(dataDir, 'shots')),
   },
 });
 

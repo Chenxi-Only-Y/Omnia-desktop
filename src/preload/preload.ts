@@ -8,7 +8,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC, type AssignInput, type CombatStat, type GroupInput, type ImportPreview, type IpcResult,
   type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type RuleSetInput,
-  type SignupInput, type SquadInput,
+  type SeasonInput, type SignupInput, type SquadInput,
 } from '../shared/types';
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
@@ -81,6 +81,15 @@ const api = {
     setActive: (id: number) => invoke('rules:setActive', id),
     remove: (id: number) => invoke('rules:remove', id),
     validate: (input: RuleSetInput) => invoke('rules:validate', input),
+  },
+  season: {
+    list: () => invoke('season:list'),
+    active: () => invoke('season:active'),
+    create: (input: SeasonInput) => invoke('season:create', input),
+    update: (id: number, patch: Partial<SeasonInput>) => invoke('season:update', id, patch),
+    setActive: (id: number) => invoke('season:setActive', id),
+    remove: (id: number) => invoke('season:remove', id),
+    assignMatches: (seasonId: number, matchIds: number[]) => invoke('season:assignMatches', seasonId, matchIds),
   },
   /** 通道常量透出，便于渲染层调试时核对 */
   channels: IPC,

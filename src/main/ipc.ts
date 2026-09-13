@@ -7,7 +7,7 @@ import { app, ipcMain, shell } from 'electron';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type {
   MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput,
-  RuleSetInput, SignupInput, SquadInput,
+  RuleSetInput, SeasonInput, SignupInput, SquadInput,
 } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
@@ -19,6 +19,7 @@ import { DashboardRepo } from './repositories/dashboardRepo';
 import { SignupRepo } from './repositories/signupRepo';
 import { RuleSetRepo, validate as validateRuleSet } from './repositories/ruleSetRepo';
 import { scoreMatch } from '../shared/scoreEngine';
+import { SeasonRepo } from './repositories/seasonRepo';
 
 export interface IpcContext {
   handle: DbHandle;
@@ -48,6 +49,7 @@ export function registerIpc(ctx: IpcContext): void {
   const dashboard = new DashboardRepo(ctx.handle.db);
   const signup = new SignupRepo(ctx.handle.db);
   const rules = new RuleSetRepo(ctx.handle.db);
+  const seasons = new SeasonRepo(ctx.handle.db);
 
   const rosterEntries = (): RosterEntry[] =>
     (ctx.handle.db.prepare('SELECT id, game_id, name, main_class FROM player')
@@ -265,6 +267,20 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
   ipcMain.handle(IPC.rulesValidate, safe((input: RuleSetInput) => validateRuleSet(input)));
+
+  // ── 赛季 ───────────────────────────────────────────────────────
+  ipcMain.handle(IPC.seasonList, safe(() => seasons.summaries()));
+  ipcMain.handle(IPC.seasonActive, safe(() => seasons.active()));
+  ipcMain.handle(IPC.seasonCreate, safe((input: SeasonInput) => seasons.create(input)));
+  ipcMain.handle(IPC.seasonUpdate, safe((id: number, patch: Partial<SeasonInput>) => seasons.update(id, patch)));
+  ipcMain.handle(IPC.seasonSetActive, safe((id: number) => seasons.setActive(id)));
+  ipcMain.handle(IPC.seasonRemove, safe((id: number) => {
+    if (!seasons.remove(id)) throw new Error(`赛季不存在：id=${id}`);
+    return true as const;
+  }));
+  ipcMain.handle(IPC.seasonAssignMatches, safe((seasonId: number, matchIds: number[]) => ({
+    moved: seasons.assignMatches(seasonId, matchIds),
+  })));
 
   // ── 数据看板（M6） ─────────────────────────────────────────────
   ipcMain.handle(IPC.dashboardData, safe(() => dashboard.load()));

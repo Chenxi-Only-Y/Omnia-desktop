@@ -505,6 +505,39 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       console.log('[smoke] M7 真实旧表导入    : SKIP（未提供样本，设 OMNIA_SAMPLE_XLSX 指向旧表即可验证）');
     }
 
+    // 导入向导的界面接线：切到成员主档点「从 xlsx 导入」，确认弹窗出来了
+    const wizard = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      try {
+        const waitFor = async (fn, label, ms = 6000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+        const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('成员主档'));
+        if (!nav) throw new Error('侧栏没有「成员主档」');
+        nav.click();
+        const btn = await waitFor(
+          () => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '从 xlsx 导入'),
+          '「从 xlsx 导入」按钮');
+        btn.click();
+        const modal = await waitFor(() => document.querySelector('.modal'), '导入向导弹窗');
+        const title = modal.querySelector('h3')?.textContent || '';
+        const hasFileBtn = !!([...modal.querySelectorAll('button')].find(b => b.textContent.includes('选择 xlsx 文件')));
+        const hasHint = (modal.textContent || '').includes('表头');
+        steps.push('弹窗标题=' + JSON.stringify(title) + ' 有选文件按钮=' + hasFileBtn + ' 有表头说明=' + hasHint);
+        // 关掉弹窗
+        const closeBtn = [...modal.querySelectorAll('button')].find(b => b.textContent.trim() === '关闭');
+        if (closeBtn) closeBtn.click();
+        await new Promise(r => setTimeout(r, 200));
+        const closed = !document.querySelector('.modal');
+        steps.push('点击关闭后弹窗已消失=' + closed);
+        return { ok: title.includes('导入成员主档') && hasFileBtn && hasHint && closed, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of wizard.steps) console.log('[smoke] 向导:', s);
+    console.log('[smoke] 导入向导界面接线  :', wizard.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -537,7 +570,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
-      && m6.ok === true && m7.ok === true && iconOk;
+      && m6.ok === true && m7.ok === true && wizard.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

@@ -305,17 +305,23 @@ export class MatchRepo {
       .get(playerId) as { id: number; main_class: string; note_role: string; mic: string } | undefined;
     if (!pl) throw new Error(`成员不存在：id=${playerId}`);
 
-    const squad = s(input.squad);
+    const squadInput = s(input.squad);
+    let squad = squadInput;
     let tactic = '';
     let teamRole = '';
-    if (squad) {
+    if (squadInput) {
       // 允许「替补 / 请假」这类非战斗槽位，以及库里登记过的战斗小队
-      const isBench = (BENCH_SQUADS as readonly string[]).includes(squad);
+      const isBench = (BENCH_SQUADS as readonly string[]).includes(squadInput);
       if (!isBench) {
-        const hit = this.squads.paramsForSquadName(squad);
-        if (!hit.kind) throw new Error(`未知小队：${squad}（可在「设置 → 战斗组与小队」里新增）`);
-        tactic = hit.tactic;
-        teamRole = hit.teamRole;
+        // 走 resolve：历史战报/旧表里的「防守一2」要能对上本系统的「防守一-2」
+        const hit = this.squads.resolve(squadInput);
+        if (!hit) throw new Error(`未知小队：${squadInput}（可在「设置 → 战斗组与小队」里新增）`);
+        // 关键：落库统一存正式名。否则 squad 存的是外来写法、tactic 却取自正式名，
+        // 看板上同一支队会分裂成两个格子。
+        squad = hit.name;
+        const params = this.squads.paramsForSquadName(hit.name);
+        tactic = params.tactic;
+        teamRole = params.teamRole;
       }
     }
 

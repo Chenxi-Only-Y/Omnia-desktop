@@ -560,6 +560,8 @@ export interface AppInfo {
   chrome: string;
   dbPath: string;
   platform: string;
+  /** 数据库 schema 版本：自检与排障用，界面也可显示，避免"库是旧的"这种问题靠猜 */
+  schemaVersion: number;
 }
 
 export interface ClassInfo {

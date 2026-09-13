@@ -166,6 +166,10 @@ export default function SettingsPage({ info }: Props) {
             <div className="k">建制容量</div>
             <div className="v">{catalog?.capacity ?? 0}<small> 槽（{squads.length} 队）</small></div>
           </div>
+          <div className="stat">
+            <div className="k">数据库版本</div>
+            <div className="v">v{info?.schemaVersion ?? '—'}<small> schema 迁移</small></div>
+          </div>
         </div>
         <div className="hint">
           与旧表互通：成员主档在「成员主档 → 导入 CSV / JSON」，战报在「对局与战报 → 批量导入战报」里粘贴 Excel 区域或选文件。

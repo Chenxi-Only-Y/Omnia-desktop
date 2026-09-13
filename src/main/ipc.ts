@@ -67,6 +67,9 @@ export function registerIpc(ctx: IpcContext): void {
     chrome: process.versions.chrome ?? '',
     dbPath: ctx.handle.file,
     platform: `${process.platform} ${process.arch}`,
+    schemaVersion: Number((ctx.handle.db.prepare(
+      'SELECT COALESCE(MAX(version), 0) AS v FROM schema_migration',
+    ).get() as { v: number }).v),
   })));
 
   // ── 成员主档 ───────────────────────────────────────────────────

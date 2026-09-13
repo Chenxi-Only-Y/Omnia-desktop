@@ -1,3 +1,4 @@
+[smoke] schema 版本        : 6 （迁移应已跑到最新）
 [smoke] preload 注入        : true
 [smoke] app.info()         : true
 [smoke] meta.classes() 数量 : 12
@@ -25,8 +26,11 @@
 [smoke] M5: 新增组「演练组」→ 自动命名小队「演练组-1」序号=1
 [smoke] M5: 再增一队 → 自动命名「演练组-2」
 [smoke] M5: 清理完成
-[smoke] M5: 看板渲染小队方块=12 含职业图标=1 有姓名=1
+[smoke] M5: 旧写法「防守一2」写入=成功 落库小队="防守一-2" 战术="防守"
+[smoke] M5: 未知小队被拦=是
+[smoke] M5: 看板渲染小队方块=12 含职业图标=2 有姓名=2
 [smoke] M5: 方块小队名（前5）=防守一-1,防守一-2,防守一-3,防守二-1,防守二-2
+[smoke] M5: 别名成员落在 防守一-2 同一格=true
 [smoke] M5 建制与看板      : PASS
 [smoke] M6: 总场次=2 成员=4 参战记录=6
 [smoke] M6: 战报完整度=4/5 = 80%
@@ -59,7 +63,7 @@
 [smoke] 拖拽: 进入方式=自动进入详情
 [smoke] 拖拽: 拖拽前 防守一-1 含 拖拽甲=true
 [smoke] 拖拽: new DataTransfer() 可用，回读="probe"
-[smoke] 拖拽: dragstart 写入的载荷={"playerIds":[8],"label":"拖拽甲"}
+[smoke] 拖拽: dragstart 写入的载荷={"playerIds":[9],"label":"拖拽甲"}
 [smoke] 拖拽: 落库后 拖拽甲.squad=进攻一-1 state=PLAY tactic=塔后拆
 [smoke] 拖拽: 未分配的 拖拽乙.squad=""
 [smoke] 拖拽: 未分配区出现 拖拽乙=true

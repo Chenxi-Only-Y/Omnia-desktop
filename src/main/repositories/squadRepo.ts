@@ -110,11 +110,51 @@ export class SquadRepo {
       `SELECT s.*, g.name AS group_name, g.kind FROM squad s
        JOIN combat_group g ON g.id = s.group_id WHERE s.id = ?`,
     ).get(Number(info.lastInsertRowid)) as unknown as SquadDbRow;
+    // 新增小队时顺手登记旧写法别名，保证「补一队」之后历史战报也能对上
+    this.addAlias(row.id, SquadRepo.aliasFor(g.name, idx));
     return toSquad(row);
   }
 
   removeSquad(id: number): boolean {
     return this.db.prepare('DELETE FROM squad WHERE id = ?').run(id).changes > 0;
+  }
+
+  /** 小队别名：旧表写「防守一2」，本系统写「防守二-3」（用户口径）。同一个队两种写法都要认 */
+  private static aliasFor(groupName: string, indexInGroup: number): string {
+    return `${groupName}${indexInGroup}`;
+  }
+
+  private addAlias(squadId: number, alias: string): void {
+    this.db.prepare(
+      'INSERT INTO squad_alias (squad_id, alias) VALUES (?, ?) ON CONFLICT DO NOTHING',
+    ).run(squadId, alias);
+  }
+
+  /**
+   * 把外来小队名（历史战报 / 旧表导出 / 手工输入）解析成本系统的小队。
+   * 顺序：正式名 → 别名表 → 去掉连字符的猜测。
+   * 认不出来就返回 undefined —— 宁可空着，也不要瞎认一个队，
+   * 因为认错会把分数算到别的小队头上（战术执行分是按小队归一化的）。
+   */
+  resolve(name: string): SquadRow | undefined {
+    const n = (name ?? '').trim();
+    if (!n) return undefined;
+    const direct = this.findByName(n);
+    if (direct) return direct;
+
+    const viaAlias = this.db.prepare(
+      `SELECT s.*, g.name AS group_name, g.kind
+       FROM squad_alias a
+       JOIN squad s ON s.id = a.squad_id
+       JOIN combat_group g ON g.id = s.group_id
+       WHERE a.alias = ?`,
+    ).get(n) as unknown as SquadDbRow | undefined;
+    if (viaAlias) return toSquad(viaAlias);
+
+    // 「防守一2」→「防守一-2」：把结尾的数字前插一个连字符再试一次
+    const m = /^(.*?)(\d+)$/.exec(n);
+    if (m) return this.findByName(`${m[1]}-${m[2]}`);
+    return undefined;
   }
 
   /** 按名字找小队（写参战时用） */
@@ -145,7 +185,8 @@ export class SquadRepo {
   }
 
   paramsForSquadName(name: string): { tactic: string; teamRole: string; kind: GroupKind | '' } {
-    const s = this.findByName(name);
+    // 走 resolve：历史战报里的「防守一2」也要能取到战术与攻/防类别
+    const s = this.resolve(name);
     if (!s) return { tactic: '', teamRole: '', kind: '' };
     return {
       tactic: s.tactic,

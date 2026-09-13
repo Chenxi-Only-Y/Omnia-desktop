@@ -321,6 +321,36 @@ const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    name: 'squad_alias',
+    up: (db) => {
+      // 小队别名：旧表里小队写作「防守一2」（无连字符），本系统按用户口径命名为
+      // 「防守二-3」（带连字符）。历史战报、旧表导出的名字直接查库会查不到，
+      // 于是战术与攻/防类别静默变成空 —— 打分时少了战术执行分还看不出原因。
+      // 这里用一张别名表兜住，和职业别名（findClass 的 aliases）同一个思路。
+      db.exec(`
+        CREATE TABLE squad_alias (
+          squad_id  INTEGER NOT NULL REFERENCES squad(id) ON DELETE CASCADE,
+          alias     TEXT NOT NULL,
+          PRIMARY KEY (squad_id, alias)
+        );
+        CREATE INDEX idx_squad_alias ON squad_alias(alias);
+      `);
+
+      // 为现有小队补上「组名+序号」这个旧写法作为别名
+      const rows = db.prepare(
+        `SELECT s.id, s.index_in_group, g.name AS group_name
+         FROM squad s JOIN combat_group g ON g.id = s.group_id`,
+      ).all() as unknown as { id: number; index_in_group: number; group_name: string }[];
+      const ins = db.prepare(
+        'INSERT INTO squad_alias (squad_id, alias) VALUES (?, ?) ON CONFLICT DO NOTHING',
+      );
+      for (const r of rows) {
+        ins.run(r.id, `${r.group_name}${r.index_in_group}`);   // 旧表写法：防守一2
+      }
+    },
+  },
 ];
 
 export interface DbHandle {

@@ -252,10 +252,10 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     }
   };
 
-  const preloadProbe = async (): Promise<{ preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null }> => {
+  const preloadProbe = async (): Promise<{ preload: boolean; appInfo: boolean; classes: number; players: number; schemaVersion: number; error: string | null }> => {
     const w = win.webContents;
     const has = await w.executeJavaScript('typeof window.omnia === "object" && window.omnia !== null');
-    if (!has) return { preload: false, appInfo: false, classes: 0, players: 0, error: 'window.omnia 未注入' };
+    if (!has) return { preload: false, appInfo: false, classes: 0, players: 0, schemaVersion: 0, error: 'window.omnia 未注入' };
     const res = await w.executeJavaScript(`(async () => {
       try {
         const info = await window.omnia.app.info();
@@ -266,11 +266,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           appInfo: !!(info && info.ok),
           classes: cls && cls.ok ? cls.data.length : -1,
           players: ps && ps.ok ? ps.data.length : -1,
+          schemaVersion: info && info.ok ? Number(info.data.schemaVersion) : -1,
           error: [info, cls, ps].filter(r => r && !r.ok).map(r => r.error).join('; ') || null,
         };
-      } catch (e) { return { preload: true, appInfo: false, classes: -1, players: -1, error: String(e) }; }
+      } catch (e) { return { preload: true, appInfo: false, classes: -1, players: -1, schemaVersion: -1, error: String(e) }; }
     })()`);
-    return res as { preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null };
+    return res as { preload: boolean; appInfo: boolean; classes: number; players: number; schemaVersion: number; error: string | null };
   };
 
   win.webContents.once('did-finish-load', async () => {
@@ -278,8 +279,9 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     try {
       r = await preloadProbe();
     } catch (err) {
-      r = { preload: false, appInfo: false, classes: -1, players: -1, error: String(err) };
+      r = { preload: false, appInfo: false, classes: -1, players: -1, schemaVersion: -1, error: String(err) };
     }
+    log('[smoke] schema 版本        :', r.schemaVersion, '（迁移应已跑到最新）');
     const rootProbeResult = await guarded(
       `document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1`,
       '根节点渲染',
@@ -434,6 +436,23 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         if (!m.ok) throw new Error('建对局失败: ' + m.error);
         await api.match.upsertParticipation({ matchId: m.data.match.id, playerId: p.data.id, squad: '防守一-1', state: 'PLAY' });
 
+        // 小队别名：旧表写「防守一2」，本系统写「防守一-2」。
+        // 用旧写法排表必须能对上，并且落库要统一成正式名（否则同一队分裂成两个格子）。
+        const pAlias = await api.player.create({ gameId: 'smoke_board_alias', name: '别名测试员', mainClass: '铁衣' });
+        if (!pAlias.ok) throw new Error('建别名成员失败: ' + pAlias.error);
+        const upsertAlias = await api.match.upsertParticipation({
+          matchId: m.data.match.id, playerId: pAlias.data.id, squad: '防守一2', state: 'PLAY',
+        });
+        const partsAlias = await api.match.participations(m.data.match.id);
+        const aliasRow = partsAlias.data.find(r => r.name === '别名测试员');
+        steps.push('旧写法「防守一2」写入=' + (upsertAlias.ok ? '成功' : '被拒:' + upsertAlias.error)
+          + ' 落库小队=' + JSON.stringify(aliasRow?.squad)
+          + ' 战术=' + JSON.stringify(aliasRow?.tactic));
+        const unknown = await api.match.upsertParticipation({
+          matchId: m.data.match.id, playerId: pAlias.data.id, squad: '不存在队-9', state: 'PLAY',
+        });
+        steps.push('未知小队被拦=' + (unknown.ok ? '否（异常！）' : '是'));
+
         const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('对局与战报'));
         if (!nav) throw new Error('侧栏里没找到「对局与战报」');
         nav.click();
@@ -470,16 +489,26 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('看板渲染小队方块=' + blocks + ' 含职业图标=' + icons + ' 有姓名=' + named);
         steps.push('方块小队名（前5）=' + teamNames.slice(0, 5).join(','));
         const hasTarget = teamNames.includes('防守一-1');
+        // 别名写进去的那个人也必须落在「防守一-2」同一块里，而不是另起一格
+        const aliasBlock = [...document.querySelectorAll('.blk')]
+          .find(b => b.dataset.squad === '防守一-2');
+        const aliasInSameBlock = !!aliasBlock && aliasBlock.textContent.includes('别名测试员');
+        steps.push('别名成员落在 防守一-2 同一格=' + aliasInSameBlock);
 
         await api.match.remove(m.data.match.id);
         await api.player.remove(p.data.id);
+        await api.player.remove(pAlias.data.id);
 
         const ok = cat.data.groups.length === 4
           && cat.data.squads.length === 12
           && cat.data.capacity === 72
           && squads.includes('防守一-1') && squads.includes('防守二-3') && squads.includes('进攻二-3')
           && s1.data.name === '演练组-1' && s2.data.name === '演练组-2'
-          && blocks === 12 && hasTarget;        return { ok, steps };
+          && blocks === 12 && hasTarget
+          && upsertAlias.ok === true && aliasRow?.squad === '防守一-2' && aliasRow?.tactic === '防守'
+          && aliasInSameBlock
+          && unknown.ok === false;
+        return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针4');
     for (const s of m5.steps) log('[smoke] M5:', s);
@@ -1515,7 +1544,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
-      && scoring.ok === true && season.ok === true && iconOk;
+      && scoring.ok === true && season.ok === true && iconOk && r.schemaVersion >= 6;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

@@ -6,5 +6,6 @@ release/
 !docs/packaged-smoke.log
 .DS_Store
 dev-data/
-# 提交信息草稿（用 git commit -F 时临时生成）
+# 临时文件（提交信息草稿等，用 git commit -F 时生成），一律不入库
+*.tmp
 commit-msg.txt

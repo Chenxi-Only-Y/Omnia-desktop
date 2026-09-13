@@ -7,6 +7,7 @@ import MatchPage from './pages/MatchPage';
 import BoardPage from './pages/BoardPage';
 import PlayerDetailPage from './pages/PlayerDetailPage';
 import RulesPage from './pages/RulesPage';
+import GuidePage from './pages/GuidePage';
 import SettingsPage from './pages/SettingsPage';
 
 export interface PageProps {
@@ -14,7 +15,7 @@ export interface PageProps {
   classMap: Map<string, ClassInfo>;
 }
 
-type PageKey = 'overview' | 'roster' | 'match' | 'board' | 'rules' | 'settings';
+type PageKey = 'overview' | 'roster' | 'match' | 'board' | 'rules' | 'guide' | 'settings';
 
 const NAV: { key: PageKey; label: string; icon: string; ready: boolean }[] = [
   { key: 'overview', label: '总览', icon: '◈', ready: true },
@@ -22,6 +23,7 @@ const NAV: { key: PageKey; label: string; icon: string; ready: boolean }[] = [
   { key: 'match', label: '对局与战报', icon: '⚔', ready: true },
   { key: 'board', label: '数据看板', icon: '◱', ready: true },
   { key: 'rules', label: '权重与规则', icon: '⚙', ready: true },
+  { key: 'guide', label: '攻略', icon: '📖', ready: true },
   { key: 'settings', label: '设置', icon: '⚒', ready: true },
 ];
 
@@ -108,6 +110,7 @@ export default function App() {
           {page === 'match' && <MatchPage {...props} />}
           {page === 'board' && <BoardPage {...props} />}
           {page === 'rules' && <RulesPage {...props} />}
+          {page === 'guide' && <GuidePage />}
           {page === 'settings' && <SettingsPage {...props} info={info} />}
         </section>
       </main>

@@ -966,6 +966,87 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of rules.steps) log('[smoke] 规则:', s);
     log('[smoke] 规则集管理        :', rules.ok ? 'PASS' : 'FAIL');
 
+    // 攻略图库：13 张图真实加载 + 装备卡速查 + 灯箱
+    const guide = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      try {
+        const waitFor = async (fn, label, ms = 10000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 200)); }
+          throw new Error('等待超时：' + label);
+        };
+        const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.indexOf('攻略') >= 0);
+        if (!nav) throw new Error('侧栏没有「攻略」');
+        nav.click();
+        await waitFor(() => document.querySelectorAll('.shot').length > 0 ? true : null, '图库卡片');
+
+        const shots = [...document.querySelectorAll('.shot')];
+        const files = shots.map(s => s.querySelector('img')?.dataset.shot).filter(Boolean);
+        steps.push('图库卡片数=' + shots.length + ' 分类按钮=' + document.querySelectorAll('.card .btn.sm').length);
+
+        // 等所有图真的解码完成（naturalWidth > 0）
+        await waitFor(() => [...document.querySelectorAll('.shot__img')].every(i => i.complete) ? true : null, '图片加载完成');
+        const dims = [...document.querySelectorAll('.shot__img')].map(i => ({
+          f: i.dataset.shot, w: i.naturalWidth, h: i.naturalHeight,
+        }));
+        const failed = dims.filter(d => !d.w || d.w === 0);
+        steps.push('图片尺寸抽样=' + dims.slice(0, 4).map(d => d.f + ':' + d.w + 'x' + d.h).join(' '));
+        steps.push('加载失败的图=' + (failed.length ? failed.map(f => f.f).join(',') : '无'));
+
+        // 装备卡速查表（表头 1 行 + 7 张卡）
+        const tables = [...document.querySelectorAll('table.grid')];
+        const gearTable = tables[tables.length - 1];
+        const gearRows = gearTable ? gearTable.querySelectorAll('tbody tr').length : 0;
+        const firstGear = gearTable ? gearTable.querySelector('tbody tr')?.textContent.replace(/\\s+/g, ' ').trim() : '';
+        steps.push('装备卡表行数=' + gearRows);
+        steps.push('首行（按装评降序）=' + firstGear);
+
+        // 分类筛选：点「装备选择」应只剩 7 张
+        const gearBtn = [...document.querySelectorAll('.btn.sm')].find(b => b.textContent.indexOf('装备选择') >= 0);
+        gearBtn.click();
+        await waitFor(() => document.querySelectorAll('.shot').length === 7 ? true : null, '筛选后 7 张');
+        steps.push('筛选「装备选择」后卡片数=' + document.querySelectorAll('.shot').length);
+        const allBtn = [...document.querySelectorAll('.btn.sm')].find(b => b.textContent.trim() === '全部');
+        allBtn.click();
+        await waitFor(() => document.querySelectorAll('.shot').length > 7 ? true : null, '恢复全部');
+
+        // 灯箱
+        document.querySelector('.shot').click();
+        const box = await waitFor(() => document.querySelector('.lightbox__img'), '灯箱大图');
+        const boxImg = box.getAttribute('src') || '';
+        const boxTitle = document.querySelector('.lightbox__head h3')?.textContent || '';
+        steps.push('灯箱标题=' + JSON.stringify(boxTitle) + ' src=' + boxImg);
+        const closeBtn = [...document.querySelectorAll('.lightbox__head button')].find(b => b.textContent.trim() === '关闭');
+        closeBtn.click();
+        await waitFor(() => document.querySelector('.lightbox') ? null : true, '灯箱关闭');
+
+        // 要点区
+        const noteCards = document.querySelectorAll('.note').length;
+        const noteItems = document.querySelectorAll('.note li').length;
+        steps.push('要点卡片=' + noteCards + ' 要点条数=' + noteItems);
+
+        // 首页立绘卡
+        const home = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.indexOf('总览') >= 0);
+        home.click();
+        await waitFor(() => document.querySelectorAll('.banner-cards img').length > 0 ? true : null, '首页立绘卡');
+        const banners = [...document.querySelectorAll('.banner-cards img')];
+        await waitFor(() => banners.every(i => i.complete) ? true : null, '立绘卡加载');
+        steps.push('首页立绘卡=' + banners.length + ' 尺寸=' + banners.map(b => b.naturalWidth + 'x' + b.naturalHeight).join(' '));
+
+        const ok = shots.length === 13
+          && failed.length === 0
+          && dims.every(d => d.h > 100)
+          && gearRows === 7
+          && firstGear.indexOf('如意·錾花锁') >= 0 && firstGear.indexOf('4012') >= 0
+          && boxImg.indexOf('guide/') >= 0
+          && noteCards >= 4 && noteItems >= 10
+          && banners.length === 2 && banners.every(b => b.naturalWidth > 500);
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of guide.steps) log('[smoke] 攻略:', s);
+    log('[smoke] 攻略图库          :', guide.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -999,7 +1080,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
-      && detail.ok === true && signup.ok === true && rules.ok === true && iconOk;
+      && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true && iconOk;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

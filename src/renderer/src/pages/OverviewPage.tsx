@@ -14,6 +14,7 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import { classIconSrc } from '../lib/assets';
+import { BannerCards } from './GuidePage';
 
 /** 换成真实立绘时填文件名，例如 'hero/cover.png'（相对 public/） */
 const HERO_IMAGE: string | null = null;
@@ -78,6 +79,9 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
             <button className="hero__btn" onClick={() => onGo('settings')}>战斗组与小队</button>
           </div>
         </div>
+
+        {/* 三职业立绘卡（原表攻略页的 image22 / image26）*/}
+        <BannerCards />
 
         {/* 职业图标阵 —— 既是装饰也是"这个系统认识哪些职业"的表达 */}
         <div className="hero__classes" aria-hidden="true">

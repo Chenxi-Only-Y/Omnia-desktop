@@ -5,11 +5,12 @@
  */
 import { app, ipcMain, shell } from 'electron';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
-import type { MatchInput, ParticipationInput, CombatStat, ImportPreview } from '../shared/types';
+import type { MatchInput, ParticipationInput, CombatStat, ImportPreview, GroupInput, SquadInput } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import type { DbHandle } from './db';
 import { PlayerRepo } from './repositories/playerRepo';
 import { MatchRepo } from './repositories/matchRepo';
+import { SquadRepo } from './repositories/squadRepo';
 
 export interface IpcContext {
   handle: DbHandle;
@@ -35,6 +36,7 @@ function safe<A extends unknown[], R>(fn: (...args: A) => R) {
 export function registerIpc(ctx: IpcContext): void {
   const players = new PlayerRepo(ctx.handle.db);
   const matches = new MatchRepo(ctx.handle.db);
+  const squads = new SquadRepo(ctx.handle.db);
 
   const rosterEntries = (): RosterEntry[] =>
     (ctx.handle.db.prepare('SELECT id, game_id, name, main_class FROM player')
@@ -168,6 +170,19 @@ export function registerIpc(ctx: IpcContext): void {
       key: string; value: string;
     }[];
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  }));
+
+  // ── 战斗组 / 小队建制（可新增） ─────────────────────────────────
+  ipcMain.handle(IPC.metaSquads, safe(() => squads.catalog()));
+  ipcMain.handle(IPC.metaGroupCreate, safe((input: GroupInput) => squads.createGroup(input)));
+  ipcMain.handle(IPC.metaGroupRemove, safe((id: number) => {
+    if (!squads.removeGroup(id)) throw new Error(`战斗组不存在：id=${id}`);
+    return true as const;
+  }));
+  ipcMain.handle(IPC.metaSquadCreate, safe((input: SquadInput) => squads.createSquad(input)));
+  ipcMain.handle(IPC.metaSquadRemove, safe((id: number) => {
+    if (!squads.removeSquad(id)) throw new Error(`小队不存在：id=${id}`);
+    return true as const;
   }));
 
   // 外部链接走系统浏览器，而不是在应用内开窗

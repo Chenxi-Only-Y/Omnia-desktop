@@ -6,8 +6,8 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import {
-  IPC, type CombatStat, type ImportPreview, type IpcResult, type JoinMode,
-  type MatchInput, type ParticipationInput, type PlayerInput,
+  IPC, type CombatStat, type GroupInput, type ImportPreview, type IpcResult, type JoinMode,
+  type MatchInput, type ParticipationInput, type PlayerInput, type SquadInput,
 } from '../shared/types';
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
@@ -29,6 +29,11 @@ const api = {
   meta: {
     classes: () => invoke('meta:classes'),
     settings: () => invoke('meta:settings'),
+    squads: () => invoke('meta:squads'),
+    createGroup: (input: GroupInput) => invoke('meta:group:create', input),
+    removeGroup: (id: number) => invoke('meta:group:remove', id),
+    createSquad: (input: SquadInput) => invoke('meta:squad:create', input),
+    removeSquad: (id: number) => invoke('meta:squad:remove', id),
   },
   match: {
     list: () => invoke('match:list'),

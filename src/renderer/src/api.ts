@@ -3,9 +3,9 @@
  * 这样调用方可以用普通的 try/catch，而不用每处判断 ok。
  */
 import type {
-  AppInfo, ClassInfo, CombatStat, ImportPreview, IpcResult, JoinMode,
+  AppInfo, ClassInfo, CombatGroupRow, CombatStat, GroupInput, ImportPreview, IpcResult, JoinMode,
   Match, MatchInput, MatchSummary, ParticipationInput, ParticipationRow,
-  Player, PlayerInput,
+  Player, PlayerInput, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -31,8 +31,17 @@ const bridge = () => {
 
 export const api = {
   appInfo: (): Promise<AppInfo> => unwrap(bridge().app.info()),
-  classes: (): Promise<ClassInfo[]> => unwrap(bridge().meta.classes()),
-  settings: (): Promise<Record<string, string>> => unwrap(bridge().meta.settings()),
+
+  meta: {
+    classes: (): Promise<ClassInfo[]> => unwrap(bridge().meta.classes()),
+    settings: (): Promise<Record<string, string>> => unwrap(bridge().meta.settings()),
+    /** 战斗组 / 小队建制（数据驱动，可新增） */
+    squads: (): Promise<SquadCatalog> => unwrap(bridge().meta.squads()),
+    createGroup: (input: GroupInput): Promise<CombatGroupRow> => unwrap(bridge().meta.createGroup(input)),
+    removeGroup: (id: number): Promise<true> => unwrap(bridge().meta.removeGroup(id)),
+    createSquad: (input: SquadInput): Promise<SquadRow> => unwrap(bridge().meta.createSquad(input)),
+    removeSquad: (id: number): Promise<true> => unwrap(bridge().meta.removeSquad(id)),
+  },
 
   player: {
     list: (): Promise<Player[]> => unwrap(bridge().player.list()),

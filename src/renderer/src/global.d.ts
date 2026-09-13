@@ -1,7 +1,7 @@
 import type {
-  AppInfo, ClassInfo, CombatStat, ImportPreview, IpcResult, JoinMode,
+  AppInfo, ClassInfo, CombatStat, CombatGroupRow, GroupInput, ImportPreview, IpcResult, JoinMode,
   MatchInput, MatchSummary, OmniaApi, ParticipationInput, ParticipationRow,
-  Player, PlayerInput, Match,
+  Player, PlayerInput, Match, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 declare global {
@@ -20,6 +20,11 @@ declare global {
       meta: {
         classes(): Promise<IpcResult<ClassInfo[]>>;
         settings(): Promise<IpcResult<Record<string, string>>>;
+        squads(): Promise<IpcResult<SquadCatalog>>;
+        createGroup(input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
+        removeGroup(id: number): Promise<IpcResult<true>>;
+        createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
+        removeSquad(id: number): Promise<IpcResult<true>>;
       };
       match: {
         list(): Promise<IpcResult<MatchSummary[]>>;

@@ -1,13 +1,19 @@
 /**
- * 主进程 SQLite 封装（CommonJS 输出，直接使用 require 加载内置模块）
+ * 数据库层：使用 Electron 内置的 node:sqlite（无需原生编译）
  *
- * 用 Electron 内置的 node:sqlite，而不是原生模块 better-sqlite3：
- * 原生模块需要为 Electron ABI 重编译，依赖 VS Build Tools，是部署链上最大的不确定因素。
+ * 之所以不用 better-sqlite3：它是原生模块，需要为 Electron ABI 重新编译，
+ * 依赖 VS Build Tools，是部署链上最大的不确定因素。
  * 将来若要换实现，只改 loadSqlite()。
+ *
+ * 关于「战斗组 / 小队」：设计基准 v2 里原本把它们写成常量（4 组 × 3 队 × 6 人），
+ * 但用户明确要求「战斗组可新增、每组队伍数量不定」，因此改为数据库实体：
+ *   combat_group（防守一/二、进攻一/二 … 可挂 leadership 等属性）
+ *   squad       （防守二-3 这种，属于某个战斗组，默认 6 人）
+ * 业务校验一律以库里的行为准，代码里不再硬编码组名。
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { CLASSES, classIconFile } from '../shared/domain';
+import { CLASSES, DEFAULT_SQUADS, classIconFile } from '../shared/domain';
 
 export type SqlValue = string | number | bigint | null | Uint8Array;
 
@@ -243,13 +249,8 @@ const MIGRATIONS: Migration[] = [
     version: 3,
     name: 'class-icons-and-brand',
     up: (db) => {
-      // M8：把从原表导出的职业图标写入字典；惊鸿暂无素材，保持 NULL
       const upd = db.prepare('UPDATE class SET icon_file = ? WHERE name = ?');
-      for (const c of CLASSES) {
-        const f = classIconFile(c.name);
-        if (f) upd.run(f, c.name);
-        else upd.run(null, c.name);
-      }
+      for (const c of CLASSES) upd.run(classIconFile(c.name), c.name);
       db.prepare(
         `INSERT INTO app_setting (key, value) VALUES ('brandName', '万象·Omnia')
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
@@ -258,6 +259,46 @@ const MIGRATIONS: Migration[] = [
         `INSERT INTO app_setting (key, value) VALUES ('brandSlogan', 'All leagues. One universe. / 万象归一，联赛集成')
          ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
       ).run();
+    },
+  },
+  {
+    version: 4,
+    name: 'combat-groups-and-squads',
+    up: (db) => {
+      // 战斗组与小队改为数据实体：组可新增，组内队伍数量不定
+      db.exec(`
+        CREATE TABLE combat_group (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          name        TEXT NOT NULL UNIQUE,
+          kind        TEXT NOT NULL DEFAULT 'attack',   -- defend | attack
+          sort_order  INTEGER NOT NULL DEFAULT 0,
+          remark      TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE squad (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          group_id    INTEGER NOT NULL REFERENCES combat_group(id) ON DELETE CASCADE,
+          index_in_group INTEGER NOT NULL,               -- 组内第几队 → 命名 组名-N
+          name        TEXT NOT NULL UNIQUE,             -- 如 "防守二-3"
+          tactic      TEXT NOT NULL DEFAULT '',          -- 塔后拆 / 塔前拆 / 保镖 / 防守
+          size        INTEGER NOT NULL DEFAULT 6,
+          sort_order  INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX idx_squad_group ON squad(group_id);
+      `);
+
+      const grp = db.prepare(
+        'INSERT INTO combat_group (name, kind, sort_order) VALUES (?, ?, ?) ON CONFLICT(name) DO NOTHING',
+      );
+      const sqd = db.prepare(
+        `INSERT INTO squad (group_id, index_in_group, name, tactic, size, sort_order)
+         VALUES ((SELECT id FROM combat_group WHERE name = ?), ?, ?, ?, ?, ?)
+         ON CONFLICT(name) DO NOTHING`,
+      );
+      for (const g of DEFAULT_SQUADS) {
+        grp.run(g.group, g.kind, g.sortOrder);
+        sqd.run(g.group, g.indexInGroup, g.name, g.tactic, 6, g.sortOrder);
+      }
     },
   },
 ];

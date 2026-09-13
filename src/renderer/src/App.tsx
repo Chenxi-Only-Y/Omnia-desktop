@@ -34,7 +34,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const [cls, appInfo] = await Promise.all([api.classes(), api.appInfo()]);
+        const [cls, appInfo] = await Promise.all([api.meta.classes(), api.appInfo()]);
         setClasses(cls);
         setClassMap(new Map(cls.map((c) => [c.name, c])));
         setInfo(appInfo);

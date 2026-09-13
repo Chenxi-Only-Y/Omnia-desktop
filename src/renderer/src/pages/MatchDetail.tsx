@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
-  CombatStat, ImportPreview, JoinMode, Match, ParticipationRow, Player,
+  CombatStat, ImportPreview, JoinMode, Match, ParticipationRow, Player, SquadCatalog,
 } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
+import LineupBoard from '../components/LineupBoard';
 import {
-  BENCH_SQUADS, SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
+  BENCH_SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
 } from '@shared/domain';
 
 interface Props extends PageProps {
@@ -17,10 +18,7 @@ interface Props extends PageProps {
 
 type TabKey = 'lineup' | 'stats' | 'import';
 
-const SQUAD_OPTIONS = [
-  ...SQUADS.map((s) => s.squad),
-  ...BENCH_SQUADS,
-];
+/** 小队下拉选项来自建制（组件内用 catalog 计算） */
 
 /** 战报网格里展示的列（顺序对齐原表 / 录入习惯） */
 const GRID_FIELDS: { key: keyof CombatStat; label: string }[] = [
@@ -50,17 +48,23 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
   const [dirty, setDirty] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  /** 看板上被点开的小队槽位（空字符串表示未打开） */
+  const [cellPick, setCellPick] = useState<string | null>(null);
+  /** 战斗组 / 小队建制（数据驱动，可新增） */
+  const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [m, ps, pl] = await Promise.all([
+      const [m, ps, pl, cat] = await Promise.all([
         api.match.get(matchId),
         api.match.participations(matchId),
         api.player.list(),
+        api.meta.squads(),
       ]);
       setMatch(m);
       setRows(ps);
       setRoster(pl);
+      setCatalog(cat);
       setDrafts({});
       setDirty(new Set());
       setError(null);
@@ -152,6 +156,19 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
     }
   }
 
+  /** 把某人放进指定小队（看板点格子后的落点） */
+  async function addPlayerToSquad(playerId: number, squad: string) {
+    try {
+      await api.match.upsertParticipation({ matchId, playerId, squad, state: 'PLAY' });
+      setError(null);
+      await load();
+      onChanged();
+      setNotice(`已把队员放入「${squad}」`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
+
   function editStat(row: ParticipationRow, key: keyof CombatStat, value: string) {
     const base = drafts[row.id] ?? row.stat;
     const num = value === '' ? 0 : Math.max(0, Math.round(Number(value) || 0));
@@ -186,7 +203,10 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
     );
   }
 
-  const missingSlots = Math.max(0, 60 - stats.assigned);
+  const missingSlots = our.filter((r) => r.state === 'PLAY' && !r.squad).length;
+  /** 建制容量与下拉选项全部来自数据库，不硬编码 */
+  const squadOptions = [...(catalog?.squads ?? []).map((s) => s.name), ...BENCH_SQUADS];
+  const capacityHint = catalog?.capacity ?? 0;
 
   return (
     <>
@@ -249,13 +269,45 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
 
       {tab === 'lineup' && (
         <>
+          <div className="card" style={{ padding: '12px 14px' }}>
+            <LineupBoard
+              classes={classes}
+              classMap={classMap}
+              rows={our}
+              catalog={catalog}
+              onPickSlot={(squad) => setCellPick(squad)}
+              onRemoveRow={(id) => {
+                const row = our.find((r) => r.id === id);
+                if (row) void removeRow(row);
+              }}
+            />
+            <div className="hint" style={{ marginTop: 8 }}>
+              点击职业色块可把队员放进该小队；点击姓名把该人移出本场。
+              版式对齐原表「排表」页：每小队 6 人 × 5 行（职业 / 备注 / 姓名 / 战术 / 角色 ID）。
+            </div>
+          </div>
+
+          {cellPick && (
+            <CellPicker
+              squad={cellPick}
+              roster={roster}
+              rows={our}
+              classMap={classMap}
+              onClose={() => setCellPick(null)}
+              onAssign={async (playerId, targetSquad) => {
+                await addPlayerToSquad(playerId, targetSquad);
+                setCellPick(null);
+              }}
+            />
+          )}
+
           <div className="card">
             <div className="toolbar" style={{ marginBottom: 0 }}>
               <button className="btn primary" onClick={() => setShowAdd(!showAdd)}>
                 {showAdd ? '收起' : '添加队员'}
               </button>
               <span className="hint" style={{ margin: 0 }}>
-                小队共 60 个上场槽位（防守一/二 各 12，进攻一/二 各 18）
+                也可用下方表格逐项调整（小队共 {capacityHint} 个上场槽位）
                 {missingSlots > 0 ? ` · 还空 ${missingSlots} 个` : ' · 已排满'}
               </span>
             </div>
@@ -270,7 +322,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
           </div>
 
           <div className="card">
-            <h3>我方参战（{our.length}）</h3>
+            <h3>我方参战明细（{our.length}）</h3>
             <div className="table-wrap" style={{ maxHeight: '50vh' }}>
               <table className="grid">
                 <thead>
@@ -303,7 +355,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                         <select className="select" value={r.squad}
                                 onChange={(e) => void setSquad(r, e.target.value)}>
                           <option value="">未分配</option>
-                          {SQUAD_OPTIONS.map((s) => (
+                          {squadOptions.map((s) => (
                             <option key={s} value={s}>
                               {s}{stats.squadCounts.get(s) ? `（${stats.squadCounts.get(s)}）` : ''}
                             </option>
@@ -400,6 +452,65 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
         />
       )}
     </>
+  );
+}
+
+// ── 点击看板格子后的选人面板 ─────────────────────────────────────
+function CellPicker({
+  squad, roster, rows, classMap, onAssign, onClose,
+}: {
+  squad: string;
+  roster: Player[];
+  rows: ParticipationRow[];
+  classMap: PageProps['classMap'];
+  onAssign: (playerId: number, squad: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState('');
+  const byId = new Map(rows.map((r) => [r.playerId, r]));
+  const key = q.trim().toLowerCase();
+
+  const list = roster
+    .map((p) => ({ p, cur: byId.get(p.id) }))
+    .filter(({ p, cur }) => {
+      if (cur?.squad === squad) return false;        // 已在本小队
+      if (!key) return true;
+      return p.name.toLowerCase().includes(key) || p.gameId.toLowerCase().includes(key)
+        || p.mainClass.includes(q.trim());
+    })
+    .sort((a, b) => {
+      // 未分配的排前面，其次按入帮序
+      const ua = a.cur?.squad ? 1 : 0;
+      const ub = b.cur?.squad ? 1 : 0;
+      if (ua !== ub) return ua - ub;
+      return (a.p.joinedOrder ?? 9999) - (b.p.joinedOrder ?? 9999);
+    });
+
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="modal__box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal__head">
+          <h3>放入「{squad}」</h3>
+          <button className="btn sm ghost" onClick={onClose}>关闭</button>
+        </div>
+        <input className="input" style={{ width: '100%', marginBottom: 8 }}
+               placeholder="搜索名字 / 角色 ID / 职业" value={q} autoFocus
+               onChange={(e) => setQ(e.target.value)} />
+        <div className="picker-grid" style={{ maxHeight: 320 }}>
+          {list.length === 0 && <span className="hint">没有可放入的队员</span>}
+          {list.map(({ p, cur }) => (
+            <button key={p.id} className="picker-item" onClick={() => void onAssign(p.id, squad)}>
+              <span className="nm">{p.name}</span>
+              <ClassChip name={p.mainClass} classMap={classMap} />
+              {cur?.squad && <span className="picker-item__where">{cur.squad}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="hint" style={{ marginTop: 8 }}>
+          已经在别的小队里的人会被移动过来（同一场里一人只能在一个小队）。
+        </div>
+      </div>
+    </div>
   );
 }
 

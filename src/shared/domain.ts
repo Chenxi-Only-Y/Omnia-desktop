@@ -81,38 +81,58 @@ export const CLASS_COEF: Record<string, number> = Object.fromEntries(
 );
 
 // ── 战术类型与小队结构（D9 / D10） ───────────────────────────────
-export type Tactic = '塔后拆' | '塔前拆' | '保镖' | '防守';
-export const TACTICS: readonly Tactic[] = ['塔后拆', '塔前拆', '保镖', '防守'] as const;
+export type Tactic = '塔后拆' | '塔前拆' | '保镖' | '防守' | '未定';
+export const TACTICS: readonly Tactic[] = ['塔后拆', '塔前拆', '保镖', '防守', '未定'] as const;
+
+/** 战斗组类别：防守 / 进攻 */
+export type GroupKind = 'defend' | 'attack';
+export const GROUP_KIND_LABEL: Record<GroupKind, string> = { defend: '防守', attack: '进攻' };
 
 export type SquadGroup = '防守一' | '防守二' | '进攻一' | '进攻二';
-export const SQUAD_GROUPS: readonly SquadGroup[] = ['防守一', '防守二', '进攻一', '进攻二'] as const;
 
 export interface SquadDef {
-  /** 小队编号，如 "防守一1" —— 与原表 I 列自动编号规则一致 */
-  squad: string;
+  /** 小队名，格式为「组名-序号」，如 防守二-3 */
+  name: string;
   group: SquadGroup;
+  kind: 'defend' | 'attack';
+  /** 组内第几队；命名规则 = 组名 + "-" + indexInGroup */
+  indexInGroup: number;
   tactic: Tactic;
   size: number;
+  sortOrder: number;
 }
 
-/** 10 支上场小队：防守一/二 各 2 支，进攻一/二 各 3 支 */
-export const SQUADS: readonly SquadDef[] = [
-  { squad: '防守一1', group: '防守一', tactic: '防守', size: 6 },
-  { squad: '防守一2', group: '防守一', tactic: '防守', size: 6 },
-  { squad: '防守二1', group: '防守二', tactic: '防守', size: 6 },
-  { squad: '防守二2', group: '防守二', tactic: '防守', size: 6 },
-  { squad: '进攻一1', group: '进攻一', tactic: '塔后拆', size: 6 },
-  { squad: '进攻一2', group: '进攻一', tactic: '塔前拆', size: 6 },
-  { squad: '进攻一3', group: '进攻一', tactic: '保镖', size: 6 },
-  { squad: '进攻二1', group: '进攻二', tactic: '塔后拆', size: 6 },
-  { squad: '进攻二2', group: '进攻二', tactic: '塔前拆', size: 6 },
-  { squad: '进攻二3', group: '进攻二', tactic: '保镖', size: 6 },
+/**
+ * 默认的「战斗组 → 小队」结构（迁移脚本用它初始化数据库）。
+ *
+ * 用户口径：共 10 个战斗队 × 6 人，划归到 4 个战斗组；
+ * 组内第 N 队命名为「组名-N」（如防守二有 3 队 → 防守二-3）。
+ * 战斗组可新增、每组队伍数量不定，因此运行时一律读数据库，
+ * 这里的常量只用于首次初始化，不作为业务校验依据。
+ */
+export const DEFAULT_SQUADS: readonly SquadDef[] = [
+  { name: '防守一-1', group: '防守一', kind: 'defend', indexInGroup: 1, tactic: '防守', size: 6, sortOrder: 1 },
+  { name: '防守一-2', group: '防守一', kind: 'defend', indexInGroup: 2, tactic: '防守', size: 6, sortOrder: 2 },
+  { name: '防守一-3', group: '防守一', kind: 'defend', indexInGroup: 3, tactic: '防守', size: 6, sortOrder: 3 },
+  { name: '防守二-1', group: '防守二', kind: 'defend', indexInGroup: 1, tactic: '防守', size: 6, sortOrder: 4 },
+  { name: '防守二-2', group: '防守二', kind: 'defend', indexInGroup: 2, tactic: '防守', size: 6, sortOrder: 5 },
+  { name: '防守二-3', group: '防守二', kind: 'defend', indexInGroup: 3, tactic: '防守', size: 6, sortOrder: 6 },
+  { name: '进攻一-1', group: '进攻一', kind: 'attack', indexInGroup: 1, tactic: '塔后拆', size: 6, sortOrder: 7 },
+  { name: '进攻一-2', group: '进攻一', kind: 'attack', indexInGroup: 2, tactic: '塔前拆', size: 6, sortOrder: 8 },
+  { name: '进攻一-3', group: '进攻一', kind: 'attack', indexInGroup: 3, tactic: '保镖', size: 6, sortOrder: 9 },
+  { name: '进攻二-1', group: '进攻二', kind: 'attack', indexInGroup: 1, tactic: '塔后拆', size: 6, sortOrder: 10 },
+  { name: '进攻二-2', group: '进攻二', kind: 'attack', indexInGroup: 2, tactic: '塔前拆', size: 6, sortOrder: 11 },
+  { name: '进攻二-3', group: '进攻二', kind: 'attack', indexInGroup: 3, tactic: '保镖', size: 6, sortOrder: 12 },
 ] as const;
 
-/** 非上场槽位 */
+/** 非上场槽位（状态，不是战斗组） */
 export const BENCH_SQUADS = ['替补', '请假'] as const;
 
-export const TOTAL_MATCH_SLOTS = SQUADS.reduce((s, x) => s + x.size, 0); // 60
+/** 默认建制容量：10 队 × 6 人 = 60 */
+export const DEFAULT_SQUAD_CAPACITY = DEFAULT_SQUADS.length * 6;
+
+export const TOTAL_MATCH_SLOTS = DEFAULT_SQUAD_CAPACITY;
+
 
 // ── 备注角色与附加分（D18） ───────────────────────────────────────
 export type NoteRole = '指挥' | '统战' | 'K龙' | '替补指挥' | '长期请假' | '';

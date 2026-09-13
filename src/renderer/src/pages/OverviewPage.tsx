@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AppInfo, Player } from '@shared/types';
+import type { AppInfo, Player, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
-import { CLASSES, SQUADS, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE, classIconUrl } from '@shared/domain';
+import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
+import { classIconSrc } from '../lib/assets';
 
 interface Props extends PageProps {
   info: AppInfo | null;
@@ -12,12 +13,14 @@ interface Props extends PageProps {
 
 export default function OverviewPage({ classes, onCount, onGoRoster, info }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const rows = await api.player.list();
+      const [rows, cat] = await Promise.all([api.player.list(), api.meta.squads()]);
       setPlayers(rows);
+      setCatalog(cat);
       onCount(rows.length);
       setError(null);
     } catch (err) {
@@ -77,8 +80,7 @@ export default function OverviewPage({ classes, onCount, onGoRoster, info }: Pro
             {CLASSES.map((c) => {
               const n = byClass.get(c.name) ?? 0;
               const pct = (n / maxClass) * 100;
-              const icon = classIconUrl(c.name);
-              const iconSrc = icon ? `${import.meta.env.BASE_URL}${icon.replace(/^\.\//, '')}` : null;
+              const iconSrc = classIconSrc(c.name);
               return (
                 <div key={c.name} style={{ display: 'grid', gridTemplateColumns: '104px 1fr 52px', alignItems: 'center', gap: 10 }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: c.color, fontSize: 12 }}>
@@ -105,11 +107,13 @@ export default function OverviewPage({ classes, onCount, onGoRoster, info }: Pro
         <div className="stat-grid">
           <div className="stat"><div className="k">上场结构</div>
             <div className="v" style={{ fontSize: 15 }}>
-              10 支小队 × 6 人 <small>= {TOTAL_MATCH_SLOTS} 槽</small>
+              {catalog ? `${catalog.squads.length} 个战斗队 × 6 人` : '—'}
+              <small> = {catalog?.capacity ?? TOTAL_MATCH_SLOTS} 槽</small>
             </div>
             <div className="hint" style={{ marginTop: 4 }}>
-              {SQUADS.filter((s) => s.group.startsWith('防守')).length} 支防守队 ·{' '}
-              {SQUADS.filter((s) => s.group.startsWith('进攻')).length} 支进攻队
+              {catalog
+                ? `划归 ${catalog.groups.length} 个战斗组：${catalog.groups.map((g) => g.name).join('、')}`
+                : '读取建制作战中…'}
             </div>
           </div>
           <div className="stat"><div className="k">每方塔数</div>

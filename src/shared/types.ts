@@ -3,14 +3,14 @@
  * 主进程与渲染进程共用；任何一侧改动都会触发 TypeScript 报错。
  */
 import type {
-  CombatStat, MatchResult, NoteRole, PartState, Tactic, SquadGroup, RoleKey,
+  CombatStat, MatchResult, NoteRole, PartState, Tactic, SquadGroup, RoleKey, GroupKind,
 } from './domain';
 
 /**
  * 领域类型统一从 types 出口转发，调用方（主进程 / 预加载 / 渲染层）
  * 只需依赖 `shared/types` 一个模块。
  */
-export type { CombatStat, MatchResult, NoteRole, PartState, Tactic, SquadGroup, RoleKey };
+export type { CombatStat, MatchResult, NoteRole, PartState, Tactic, SquadGroup, RoleKey, GroupKind };
 
 // ── 实体 ─────────────────────────────────────────────────────────
 export interface Player {
@@ -227,6 +227,48 @@ export interface ImportPreview {
 
 export type JoinMode = 'roster' | 'full';
 
+// ── 战斗组 / 小队建制（可新增，运行时以库为准） ──────────────────
+export interface CombatGroupRow {
+  id: number;
+  name: string;
+  kind: GroupKind;
+  sortOrder: number;
+  remark: string;
+}
+
+export interface SquadRow {
+  id: number;
+  groupId: number;
+  groupName: string;
+  kind: GroupKind;
+  indexInGroup: number;
+  /** 组名-序号，如 防守二-3 */
+  name: string;
+  tactic: Tactic | '';
+  size: number;
+  sortOrder: number;
+}
+
+export interface SquadCatalog {
+  groups: CombatGroupRow[];
+  squads: SquadRow[];
+  /** 建制总容量 = Σ 小队人数 */
+  capacity: number;
+}
+
+export interface GroupInput {
+  name: string;
+  kind: GroupKind;
+  remark?: string;
+}
+
+export interface SquadInput {
+  groupId: number;
+  indexInGroup?: number;
+  tactic?: string;
+  size?: number;
+}
+
 // ── IPC 契约 ─────────────────────────────────────────────────────
 export interface AppInfo {
   version: string;
@@ -268,6 +310,12 @@ export interface OmniaApi {
   meta: {
     classes(): Promise<IpcResult<ClassInfo[]>>;
     settings(): Promise<IpcResult<AppSettings>>;
+    /** 战斗组 / 小队建制（可新增） */
+    squads(): Promise<IpcResult<SquadCatalog>>;
+    createGroup(input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
+    removeGroup(id: number): Promise<IpcResult<true>>;
+    createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
+    removeSquad(id: number): Promise<IpcResult<true>>;
   };
   match: {
     list(): Promise<IpcResult<MatchSummary[]>>;
@@ -294,6 +342,11 @@ export const IPC = {
   playerExport: 'player:export',
   metaClasses: 'meta:classes',
   metaSettings: 'meta:settings',
+  metaSquads: 'meta:squads',
+  metaGroupCreate: 'meta:group:create',
+  metaGroupRemove: 'meta:group:remove',
+  metaSquadCreate: 'meta:squad:create',
+  metaSquadRemove: 'meta:squad:remove',
 
   // M3 对局与战报
   matchList: 'match:list',

@@ -12,7 +12,8 @@ import type {
   CombatStat, Match, MatchInput, MatchSummary, NoteRole, PartState,
   ParticipationInput, ParticipationRow,
 } from '../../shared/types';
-import { EMPTY_COMBAT_STAT, SQUADS, findClass, tacticKind } from '../../shared/domain';
+import { BENCH_SQUADS, EMPTY_COMBAT_STAT, findClass, tacticKind } from '../../shared/domain';
+import { SquadRepo } from './squadRepo';
 
 interface MatchRow {
   id: number; season_id: number | null; date: string; index_in_day: number;
@@ -83,10 +84,12 @@ const STAT_COLUMNS: [keyof CombatStat, string][] = [
   ['revives', 'revives'], ['boneBurn', 'bone_burn'],
 ];
 
-const SQUAD_BY_NAME = new Map(SQUADS.map((x) => [x.squad, x]));
-
 export class MatchRepo {
-  constructor(private db: SqlDatabase) {}
+  private squads: SquadRepo;
+
+  constructor(private db: SqlDatabase) {
+    this.squads = new SquadRepo(db);
+  }
 
   // ── 对局 ─────────────────────────────────────────────────────
   list(): MatchSummary[] {
@@ -302,12 +305,18 @@ export class MatchRepo {
     if (!pl) throw new Error(`成员不存在：id=${playerId}`);
 
     const squad = s(input.squad);
-    const sq = squad ? SQUAD_BY_NAME.get(squad) : undefined;
-    if (squad && !sq && squad !== '替补' && squad !== '请假') {
-      throw new Error(`未知小队：${squad}`);
+    let tactic = '';
+    let teamRole = '';
+    if (squad) {
+      // 允许「替补 / 请假」这类非战斗槽位，以及库里登记过的战斗小队
+      const isBench = (BENCH_SQUADS as readonly string[]).includes(squad);
+      if (!isBench) {
+        const hit = this.squads.paramsForSquadName(squad);
+        if (!hit.kind) throw new Error(`未知小队：${squad}（可在「设置 → 战斗组与小队」里新增）`);
+        tactic = hit.tactic;
+        teamRole = hit.teamRole;
+      }
     }
-    const tactic = sq?.tactic ?? '';
-    const teamRole = sq ? (sq.group.startsWith('防守') ? '防守' : '进攻') : '';
 
     const classUsed = s(input.classUsed) || pl.main_class;
     if (classUsed && !findClass(classUsed)) {

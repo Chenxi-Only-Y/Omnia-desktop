@@ -17,6 +17,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "types": ["vite/client"],
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"]

@@ -238,6 +238,90 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of m3.steps) console.log('[smoke] M3:', s);
     console.log('[smoke] M3 对局与战报      :', m3.ok ? 'PASS' : 'FAIL');
 
+    // M5：战斗组/小队建制（数据驱动）+ 排表看板渲染
+    const m5 = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      try {
+        const api = window.omnia;
+        const cat = await api.meta.squads();
+        if (!cat.ok) throw new Error('读取建制失败: ' + cat.error);
+        const groups = cat.data.groups.map(g => g.name + ':' + g.kind);
+        const squads = cat.data.squads.map(s => s.name);
+        steps.push('战斗组=' + groups.join(' '));
+        steps.push('小队=' + squads.join(' '));
+        steps.push('容量=' + cat.data.capacity);
+
+        // 新增一个战斗组 + 一支小队，验证「可新增」与命名规则
+        const g = await api.meta.createGroup({ name: '演练组', kind: 'attack' });
+        if (!g.ok) throw new Error('新增战斗组失败: ' + g.error);
+        const s1 = await api.meta.createSquad({ groupId: g.data.id, tactic: '保镖' });
+        if (!s1.ok) throw new Error('新增小队失败: ' + s1.error);
+        steps.push('新增组「演练组」→ 自动命名小队「' + s1.data.name + '」序号=' + s1.data.indexInGroup);
+        const s2 = await api.meta.createSquad({ groupId: g.data.id });
+        steps.push('再增一队 → 自动命名「' + s2.data.name + '」');
+        await api.meta.removeSquad(s2.data.id);
+        await api.meta.removeSquad(s1.data.id);
+        await api.meta.removeGroup(g.data.id);
+        steps.push('清理完成');
+
+        // 建一场对局并把一个人排进「防守一-1」，然后进看板页数方块
+        const p = await api.player.create({ gameId: 'smoke_board_1', name: '看板测试员', mainClass: '素问', mic: '有' });
+        if (!p.ok) throw new Error('建档失败: ' + p.error);
+        const m = await api.match.create({ date: '2026-02-02', ourSide: '我方', oppSide: '对手B', result: 'WIN' });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        await api.match.upsertParticipation({ matchId: m.data.match.id, playerId: p.data.id, squad: '防守一-1', state: 'PLAY' });
+
+        const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('对局与战报'));
+        if (!nav) throw new Error('侧栏里没找到「对局与战报」');
+        nav.click();
+
+        const waitFor = async (fn, label, ms = 6000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) {
+            const r = fn();
+            if (r) return r;
+            await new Promise(res => setTimeout(res, 150));
+          }
+          throw new Error('等待超时：' + label
+            + '；当前内容区前 120 字=' + (document.querySelector('.content')?.textContent ?? '').slice(0, 120));
+        };
+
+        // 点「进入」打开对局详情（若列表页直接带了进入按钮）
+        const enterBtn = [...document.querySelectorAll('table.grid button')]
+          .find(b => b.textContent.trim() === '进入');
+        if (enterBtn) enterBtn.click();
+
+        // 切到阵容编排页签
+        await waitFor(() => document.querySelector('button.tab') ? true : null, '页签出现');
+        const lineupTab = [...document.querySelectorAll('button.tab')]
+          .find(b => b.textContent.includes('阵容编排'));
+        if (lineupTab) lineupTab.click();
+
+        // 等排表看板方块渲染出来
+        await waitFor(() => document.querySelectorAll('.blk').length > 0 ? true : null, '排表看板方块');
+
+        const blocks = document.querySelectorAll('.blk').length;
+        const teamNames = [...document.querySelectorAll('.blk__teamname')].map(e => e.textContent.trim());
+        const icons = document.querySelectorAll('.blk__icon').length;
+        const named = document.querySelectorAll('.blk__pname').length;
+        steps.push('看板渲染小队方块=' + blocks + ' 含职业图标=' + icons + ' 有姓名=' + named);
+        steps.push('方块小队名（前5）=' + teamNames.slice(0, 5).join(','));
+        const hasTarget = teamNames.includes('防守一-1');
+
+        await api.match.remove(m.data.match.id);
+        await api.player.remove(p.data.id);
+
+        const ok = cat.data.groups.length === 4
+          && cat.data.squads.length === 12
+          && cat.data.capacity === 72
+          && squads.includes('防守一-1') && squads.includes('防守二-3') && squads.includes('进攻二-3')
+          && s1.data.name === '演练组-1' && s2.data.name === '演练组-2'
+          && blocks === 12 && hasTarget;        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of m5.steps) console.log('[smoke] M5:', s);
+    console.log('[smoke] M5 建制与看板      :', m5.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -269,7 +353,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
-      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && iconOk;
+      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

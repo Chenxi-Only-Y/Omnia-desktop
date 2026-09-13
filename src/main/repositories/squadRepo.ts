@@ -1,0 +1,165 @@
+/**
+ * 战斗组 / 小队建制仓储
+ *
+ * 用户口径：一共 10 个战斗队每队 6 人，10 个队划归到不同战斗组（每组划归小队数量不定），
+ * 共 4 个战斗组：防守一 / 防守二 / 进攻一 / 进攻二，**可新增**。
+ * 战斗组按队伍数量分 1/2/3：如防守二有 3 队，则第 3 队叫「防守二-3」。
+ *
+ * 因此组与小队的命名、归属、战术都在库里维护，代码不硬编码。
+ */
+import type { SqlDatabase, SqlValue } from '../db';
+import type {
+  CombatGroupRow, GroupInput, SquadCatalog, SquadInput, SquadRow,
+} from '../../shared/types';
+import type { GroupKind, Tactic } from '../../shared/domain';
+
+interface GroupDbRow {
+  id: number; name: string; kind: string; sort_order: number; remark: string;
+}
+interface SquadDbRow {
+  id: number; group_id: number; index_in_group: number; name: string;
+  tactic: string; size: number; sort_order: number;
+  group_name: string; kind: string;
+}
+
+const toGroup = (r: GroupDbRow): CombatGroupRow => ({
+  id: r.id,
+  name: r.name,
+  kind: (r.kind === 'defend' ? 'defend' : 'attack') as GroupKind,
+  sortOrder: r.sort_order,
+  remark: r.remark ?? '',
+});
+
+const toSquad = (r: SquadDbRow): SquadRow => ({
+  id: r.id,
+  groupId: r.group_id,
+  groupName: r.group_name,
+  kind: (r.kind === 'defend' ? 'defend' : 'attack') as GroupKind,
+  indexInGroup: r.index_in_group,
+  name: r.name,
+  tactic: (r.tactic || '') as Tactic | '',
+  size: r.size,
+  sortOrder: r.sort_order,
+});
+
+export class SquadRepo {
+  constructor(private db: SqlDatabase) {}
+
+  catalog(): SquadCatalog {
+    const groups = (this.db.prepare(
+      'SELECT * FROM combat_group ORDER BY sort_order ASC, id ASC',
+    ).all() as unknown as GroupDbRow[]).map(toGroup);
+
+    const squads = (this.db.prepare(
+      `SELECT s.*, g.name AS group_name, g.kind
+       FROM squad s JOIN combat_group g ON g.id = s.group_id
+       ORDER BY g.sort_order ASC, s.index_in_group ASC, s.sort_order ASC`,
+    ).all() as unknown as SquadDbRow[]).map(toSquad);
+
+    return { groups, squads, capacity: squads.reduce((n, s) => n + s.size, 0) };
+  }
+
+  /** 战斗组可新增；名称唯一 */
+  createGroup(input: GroupInput): CombatGroupRow {
+    const name = (input.name ?? '').trim();
+    if (!name) throw new Error('战斗组名称不能为空');
+    if (this.db.prepare('SELECT 1 FROM combat_group WHERE name = ?').get(name)) {
+      throw new Error(`战斗组已存在：${name}`);
+    }
+    const max = this.db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM combat_group').get() as { m: number };
+    const info = this.db.prepare(
+      'INSERT INTO combat_group (name, kind, sort_order, remark) VALUES (?, ?, ?, ?)',
+    ).run(name, input.kind === 'defend' ? 'defend' : 'attack', Number(max.m) + 1, (input.remark ?? '').trim());
+    const row = this.db.prepare('SELECT * FROM combat_group WHERE id = ?')
+      .get(Number(info.lastInsertRowid)) as unknown as GroupDbRow;
+    return toGroup(row);
+  }
+
+  removeGroup(id: number): boolean {
+    const n = this.db.prepare('SELECT COUNT(*) AS c FROM squad WHERE group_id = ?').get(id) as { c: number };
+    if (Number(n.c) > 0) throw new Error(`该战斗组下还有 ${n.c} 支小队，请先删除小队`);
+    return this.db.prepare('DELETE FROM combat_group WHERE id = ?').run(id).changes > 0;
+  }
+
+  /** 新增小队：序号默认接在该组末尾，命名自动为「组名-序号」 */
+  createSquad(input: SquadInput): SquadRow {
+    const g = this.db.prepare('SELECT * FROM combat_group WHERE id = ?')
+      .get(input.groupId) as unknown as GroupDbRow | undefined;
+    if (!g) throw new Error(`战斗组不存在：id=${input.groupId}`);
+
+    const maxIdx = this.db.prepare(
+      'SELECT COALESCE(MAX(index_in_group), 0) AS m FROM squad WHERE group_id = ?',
+    ).get(input.groupId) as { m: number };
+    const idx = input.indexInGroup && input.indexInGroup > 0 ? input.indexInGroup : Number(maxIdx.m) + 1;
+    const name = `${g.name}-${idx}`;
+
+    if (this.db.prepare('SELECT 1 FROM squad WHERE name = ?').get(name)) {
+      throw new Error(`小队已存在：${name}`);
+    }
+    const maxSort = this.db.prepare('SELECT COALESCE(MAX(sort_order), 0) AS m FROM squad').get() as { m: number };
+    const info = this.db.prepare(
+      `INSERT INTO squad (group_id, index_in_group, name, tactic, size, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(
+      input.groupId, idx, name,
+      (input.tactic ?? '').trim(),
+      input.size && input.size > 0 ? Math.min(12, Math.round(input.size)) : 6,
+      Number(maxSort.m) + 1,
+    );
+    const row = this.db.prepare(
+      `SELECT s.*, g.name AS group_name, g.kind FROM squad s
+       JOIN combat_group g ON g.id = s.group_id WHERE s.id = ?`,
+    ).get(Number(info.lastInsertRowid)) as unknown as SquadDbRow;
+    return toSquad(row);
+  }
+
+  removeSquad(id: number): boolean {
+    return this.db.prepare('DELETE FROM squad WHERE id = ?').run(id).changes > 0;
+  }
+
+  /** 按名字找小队（写参战时用） */
+  findByName(name: string): SquadRow | undefined {
+    const r = this.db.prepare(
+      `SELECT s.*, g.name AS group_name, g.kind FROM squad s
+       JOIN combat_group g ON g.id = s.group_id WHERE s.name = ?`,
+    ).get((name ?? '').trim()) as unknown as SquadDbRow | undefined;
+    return r ? toSquad(r) : undefined;
+  }
+
+  /** 供参战校验使用：名字集合 */
+  nameSet(): Set<string> {
+    const rows = this.db.prepare('SELECT name FROM squad').all() as unknown as { name: string }[];
+    return new Set(rows.map((r) => r.name));
+  }
+
+  groupByName(name: string): CombatGroupRow | undefined {
+    const r = this.db.prepare('SELECT * FROM combat_group WHERE name = ?')
+      .get((name ?? '').trim()) as unknown as GroupDbRow | undefined;
+    return r ? toGroup(r) : undefined;
+  }
+
+  /** 组名 → 类别，用于 team_role 判定 */
+  kindOfGroup(name: string): GroupKind | '' {
+    const g = this.groupByName(name);
+    return g ? g.kind : '';
+  }
+
+  paramsForSquadName(name: string): { tactic: string; teamRole: string; kind: GroupKind | '' } {
+    const s = this.findByName(name);
+    if (!s) return { tactic: '', teamRole: '', kind: '' };
+    return {
+      tactic: s.tactic,
+      teamRole: s.kind === 'defend' ? '防守' : '进攻',
+      kind: s.kind,
+    };
+  }
+
+  /** 从「防守二-3」这类名字里取出组名 */
+  static groupOf(squadName: string): string {
+    return (squadName ?? '').replace(/-\d+$/, '');
+  }
+
+  static sqlValue(v: unknown): SqlValue {
+    return v as SqlValue;
+  }
+}

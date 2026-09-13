@@ -2,5 +2,7 @@ node_modules/
 dist/
 release/
 *.log
+# 打包后自检的证据日志需要入库（见 README「打包与安装验证」）
+!docs/packaged-smoke.log
 .DS_Store
 dev-data/

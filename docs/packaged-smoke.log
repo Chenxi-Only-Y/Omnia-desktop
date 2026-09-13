@@ -1,0 +1,81 @@
+[smoke] preload 注入        : true
+[smoke] app.info()         : true
+[smoke] meta.classes() 数量 : 12
+[smoke] player.list() 数量  : 0
+[smoke] React 已渲染字符数  : 4936
+[smoke] 错误                : 无
+[smoke] CRUD: create ok id=1 class=神相
+[smoke] CRUD: update ok sub=潮光 remark=自检写入
+[smoke] CRUD: 重复 ID 被拦: 是
+[smoke] CRUD: before=0 afterCreate=1 afterRemove=0
+[smoke] M3: 建档 ok id=2
+[smoke] M3: 建对局 ok id=1 inherited=0
+[smoke] M3: 严格模式 total=3 匹配=2 未匹配=1 错误=2 警告=0
+[smoke] M3: 问题分类=NOT_IN_ROSTER,DUPLICATE_IN_MATCH
+[smoke] M3: 解析复合列 击败=32 清泉=0 有效人伤=8930953 有效塔伤=1965057
+[smoke] M3: 有错误时提交被拒: 是
+[smoke] M3: 入库 ok written=2 自动建档=1
+[smoke] M3: 读回 ok 参战=2 有效击杀=32 助攻=151 statFilled=true
+[smoke] M3: 对局列表 ok 场次=1 我方参战=2 已录战报=2
+[smoke] M3: 清理后成员数=1
+[smoke] M3 对局与战报      : PASS
+[smoke] M5: 战斗组=防守一:defend 防守二:defend 进攻一:attack 进攻二:attack
+[smoke] M5: 小队=防守一-1 防守一-2 防守一-3 防守二-1 防守二-2 防守二-3 进攻一-1 进攻一-2 进攻一-3 进攻二-1 进攻二-2 进攻二-3
+[smoke] M5: 容量=72
+[smoke] M5: 新增组「演练组」→ 自动命名小队「演练组-1」序号=1
+[smoke] M5: 再增一队 → 自动命名「演练组-2」
+[smoke] M5: 清理完成
+[smoke] M5: 看板渲染小队方块=12 含职业图标=1 有姓名=1
+[smoke] M5: 方块小队名（前5）=防守一-1,防守一-2,防守一-3,防守二-1,防守二-2
+[smoke] M5 建制与看板      : PASS
+[smoke] M6: 总场次=2 成员=4 参战记录=6
+[smoke] M6: 战报完整度=4/5 = 80%
+[smoke] M6: 场均上场=2.50
+[smoke] M6: 出勤前三=统计甲(2/2) 统计乙(2/2) 统计丙(1/2)
+[smoke] M6: 职业出场=素问:2 神相:2 铁衣:1
+[smoke] M6: 小队使用=防守一-1:3[defend] 进攻一-1:2[attack]
+[smoke] M6: 治疗值覆盖=1/5
+[smoke] M6: 主视觉 品牌字="万象·Omnia" 职业图标=12 快捷按钮=4
+[smoke] M6: 看板页 行数=4 页签=3
+[smoke] M6: 设置页 战斗组表行数=16
+[smoke] M6: 清理后场次=0 成员=1
+[smoke] M6 看板与首页      : PASS
+[smoke] M7 真实旧表导入    : SKIP（未提供样本，设 OMNIA_SAMPLE_XLSX 指向旧表即可验证）
+[smoke] 向导: 弹窗标题="导入成员主档" 有选文件按钮=true 有表头说明=true
+[smoke] 向导: 点击关闭后弹窗已消失=true
+[smoke] 导入向导界面接线  : PASS
+[smoke] 拖拽: 进入方式=自动进入详情
+[smoke] 拖拽: 拖拽前 防守一-1 含 拖拽甲=true
+[smoke] 拖拽: new DataTransfer() 可用，回读="probe"
+[smoke] 拖拽: dragstart 写入的载荷={"playerIds":[8],"label":"拖拽甲"}
+[smoke] 拖拽: 落库后 拖拽甲.squad=进攻一-1 state=PLAY tactic=塔后拆
+[smoke] 拖拽: 未分配的 拖拽乙.squad=""
+[smoke] 拖拽: 未分配区出现 拖拽乙=true
+[smoke] 看板拖拽排表      : PASS
+[smoke] 详情: 场次=2 上场=2 已填战报=2
+[smoke] 详情: 有效击杀=33（应 20+2+10+1=33）
+[smoke] 详情: 有效人伤=2300（应 1500+800=2300）
+[smoke] 详情: 有效塔伤=500（应 400+100=500）
+[smoke] 详情: 助攻=50 重伤=3 承伤=1200
+[smoke] 详情: 逐场条数=2 首条=2026-05-08 -1 职业=神相 状态=PLAY
+[smoke] 详情: 雷达维度=有效击杀:2.00 有效人伤:2.00 有效塔伤:2.00 助攻:1.11 治疗量:0.00 承伤:1.60
+[smoke] 详情: 球队人均 有效击杀=8.25 有效人伤=575.00
+[smoke] 详情: 乙 上场=2 已填战报=1（应 2 / 1）
+[smoke] 详情: 雷达多边形=2（个人 + 基准圈 = 2）标签=有效击杀/有效人伤/有效塔伤/助攻/治疗量/承伤
+[smoke] 详情: 雷达下方对比表行数=7
+[smoke] 成员详情页        : PASS
+[smoke] 报名: 初始 未报名=5 参加=0 在队未报名=5
+[smoke] 报名: 请假记录 备注=家里有事 提交时间=有
+[smoke] 报名: 标记后 参加=1 替补=1 请假=1 未报名=2
+[smoke] 报名: 丁 报名=null 上场名单=null
+[smoke] 报名: 最终报名统计 参加=2 替补=1 请假=0 未报名=2
+[smoke] 报名: 应用条数=3
+[smoke] 报名: 应用后 甲=PLAY/未分配 乙=BENCH/未分配 丙=PLAY/未分配 丁=undefined
+[smoke] 报名: 再次应用后 甲 squad=防守一-1（应保留 防守一-1）
+[smoke] 报名: 报名页 行数=5 每行标记按钮组=5 标题="2026-06-01 第 1 场 · 我方 vs 报名队"
+[smoke] 报名与请假        : PASS
+[smoke] M8 图标 base       : file:///D:/AI/ds.5/lis-desktop/release/win-unpacked/resources/app.asar/dist/renderer/
+[smoke] M8 图标加载        : PASS image4.png:108px image11.png:96px image2.png:102px
+[smoke] M8 页面渲染图标    : 2 个，首个 src = ./class-icons/image9.png
+[smoke] 写操作往返          : PASS
+[smoke] 结果                : PASS

@@ -107,7 +107,7 @@ export default function App() {
                 '战术类型选择：塔后拆 / 塔前拆 / 保镖 / 防守',
                 '校验：职业构成、指挥与统战是否到场、麦克风、请假与替补',
               ]}
-              note="小队结构已在 shared/domain.ts 固化（SQUADS）。"
+              note="小队结构已是数据库实体（combat_group / squad），可在设置里新增战斗组与小队。"
             />
           )}
           {page === 'board' && (

@@ -9,7 +9,7 @@
  */
 import type { SqlDatabase, SqlValue } from '../db';
 import type {
-  CombatStat, Match, MatchInput, MatchSummary, NoteRole, PartState,
+  AssignInput, CombatStat, Match, MatchInput, MatchSummary, NoteRole, PartState,
   ParticipationInput, ParticipationRow,
 } from '../../shared/types';
 import { BENCH_SQUADS, EMPTY_COMBAT_STAT, findClass, tacticKind } from '../../shared/domain';
@@ -346,6 +346,60 @@ export class MatchRepo {
 
   removeParticipation(id: number): boolean {
     return this.db.prepare('DELETE FROM participation WHERE id = ?').run(id).changes > 0;
+  }
+
+  /**
+   * 批量把队员放进某小队（拖拽落点用）。
+   * 单事务执行：任一条失败则整体回滚，避免拖拽后出现半截状态。
+   */
+  assignBulk(input: AssignInput): number {
+    const { matchId, playerIds, squad } = input;
+    if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
+    if (!playerIds.length) throw new Error('没有要移动的队员');
+
+    // 目标小队合法性与容量先校验（容量只提示，不阻止——个别情况确实需要超员）
+    const isBench = (BENCH_SQUADS as readonly string[]).includes(squad);
+    let size = 0;
+    if (!isBench) {
+      const hit = this.squads.findByName(squad);
+      if (!hit) throw new Error(`未知小队：${squad}（可在「设置 → 战斗组与小队」里新增）`);
+      size = hit.size;
+    }
+
+    const already = this.db.prepare(
+      "SELECT COUNT(*) AS c FROM participation WHERE match_id = ? AND squad = ? AND state = 'PLAY'",
+    ).get(matchId, squad) as { c: number };
+    const incoming = playerIds.filter((pid) => !this.db.prepare(
+      'SELECT 1 FROM participation WHERE match_id = ? AND player_id = ? AND side = ? AND squad = ?',
+    ).get(matchId, pid, 'our', squad));
+    if (!input.allowOverfill && size > 0 && Number(already.c) + incoming.length > size) {
+      throw new Error(`「${squad}」已满（${already.c}/${size}），无法再放 ${incoming.length} 人`);
+    }
+
+    this.db.exec('BEGIN');
+    try {
+      for (const pid of playerIds) {
+        this.upsertParticipation({
+          matchId,
+          playerId: pid,
+          squad,
+          state: isBench ? (squad === '请假' ? 'LEAVE' : 'BENCH') : 'PLAY',
+        });
+      }
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return playerIds.length;
+  }
+
+  /** 把队员移出小队（保留在名单里，成为"未分配"） */
+  unassign(playerId: number, matchId: number): void {
+    this.db.prepare(
+      `UPDATE participation SET squad = '', tactic = '', team_role = ''
+       WHERE match_id = ? AND player_id = ? AND side = 'our'`,
+    ).run(matchId, playerId);
   }
 
   /** 只改某一条参战记录的战报（保存 14 项指标） */

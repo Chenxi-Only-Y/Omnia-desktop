@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
-  CombatStat, ImportPreview, JoinMode, Match, ParticipationRow, Player, SquadCatalog,
+  CombatStat, Match, ParticipationRow, Player, SquadCatalog,
 } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
 import LineupBoard from '../components/LineupBoard';
-import ImportWizard from '../components/ImportWizard';
+import CellPicker from '../components/CellPicker';
+import AddPlayerPicker from '../components/AddPlayerPicker';
+import StatImportPanel from '../components/StatImportPanel';
 import {
   BENCH_SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
 } from '@shared/domain';
@@ -277,13 +279,34 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
               rows={our}
               catalog={catalog}
               onPickSlot={(squad) => setCellPick(squad)}
+              onAssign={async (playerIds, squad) => {
+                try {
+                  const res = await api.match.assignBulk({ matchId, playerIds, squad, allowOverfill: true });
+                  setError(null);
+                  setNotice(`已把 ${res.moved} 名队员移到「${squad}」`);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
+              onUnassign={async (playerId) => {
+                try {
+                  await api.match.unassign(matchId, playerId);
+                  setError(null);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
               onRemoveRow={(id) => {
                 const row = our.find((r) => r.id === id);
                 if (row) void removeRow(row);
               }}
             />
             <div className="hint" style={{ marginTop: 8 }}>
-              点击职业色块可把队员放进该小队；点击姓名把该人移出本场。
+              拖动姓名可换小队、拖到下方「未分配」区可移出小队；点击职业色块也能选人入队，点击姓名移出本场。
               版式对齐原表「排表」页：每小队 6 人 × 5 行（职业 / 备注 / 姓名 / 战术 / 角色 ID）。
             </div>
           </div>
@@ -456,293 +479,5 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
         />
       )}
     </>
-  );
-}
-
-// ── 点击看板格子后的选人面板 ─────────────────────────────────────
-function CellPicker({
-  squad, roster, rows, classMap, onAssign, onClose,
-}: {
-  squad: string;
-  roster: Player[];
-  rows: ParticipationRow[];
-  classMap: PageProps['classMap'];
-  onAssign: (playerId: number, squad: string) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [q, setQ] = useState('');
-  const byId = new Map(rows.map((r) => [r.playerId, r]));
-  const key = q.trim().toLowerCase();
-
-  const list = roster
-    .map((p) => ({ p, cur: byId.get(p.id) }))
-    .filter(({ p, cur }) => {
-      if (cur?.squad === squad) return false;        // 已在本小队
-      if (!key) return true;
-      return p.name.toLowerCase().includes(key) || p.gameId.toLowerCase().includes(key)
-        || p.mainClass.includes(q.trim());
-    })
-    .sort((a, b) => {
-      // 未分配的排前面，其次按入帮序
-      const ua = a.cur?.squad ? 1 : 0;
-      const ub = b.cur?.squad ? 1 : 0;
-      if (ua !== ub) return ua - ub;
-      return (a.p.joinedOrder ?? 9999) - (b.p.joinedOrder ?? 9999);
-    });
-
-  return (
-    <div className="modal" onClick={onClose}>
-      <div className="modal__box" onClick={(e) => e.stopPropagation()}>
-        <div className="modal__head">
-          <h3>放入「{squad}」</h3>
-          <button className="btn sm ghost" onClick={onClose}>关闭</button>
-        </div>
-        <input className="input" style={{ width: '100%', marginBottom: 8 }}
-               placeholder="搜索名字 / 角色 ID / 职业" value={q} autoFocus
-               onChange={(e) => setQ(e.target.value)} />
-        <div className="picker-grid" style={{ maxHeight: 320 }}>
-          {list.length === 0 && <span className="hint">没有可放入的队员</span>}
-          {list.map(({ p, cur }) => (
-            <button key={p.id} className="picker-item" onClick={() => void onAssign(p.id, squad)}>
-              <span className="nm">{p.name}</span>
-              <ClassChip name={p.mainClass} classMap={classMap} />
-              {cur?.squad && <span className="picker-item__where">{cur.squad}</span>}
-            </button>
-          ))}
-        </div>
-        <div className="hint" style={{ marginTop: 8 }}>
-          已经在别的小队里的人会被移动过来（同一场里一人只能在一个小队）。
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── 添加队员选择器 ───────────────────────────────────────────────
-function AddPlayerPicker({
-  roster, existing, classMap, onPick,
-}: {
-  roster: Player[];
-  existing: Set<number>;
-  classMap: PageProps['classMap'];
-  onPick: (id: number) => void;
-}) {
-  const [q, setQ] = useState('');
-  const available = roster.filter((p) => {
-    if (existing.has(p.id)) return false;
-    const key = q.trim().toLowerCase();
-    if (!key) return true;
-    return p.name.toLowerCase().includes(key) || p.gameId.toLowerCase().includes(key)
-      || p.mainClass.includes(q.trim());
-  });
-  return (
-    <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-      <input className="input" style={{ width: 260, marginBottom: 8 }} placeholder="搜索名字 / 角色 ID / 职业"
-             value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="picker-grid">
-        {available.length === 0 && <span className="hint">没有可添加的队员（已在场或搜索无结果）</span>}
-        {available.map((p) => (
-          <button key={p.id} className="picker-item" onClick={() => onPick(p.id)} title={`加入本场：${p.name}`}>
-            <span className="nm">{p.name}</span>
-            <ClassChip name={p.mainClass} classMap={classMap} />
-            {p.noteRole && <span className="badge-note">{p.noteRole}</span>}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── 批量导入战报 ─────────────────────────────────────────────────
-function StatImportPanel({
-  matchId, classes, classMap, matchLabel, onDone,
-}: {
-  matchId: number;
-  classes: PageProps['classes'];
-  classMap: PageProps['classMap'];
-  matchLabel: string;
-  onDone: () => void;
-}) {
-  const [text, setText] = useState('');
-  const [mode, setMode] = useState<JoinMode>('roster');
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [wizard, setWizard] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  async function doPreview(payload?: string) {
-    const src = payload ?? text;
-    if (!src.trim()) { setError('请先粘贴战报数据'); return; }
-    setBusy(true);
-    try {
-      const res = await api.match.importPreview(src, mode);
-      setPreview(res);
-      setError(null);
-      setNotice(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function doCommit() {
-    if (!preview) return;
-    setBusy(true);
-    try {
-      const res = await api.match.importCommit(matchId, preview);
-      setNotice(`已写入 ${res.written} 条战报${res.created ? `，并自动建档 ${res.created} 人` : ''}`);
-      setPreview(null);
-      setText('');
-      setError(null);
-      onDone();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function pickFile(file: File | undefined) {
-    if (!file) return;
-    const content = await file.text();
-    setText(content);
-    await doPreview(content);
-    if (fileRef.current) fileRef.current.value = '';
-  }
-
-  return (
-    <div className="card">
-      <h3>批量导入战报</h3>
-      <div className="toolbar">
-        <button className="btn primary" onClick={() => setWizard(true)}>从 xlsx 导入</button>
-        <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" style={{ display: 'none' }}
-               onChange={(e) => void pickFile(e.target.files?.[0])} />
-        <button className="btn" onClick={() => fileRef.current?.click()}>选择 CSV/TSV 文件</button>
-        <label className="field"><span>名单模式</span>
-          <select className="select" value={mode} onChange={(e) => setMode(e.target.value as JoinMode)}>
-            <option value="roster">严格：必须在成员主档里</option>
-            <option value="full">完整：不在档的自动建档</option>
-          </select>
-        </label>
-        <button className="btn primary" onClick={() => void doPreview()} disabled={busy}>校验预览</button>
-        {preview && (
-          <button className="btn primary" onClick={() => void doCommit()} disabled={busy || preview.summary.errors > 0}>
-            确认写入{preview.summary.errors > 0 ? '（有错误，已禁用）' : ''}
-          </button>
-        )}
-      </div>
-
-      {wizard && (
-        <ImportWizard
-          classes={classes}
-          classMap={classMap}
-          mode="stat"
-          matchId={matchId}
-          matchLabel={matchLabel}
-          onClose={() => setWizard(false)}
-          onDone={(msg) => { setNotice(msg); onDone(); }}
-        />
-      )}
-
-      <textarea
-        className="input"
-        style={{ width: '100%', minHeight: 130, fontFamily: 'Consolas, monospace', fontSize: 12 }}
-        placeholder={'直接粘贴 Excel 区域（含表头），例如：\n玩家名字\t职业\t击败/清泉\t助攻\t资源\t对玩家伤害\t人伤卸甲\t对建筑伤害\t破塔卸甲\t治疗值\t承受伤害\t重伤\t复活/清泉\t焚骨'}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-      />
-
-      {error && <div className="msg error" style={{ marginTop: 10 }}>{error}</div>}
-      {notice && <div className="msg ok" style={{ marginTop: 10 }}>{notice}</div>}
-
-      {preview && (
-        <>
-          <div className="stat-grid" style={{ marginTop: 12 }}>
-            <div className="stat"><div className="k">数据行</div><div className="v">{preview.summary.total}</div></div>
-            <div className="stat"><div className="k">匹配到主档</div><div className="v">{preview.summary.matched}</div></div>
-            <div className="stat"><div className="k">未匹配</div>
-              <div className="v" style={{ color: preview.summary.unmatched ? 'var(--warn)' : undefined }}>{preview.summary.unmatched}</div>
-            </div>
-            <div className="stat"><div className="k">错误 / 警告</div>
-              <div className="v" style={{ color: preview.summary.errors ? 'var(--danger)' : undefined }}>
-                {preview.summary.errors}<small> / {preview.summary.warnings}</small>
-              </div>
-            </div>
-          </div>
-
-          {preview.issues.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <h3 style={{ fontSize: 12 }}>校验问题（{preview.issues.length}）</h3>
-              <div className="table-wrap" style={{ maxHeight: 180 }}>
-                <table className="grid">
-                  <thead>
-                    <tr><th style={{ width: 60 }}>行</th><th style={{ width: 70 }}>级别</th><th style={{ width: 170 }}>分类</th><th style={{ width: 110 }}>对象</th><th>说明</th></tr>
-                  </thead>
-                  <tbody>
-                    {preview.issues.map((i, idx) => (
-                      <tr key={idx}>
-                        <td className="num">{i.row || '—'}</td>
-                        <td style={{ color: i.level === 'error' ? 'var(--danger)' : 'var(--warn)' }}>
-                          {i.level === 'error' ? '错误' : '警告'}
-                        </td>
-                        <td style={{ color: 'var(--text-dim)' }}>{i.code}</td>
-                        <td>{i.player || '—'}</td>
-                        <td style={{ whiteSpace: 'normal' }}>{i.message}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginTop: 12 }}>
-            <h3 style={{ fontSize: 12 }}>解析结果预览（前 60 行）</h3>
-            <div className="table-wrap" style={{ maxHeight: 300 }}>
-              <table className="grid">
-                <thead>
-                  <tr>
-                    <th style={{ width: 50 }}>行</th>
-                    <th style={{ width: 120 }}>队员</th>
-                    <th style={{ width: 80 }}>职业</th>
-                    <th style={{ width: 90 }}>匹配</th>
-                    <th className="num">击败</th><th className="num">清泉</th><th className="num">助攻</th>
-                    <th className="num">对玩家伤害</th><th className="num">对建筑伤害</th>
-                    <th className="num">治疗值</th><th className="num">重伤</th><th className="num">焚骨</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.slice(0, 60).map((r) => (
-                    <tr key={r.row} style={r.issues.some((i) => i.level === 'error') ? { background: '#331d23' } : undefined}>
-                      <td className="num">{r.row}</td>
-                      <td>{r.name}</td>
-                      <td><ClassChip name={r.classUsed} classMap={new Map()} showIcon={false} /></td>
-                      <td style={{ color: r.playerId === null ? 'var(--warn)' : 'var(--ok)' }}>
-                        {r.playerId === null ? '未匹配' : '✓'}
-                      </td>
-                      <td className="num">{r.stat.kills}</td>
-                      <td className="num">{r.stat.fountainKills}</td>
-                      <td className="num">{r.stat.assists}</td>
-                      <td className="num">{r.stat.dmgPlayer.toLocaleString()}</td>
-                      <td className="num">{r.stat.dmgBuilding.toLocaleString()}</td>
-                      <td className="num">{r.stat.healing.toLocaleString()}</td>
-                      <td className="num">{r.stat.deaths}</td>
-                      <td className="num">{r.stat.boneBurn}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
-      <div className="hint">
-        写入会把战报挂到本场对应队员身上；若该队员还没在本场名单里，会自动加入（未分配小队）。
-        直接粘贴 Excel 区域时，默认是 Tab 分隔，无需另存 CSV。
-      </div>
-    </div>
   );
 }

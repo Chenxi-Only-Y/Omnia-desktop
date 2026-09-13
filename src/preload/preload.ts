@@ -6,8 +6,8 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import {
-  IPC, type CombatStat, type GroupInput, type ImportPreview, type IpcResult, type JoinMode,
-  type MatchInput, type ParticipationInput, type PlayerInput, type SquadInput,
+  IPC, type AssignInput, type CombatStat, type GroupInput, type ImportPreview, type IpcResult,
+  type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type SquadInput,
 } from '../shared/types';
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
@@ -46,6 +46,8 @@ const api = {
     remove: (id: number) => invoke('match:remove', id),
     participations: (matchId: number) => invoke('match:participation:list', matchId),
     upsertParticipation: (input: ParticipationInput) => invoke('match:participation:upsert', input),
+    assignBulk: (input: AssignInput) => invoke('match:assign:bulk', input),
+    unassign: (matchId: number, playerId: number) => invoke('match:unassign', matchId, playerId),
     removeParticipation: (id: number) => invoke('match:participation:remove', id),
     saveStat: (participationId: number, stat: Partial<CombatStat>) =>
       invoke('match:stat:save', participationId, stat),

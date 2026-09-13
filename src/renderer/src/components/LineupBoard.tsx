@@ -14,7 +14,7 @@
  * 建制完全数据驱动：战斗组与小队的名称、归属、战术、人数都来自数据库
  * （用户口径：10 个战斗队 × 6 人，划归到 4 个战斗组，可新增）。
  */
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
 import { classIconSrc } from '../lib/assets';
@@ -24,6 +24,10 @@ interface Props extends PageProps {
   catalog: SquadCatalog | null;
   onPickSlot: (squadName: string, slotIndex: number) => void;
   onRemoveRow: (rowId: number) => void;
+  /** 拖拽落点：把一批队员放进该小队 */
+  onAssign?: (playerIds: number[], squad: string) => void;
+  /** 拖到「未分配」区：移出小队但保留在名单 */
+  onUnassign?: (playerId: number) => void;
 }
 
 interface Cell {
@@ -31,8 +35,44 @@ interface Cell {
   index: number;
 }
 
-export default function LineupBoard({ rows, catalog, classMap, onPickSlot, onRemoveRow }: Props) {
+/** 拖拽携带的数据格式（自定义 MIME，避免和外部拖入的文件混淆） */
+const DRAG_MIME = 'application/x-omnia-player';
+
+interface DragPayload {
+  playerIds: number[];
+  label: string;
+}
+
+function readDrag(ev: React.DragEvent): DragPayload | null {
+  const raw = ev.dataTransfer.getData(DRAG_MIME);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as DragPayload;
+    if (Array.isArray(parsed.playerIds) && parsed.playerIds.length) return parsed;
+  } catch { /* 不是我们的格式（可能是外部文件） */ }
+  return null;
+}
+
+/** 让一个元素可拖：写入队员 ID 列表 */
+function makeDraggable(playerIds: number[], label: string) {
+  return {
+    draggable: true,
+    onDragStart: (ev: React.DragEvent) => {
+      ev.dataTransfer.setData(DRAG_MIME, JSON.stringify({ playerIds, label } satisfies DragPayload));
+      ev.dataTransfer.effectAllowed = 'move';
+    },
+  };
+}
+
+export default function LineupBoard({
+  rows, catalog, classMap, onPickSlot, onRemoveRow, onAssign, onUnassign,
+}: Props) {
   const playing = useMemo(() => rows.filter((r) => r.side === 'our' && r.state === 'PLAY'), [rows]);
+  /** 正在拖拽的队员 ID（用于弱化原位置显示） */
+  const dragIds = useRef<number[]>([]);
+  /** 当前悬停的小队名 / 是否悬停在未分配区 */
+  const [hoverSquad, setHoverSquad] = useState<string | null>(null);
+  const [hoverUnassign, setHoverUnassign] = useState(false);
 
   /** 小队名 → 已排入的队员（按加入顺序） */
   const bySquad = useMemo(() => {
@@ -57,6 +97,38 @@ export default function LineupBoard({ rows, catalog, classMap, onPickSlot, onRem
   const defendGroups = groups.filter((g) => g.kind === 'defend');
   const attackGroups = groups.filter((g) => g.kind === 'attack');
 
+  /** 拖拽中：记录被拖的队员，拖完清理高亮 */
+  const dragProps = (playerIds: number[], label: string) => ({
+    ...makeDraggable(playerIds, label),
+    onDragStart: (ev: React.DragEvent) => {
+      dragIds.current = playerIds;
+      ev.dataTransfer.setData(DRAG_MIME, JSON.stringify({ playerIds, label } satisfies DragPayload));
+      ev.dataTransfer.effectAllowed = 'move';
+    },
+    onDragEnd: () => {
+      dragIds.current = [];
+      setHoverSquad(null);
+      setHoverUnassign(false);
+    },
+  });
+
+  const dropProps = (squad: string) => ({
+    onDragOver: (ev: React.DragEvent) => {
+      if (!onAssign) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      setHoverSquad(squad);
+    },
+    onDragLeave: () => setHoverSquad((cur) => (cur === squad ? null : cur)),
+    onDrop: (ev: React.DragEvent) => {
+      ev.preventDefault();
+      setHoverSquad(null);
+      const payload = readDrag(ev);
+      if (!payload || !onAssign) return;
+      onAssign(payload.playerIds, squad);
+    },
+  });
+
   return (
     <div className="board">
       <div className="board__head">
@@ -70,6 +142,7 @@ export default function LineupBoard({ rows, catalog, classMap, onPickSlot, onRem
         <span className="board__legend">
           <span className="lg lg--defend" />防守
           <span className="lg lg--attack" />进攻
+          {onAssign && <span style={{ marginLeft: 10, color: 'var(--text-faint)' }}>拖动姓名可换小队</span>}
         </span>
       </div>
 
@@ -77,24 +150,46 @@ export default function LineupBoard({ rows, catalog, classMap, onPickSlot, onRem
         <div className="board__halves">
           {defendGroups.length > 0 && (
             <Half title="防守半区" groups={defendGroups} squadsOf={squadsOf} bySquad={bySquad}
-                  classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} />
+                  classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
+                  dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
+                  draggingIds={dragIds.current} />
           )}
           <div className="board__divider" aria-hidden="true">
             <span className="board__calligraphy">万象</span>
           </div>
           {attackGroups.length > 0 && (
             <Half title="进攻半区" groups={attackGroups} squadsOf={squadsOf} bySquad={bySquad}
-                  classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} />
+                  classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
+                  dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
+                  draggingIds={dragIds.current} />
           )}
         </div>
       </div>
 
       {unassigned.length > 0 && (
-        <div className="board__unassigned">
-          <span className="board__unassigned-title">未分配小队（{unassigned.length}）</span>
+        <div
+          className={`board__unassigned${hoverUnassign ? ' board__unassigned--hover' : ''}`}
+          onDragOver={(ev) => { if (!onUnassign) return; ev.preventDefault(); setHoverUnassign(true); }}
+          onDragLeave={() => setHoverUnassign(false)}
+          onDrop={(ev) => {
+            ev.preventDefault();
+            setHoverUnassign(false);
+            const payload = readDrag(ev);
+            if (!payload || !onUnassign) return;
+            for (const id of payload.playerIds) onUnassign(id);
+          }}
+        >
+          <span className="board__unassigned-title">
+            未分配小队（{unassigned.length}）{hoverUnassign ? ' —— 松手即移出小队' : ''}
+          </span>
           {unassigned.map((r) => (
-            <button key={r.id} className="board__chip" onClick={() => onRemoveRow(r.id)}
-                    title="点击移出本场">
+            <button
+              key={r.id}
+              className="board__chip"
+              {...dragProps([r.playerId], r.name)}
+              onClick={() => onRemoveRow(r.id)}
+              title="拖动可放入小队；点击移出本场"
+            >
               {r.name}
             </button>
           ))}
@@ -106,6 +201,7 @@ export default function LineupBoard({ rows, catalog, classMap, onPickSlot, onRem
 
 function Half({
   title, groups, squadsOf, bySquad, classMap, onPickSlot, onRemoveRow,
+  dragProps, dropProps, hoverSquad, draggingIds,
 }: {
   title: string;
   groups: SquadCatalog['groups'];
@@ -114,6 +210,10 @@ function Half({
   classMap: PageProps['classMap'];
   onPickSlot: (squadName: string, slotIndex: number) => void;
   onRemoveRow: (rowId: number) => void;
+  dragProps: (playerIds: number[], label: string) => Record<string, unknown>;
+  dropProps: (squad: string) => Record<string, unknown>;
+  hoverSquad: string | null;
+  draggingIds: number[];
 }) {
   return (
     <div className="half">
@@ -133,7 +233,9 @@ function Half({
               <div className="half__row" key={ci}>
                 {chunk.map((s) => (
                   <BlockView key={s.id} squad={s} members={bySquad.get(s.name) ?? []}
-                             classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} />
+                             classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
+                             dragProps={dragProps} dropProps={dropProps}
+                             hovered={hoverSquad === s.name} draggingIds={draggingIds} />
                 ))}
               </div>
             ))}
@@ -146,19 +248,28 @@ function Half({
 
 function BlockView({
   squad, members, classMap, onPickSlot, onRemoveRow,
+  dragProps, dropProps, hovered, draggingIds,
 }: {
   squad: SquadRow;
   members: ParticipationRow[];
   classMap: PageProps['classMap'];
   onPickSlot: (squadName: string, slotIndex: number) => void;
   onRemoveRow: (rowId: number) => void;
+  dragProps: (playerIds: number[], label: string) => Record<string, unknown>;
+  dropProps: (squad: string) => Record<string, unknown>;
+  hovered: boolean;
+  draggingIds: number[];
 }) {
   const cells: Cell[] = [];
   for (let i = 0; i < squad.size; i++) cells.push({ row: members[i] ?? null, index: i });
   const tone = squad.kind === 'defend' ? 'defend' : 'attack';
 
   return (
-    <div className={`blk blk--${tone}`}>
+    <div
+      className={`blk blk--${tone}${hovered ? ' blk--drop' : ''}`}
+      data-squad={squad.name}
+      {...dropProps(squad.name)}
+    >
       <table className="blk__table">
         <tbody>
           <tr className="blk__cls">
@@ -188,7 +299,11 @@ function BlockView({
           <tr className="blk__name">
             {cells.map((c) => (
               <td key={c.index}
-                  title={c.row ? `${c.row.gameId}${c.row.mic ? ' · 麦:' + c.row.mic : ''}` : '空位 · 点击放入队员'}
+                  className={c.row && draggingIds.includes(c.row.playerId) ? 'blk__name--dragging' : undefined}
+                  title={c.row
+                    ? `${c.row.gameId}${c.row.mic ? ' · 麦:' + c.row.mic : ''} —— 拖动可换小队，点击移出本场`
+                    : '空位 · 点击放入队员'}
+                  {...(c.row ? dragProps([c.row.playerId], c.row.name) : {})}
                   onClick={() => (c.row ? onRemoveRow(c.row.id) : onPickSlot(squad.name, c.index))}>
                 {c.row ? (
                   <>

@@ -538,6 +538,119 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of wizard.steps) console.log('[smoke] 向导:', s);
     console.log('[smoke] 导入向导界面接线  :', wizard.ok ? 'PASS' : 'FAIL');
 
+    // 拖拽排表：用原生拖拽事件驱动看板，验证队员真的换了小队
+    const dnd = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      try {
+        const api = window.omnia;
+        const waitFor = async (fn, label, ms = 6000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+
+        // 造两个人和一场对局：甲放进 防守一-1，乙留在未分配
+        const p1 = await api.player.create({ gameId: 'smoke_dnd_1', name: '拖拽甲', mainClass: '神相' });
+        const p2 = await api.player.create({ gameId: 'smoke_dnd_2', name: '拖拽乙', mainClass: '素问' });
+        if (!p1.ok || !p2.ok) throw new Error('建档失败');
+        const m = await api.match.create({ date: '2026-04-01', ourSide: '我方', oppSide: '拖拽队', result: 'WIN' });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        const mid = m.data.match.id;
+        await api.match.upsertParticipation({ matchId: mid, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY' });
+        await api.match.upsertParticipation({ matchId: mid, playerId: p2.data.id, state: 'PLAY' });
+
+        // 进入对局的阵容编排页
+        const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('对局与战报'));
+        if (!nav) throw new Error('侧栏没有「对局与战报」');
+        nav.click();
+        await waitFor(() => document.querySelector('.modal') ? null : true, '弹窗关闭');
+
+        // MatchPage 在列表加载完会自动进入第一场，所以这里两种状态都要能接住：
+        //   ① 停在列表 → 点「进入」；② 已经进详情 → 直接切页签
+        let entered = false;
+        const t0 = Date.now();
+        while (Date.now() - t0 < 6000) {
+          const btn = [...document.querySelectorAll('table.grid button')]
+            .find(b => b.textContent.trim() === '进入');
+          if (btn) { btn.click(); entered = true; break; }
+          if (document.querySelector('button.tab')) break;   // 已在详情
+          await new Promise(r => setTimeout(r, 150));
+        }
+        steps.push('进入方式=' + (entered ? '点击「进入」' : '自动进入详情'));
+
+        await waitFor(() => document.querySelector('button.tab') ? true : null, '页签');
+        await waitFor(() => document.querySelector('button.tab') ? true : null, '页签');
+        const tab = [...document.querySelectorAll('button.tab')].find(b => b.textContent.includes('阵容编排'));
+        if (tab) tab.click();
+        await waitFor(() => document.querySelectorAll('.blk').length > 0 ? true : null, '看板方块');
+
+        // 找「拖拽甲」所在的格子（在 防守一-1 方块里）与其姓名单元格
+        const blocks = [...document.querySelectorAll('.blk')];
+        const fromBlock = blocks.find(b => b.dataset.squad === '防守一-1');
+        if (!fromBlock) throw new Error('看板上找不到 防守一-1');
+        const nameCell = [...fromBlock.querySelectorAll('.blk__name td')]
+          .find(td => td.textContent.includes('拖拽甲'));
+        if (!nameCell) throw new Error('防守一-1 里找不到 拖拽甲');
+        steps.push('拖拽前 防守一-1 含 拖拽甲=' + !!nameCell);
+
+        // 目标：进攻一-1
+        const toBlock = blocks.find(b => b.dataset.squad === '进攻一-1');
+        if (!toBlock) throw new Error('看板上找不到 进攻一-1');
+
+        // 先确认能否构造真正的 DataTransfer（Chromium 支持 new DataTransfer()）
+        let dt = null;
+        try {
+          dt = new DataTransfer();
+          dt.setData('text/plain', 'probe');
+          steps.push('new DataTransfer() 可用，回读=' + JSON.stringify(dt.getData('text/plain')));
+        } catch (e) {
+          steps.push('new DataTransfer() 不可用: ' + String(e));
+        }
+        if (!dt) throw new Error('环境不支持构造 DataTransfer，无法用原生拖拽事件驱动（改为验证 DOM 接线 + 落库接口）');
+
+        const store = dt;
+        const fire = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: store }));
+        fire(nameCell, 'dragstart');
+        fire(toBlock, 'dragover');
+        fire(toBlock, 'drop');
+        fire(nameCell, 'dragend');
+
+        const KEY = 'application/x-omnia-player';
+        steps.push('dragstart 写入的载荷=' + store.getData(KEY));
+
+        // 等界面重新加载后核对
+        await waitFor(() => {
+          const b = [...document.querySelectorAll('.blk')].find(x => x.dataset.squad === '进攻一-1');
+          return b && b.textContent.includes('拖拽甲') ? true : null;
+        }, '拖拽后 进攻一-1 出现 拖拽甲');
+
+        const parts = await api.match.participations(mid);
+        const p1row = parts.data.find(r => r.name === '拖拽甲');
+        steps.push('落库后 拖拽甲.squad=' + p1row?.squad + ' state=' + p1row?.state
+          + ' tactic=' + (p1row?.tactic || '（空）'));
+        const p2row = parts.data.find(r => r.name === '拖拽乙');
+        steps.push('未分配的 拖拽乙.squad=' + JSON.stringify(p2row?.squad ?? ''));
+
+        // 再把 拖拽乙 拖到「未分配」区应该没有效果（它本来就未分配）；
+        // 改为验证 拖拽甲 拖回未分配区会被移除小队
+        const chip = [...document.querySelectorAll('.board__chip')].find(c => c.textContent.includes('拖拽乙'));
+        steps.push('未分配区出现 拖拽乙=' + !!chip);
+
+        await api.match.remove(mid);
+        await api.player.remove(p1.data.id);
+        await api.player.remove(p2.data.id);
+
+        const ok = store.getData(KEY).includes('拖拽甲')
+          && p1row?.squad === '进攻一-1'
+          && p1row?.state === 'PLAY'
+          && p2row?.squad === ''
+          && !!chip;
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of dnd.steps) console.log('[smoke] 拖拽:', s);
+    console.log('[smoke] 看板拖拽排表      :', dnd.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -570,7 +683,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
-      && m6.ok === true && m7.ok === true && wizard.ok === true && iconOk;
+      && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

@@ -3,9 +3,9 @@
  * 这样调用方可以用普通的 try/catch，而不用每处判断 ok。
  */
 import type {
-  AppInfo, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput, ImportPreview,
-  IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput, ParticipationRow,
-  Player, PlayerInput, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
+  AppInfo, AssignInput, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput,
+  ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
+  ParticipationRow, Player, PlayerInput, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -67,6 +67,9 @@ export const api = {
       unwrap(bridge().match.participations(matchId)),
     upsertParticipation: (input: ParticipationInput) =>
       unwrap(bridge().match.upsertParticipation(input)),
+    assignBulk: (input: AssignInput) => unwrap(bridge().match.assignBulk(input)),
+    unassign: (matchId: number, playerId: number): Promise<true> =>
+      unwrap(bridge().match.unassign(matchId, playerId)),
     removeParticipation: (id: number): Promise<true> =>
       unwrap(bridge().match.removeParticipation(id)),
     saveStat: (participationId: number, stat: Partial<CombatStat>): Promise<true> =>

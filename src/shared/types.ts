@@ -102,6 +102,15 @@ export interface ParticipationInput {
   stat?: Partial<CombatStat>;
 }
 
+/** 一次把多个队员放进指定小队（拖拽落点/多人调整用，单事务） */
+export interface AssignInput {
+  matchId: number;
+  playerIds: number[];
+  squad: string;
+  /** 目标小队已满时是否照常放入（默认 true，超出只是提示） */
+  allowOverfill?: boolean;
+}
+
 export interface RuleSet {
   id: number;
   seasonId: number | null;
@@ -394,6 +403,10 @@ export interface OmniaApi {
     remove(id: number): Promise<IpcResult<true>>;
     participations(matchId: number): Promise<IpcResult<ParticipationRow[]>>;
     upsertParticipation(input: ParticipationInput): Promise<IpcResult<{ id: number }>>;
+    /** 批量把队员放进某小队（单事务，拖拽用） */
+    assignBulk(input: AssignInput): Promise<IpcResult<{ moved: number }>>;
+    /** 移出小队但保留在名单 */
+    unassign(matchId: number, playerId: number): Promise<IpcResult<true>>;
     removeParticipation(id: number): Promise<IpcResult<true>>;
     saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
     importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;
@@ -430,6 +443,8 @@ export const IPC = {
   matchRemove: 'match:remove',
   matchParticipationList: 'match:participation:list',
   matchParticipationUpsert: 'match:participation:upsert',
+  matchAssignBulk: 'match:assign:bulk',
+  matchUnassign: 'match:unassign',
   matchParticipationRemove: 'match:participation:remove',
   matchStatSave: 'match:stat:save',
   matchImportPreview: 'match:import:preview',

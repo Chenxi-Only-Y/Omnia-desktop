@@ -1,7 +1,7 @@
 import type {
-  AppInfo, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput, ImportPreview,
-  IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput, ParticipationRow,
-  Player, PlayerInput, Match, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
+  AppInfo, AssignInput, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput,
+  ImportPreview, IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput,
+  ParticipationRow, Player, PlayerInput, Match, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 declare global {
@@ -36,6 +36,8 @@ declare global {
         remove(id: number): Promise<IpcResult<true>>;
         participations(matchId: number): Promise<IpcResult<ParticipationRow[]>>;
         upsertParticipation(input: ParticipationInput): Promise<IpcResult<{ id: number }>>;
+        assignBulk(input: AssignInput): Promise<IpcResult<{ moved: number }>>;
+        unassign(matchId: number, playerId: number): Promise<IpcResult<true>>;
         removeParticipation(id: number): Promise<IpcResult<true>>;
         saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
         importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;

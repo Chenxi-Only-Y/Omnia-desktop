@@ -324,6 +324,21 @@ textarea.input { resize: vertical; line-height: 1.5; }
   color: #9aa6bd; background: #262b38 !important; font-size: 10px;
 }
 
+/* ── 拖拽反馈 ─────────────────────────────────────────────── */
+.blk--drop {
+  box-shadow: inset 0 0 0 2px var(--accent), 0 0 12px rgba(43, 203, 255, .28);
+}
+.blk--drop .blk__cls td { filter: brightness(1.12); }
+.blk__name td[draggable="true"] { cursor: grab; }
+.blk__name td[draggable="true"]:active { cursor: grabbing; }
+.blk__name--dragging { opacity: .35; }
+.board__unassigned--hover {
+  border-top-color: var(--accent);
+  background: rgba(43, 203, 255, .07);
+  border-radius: 6px;
+}
+.board__chip[draggable="true"] { cursor: grab; }
+
 /* ── 出勤率条 ─────────────────────────────────────────────── */
 .ratebar {
   display: inline-block; width: 46px; height: 5px; border-radius: 3px;

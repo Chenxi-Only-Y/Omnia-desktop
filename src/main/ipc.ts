@@ -5,7 +5,7 @@
  */
 import { app, ipcMain, shell } from 'electron';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
-import type { MatchInput, ParticipationInput, CombatStat, ImportPreview, GroupInput, SquadInput } from '../shared/types';
+import type { MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput, SquadInput } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import type { DbHandle } from './db';
@@ -102,6 +102,13 @@ export function registerIpc(ctx: IpcContext): void {
   ipcMain.handle(IPC.matchParticipationUpsert, safe((input: ParticipationInput) => ({
     id: matches.upsertParticipation(input),
   })));
+  ipcMain.handle(IPC.matchAssignBulk, safe((input: AssignInput) => ({
+    moved: matches.assignBulk(input),
+  })));
+  ipcMain.handle(IPC.matchUnassign, safe((matchId: number, playerId: number) => {
+    matches.unassign(playerId, matchId);
+    return true as const;
+  }));
   ipcMain.handle(IPC.matchParticipationRemove, safe((id: number) => {
     if (!matches.removeParticipation(id)) throw new Error(`参战记录不存在：id=${id}`);
     return true as const;

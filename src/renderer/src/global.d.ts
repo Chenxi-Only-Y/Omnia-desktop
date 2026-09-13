@@ -1,7 +1,8 @@
 import type {
   AppInfo, AssignInput, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput,
-  ParticipationRow, Player, PlayerDetail, PlayerInput, Match, SheetGrid, SheetList,
+  ParticipationRow, Player, PlayerDetail, PlayerInput, Match, RuleSet, RuleSetInput,
+  RuleSetValidation, SheetGrid, SheetList,
   SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
@@ -51,6 +52,17 @@ declare global {
         board(matchId: number): Promise<IpcResult<SignupBoard>>;
         set(input: SignupInput): Promise<IpcResult<SignupRow>>;
         apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
+      };
+      rules: {
+        list(): Promise<IpcResult<RuleSet[]>>;
+        active(): Promise<IpcResult<RuleSet | null>>;
+        defaults(): Promise<IpcResult<RuleSetInput>>;
+        create(input: RuleSetInput): Promise<IpcResult<RuleSet>>;
+        update(id: number, input: RuleSetInput): Promise<IpcResult<RuleSet>>;
+        duplicate(id: number, name?: string): Promise<IpcResult<RuleSet>>;
+        setActive(id: number): Promise<IpcResult<RuleSet>>;
+        remove(id: number): Promise<IpcResult<true>>;
+        validate(input: RuleSetInput): Promise<IpcResult<RuleSetValidation>>;
       };
       channels: Record<string, string>;
     };

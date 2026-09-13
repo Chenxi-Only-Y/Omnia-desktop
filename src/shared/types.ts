@@ -110,31 +110,6 @@ export interface ParticipationInput {
   allowOverfill?: boolean;
 }
 
-export interface RuleSet {
-  id: number;
-  seasonId: number | null;
-  name: string;
-  baseScore: number;
-  capScore: number;
-  scaleTeam: number;
-  scalePersonal: number;
-  deathPen: number;
-  totalTowers: number;
-  weightsJson: string;
-  classCoefJson: string;
-  bonusJson: string;
-  version: number;
-  createdAt: string;
-}
-
-export interface Season {
-  id: number;
-  name: string;
-  startedAt: string;
-  endedAt: string;
-  remark: string;
-}
-
 // ── 评分引擎（M1 占位，算法待定） ────────────────────────────────
 export interface ScoreBreakdown {
   personalRaw: number;
@@ -348,6 +323,54 @@ export interface SignupInput {
   remark?: string;
 }
 
+// ── 评分规则集（M4：只做参数管理，算法待定） ─────────────────────
+export interface PersonalWeights {
+  /** 有效击杀（含清泉） */
+  kill?: number;
+  dmg?: number;
+  tower?: number;
+  assist?: number;
+  fountain?: number;
+  bone?: number;
+  heal?: number;
+  taken?: number;
+  revive?: number;
+}
+
+export interface ExecWeights {
+  /** 推塔型：对局共享项（塔进度 + 大旗）与小队表现项 */
+  push: { progress?: number; flag?: number; tower?: number; kill?: number };
+  guard: { kill?: number; taken?: number; lowDeath?: number };
+  defend: { keepRate?: number; kill?: number; lowDeath?: number };
+}
+
+export interface RuleSetInput {
+  name: string;
+  baseScore: number;
+  capScore: number;
+  scaleTeam: number;
+  scalePersonal: number;
+  deathPen: number;
+  totalTowers: number;
+  personalWeights: { DPS: PersonalWeights; T: PersonalWeights; HEAL: PersonalWeights };
+  execWeights: ExecWeights;
+  classCoef: Record<string, number>;
+  bonus: Record<string, number>;
+}
+
+export interface RuleSet extends RuleSetInput {
+  id: number;
+  seasonId: number | null;
+  version: number;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface RuleSetValidation {
+  ok: boolean;
+  issues: { level: 'error' | 'warn'; field: string; message: string }[];
+}
+
 // ── 数据看板（M6，先做不依赖评分算法的部分） ─────────────────────
 export interface AttendanceRow {
   playerId: number;
@@ -547,6 +570,18 @@ export interface OmniaApi {
     /** 把报名结果应用到上场名单（参加→上场、请假→请假、替补→替补） */
     apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
   };
+  rules: {
+    list(): Promise<IpcResult<RuleSet[]>>;
+    active(): Promise<IpcResult<RuleSet | null>>;
+    defaults(): Promise<IpcResult<RuleSetInput>>;
+    create(input: RuleSetInput): Promise<IpcResult<RuleSet>>;
+    update(id: number, input: RuleSetInput): Promise<IpcResult<RuleSet>>;
+    duplicate(id: number, name?: string): Promise<IpcResult<RuleSet>>;
+    setActive(id: number): Promise<IpcResult<RuleSet>>;
+    remove(id: number): Promise<IpcResult<true>>;
+    /** 校验但不保存（界面实时提示用） */
+    validate(input: RuleSetInput): Promise<IpcResult<RuleSetValidation>>;
+  };
 }
 
 export const IPC = {
@@ -583,6 +618,17 @@ export const IPC = {
   signupBoard: 'signup:board',
   signupSet: 'signup:set',
   signupApply: 'signup:apply',
+
+  // 评分规则集
+  rulesList: 'rules:list',
+  rulesActive: 'rules:active',
+  rulesDefaults: 'rules:defaults',
+  rulesCreate: 'rules:create',
+  rulesUpdate: 'rules:update',
+  rulesDuplicate: 'rules:duplicate',
+  rulesSetActive: 'rules:setActive',
+  rulesRemove: 'rules:remove',
+  rulesValidate: 'rules:validate',
   matchParticipationRemove: 'match:participation:remove',
   matchStatSave: 'match:stat:save',
   matchImportPreview: 'match:import:preview',

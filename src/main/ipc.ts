@@ -5,7 +5,10 @@
  */
 import { app, ipcMain, shell } from 'electron';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
-import type { MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput, SquadInput, SignupInput } from '../shared/types';
+import type {
+  MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput,
+  RuleSetInput, SignupInput, SquadInput,
+} from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import type { DbHandle } from './db';
@@ -14,6 +17,7 @@ import { MatchRepo } from './repositories/matchRepo';
 import { SquadRepo } from './repositories/squadRepo';
 import { DashboardRepo } from './repositories/dashboardRepo';
 import { SignupRepo } from './repositories/signupRepo';
+import { RuleSetRepo, validate as validateRuleSet } from './repositories/ruleSetRepo';
 
 export interface IpcContext {
   handle: DbHandle;
@@ -42,6 +46,7 @@ export function registerIpc(ctx: IpcContext): void {
   const squads = new SquadRepo(ctx.handle.db);
   const dashboard = new DashboardRepo(ctx.handle.db);
   const signup = new SignupRepo(ctx.handle.db);
+  const rules = new RuleSetRepo(ctx.handle.db);
 
   const rosterEntries = (): RosterEntry[] =>
     (ctx.handle.db.prepare('SELECT id, game_id, name, main_class FROM player')
@@ -204,6 +209,20 @@ export function registerIpc(ctx: IpcContext): void {
   ipcMain.handle(IPC.signupApply, safe((matchId: number, playerIds: number[]) => ({
     applied: signup.apply(matchId, playerIds),
   })));
+
+  // ── 评分规则集（M4） ───────────────────────────────────────────
+  ipcMain.handle(IPC.rulesList, safe(() => rules.list()));
+  ipcMain.handle(IPC.rulesActive, safe(() => rules.active()));
+  ipcMain.handle(IPC.rulesDefaults, safe(() => rules.defaults()));
+  ipcMain.handle(IPC.rulesCreate, safe((input: RuleSetInput) => rules.create(input)));
+  ipcMain.handle(IPC.rulesUpdate, safe((id: number, input: RuleSetInput) => rules.update(id, input)));
+  ipcMain.handle(IPC.rulesDuplicate, safe((id: number, name?: string) => rules.duplicate(id, name)));
+  ipcMain.handle(IPC.rulesSetActive, safe((id: number) => rules.setActive(id)));
+  ipcMain.handle(IPC.rulesRemove, safe((id: number) => {
+    if (!rules.remove(id)) throw new Error(`规则集不存在：id=${id}`);
+    return true as const;
+  }));
+  ipcMain.handle(IPC.rulesValidate, safe((input: RuleSetInput) => validateRuleSet(input)));
 
   // ── 数据看板（M6） ─────────────────────────────────────────────
   ipcMain.handle(IPC.dashboardData, safe(() => dashboard.load()));

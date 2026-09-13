@@ -865,6 +865,107 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of signup.steps) log('[smoke] 报名:', s);
     log('[smoke] 报名与请假        :', signup.ok ? 'PASS' : 'FAIL');
 
+    // 规则集：默认值/校验/新建/版本递增/编辑/另存/激活/删除保护/页面渲染
+    const rules = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      const madeIds = [];
+      try {
+        const api = window.omnia;
+        const psum = (o) => Object.values(o).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+        const def = await api.rules.defaults();
+        if (!def.ok) throw new Error('取默认值失败: ' + def.error);
+        const d = def.data;
+        steps.push('默认值 基础=' + d.baseScore + ' 封顶=' + d.capScore
+          + ' 团队x' + d.scaleTeam + ' 个人x' + d.scalePersonal + ' 死亡扣' + d.deathPen + ' 塔=' + d.totalTowers);
+        steps.push('默认个人权重和 DPS=' + psum(d.personalWeights.DPS).toFixed(3)
+          + ' T=' + psum(d.personalWeights.T).toFixed(3)
+          + ' HEAL=' + psum(d.personalWeights.HEAL).toFixed(3));
+        steps.push('默认战术权重和 push=' + psum(d.execWeights.push).toFixed(4)
+          + ' (应=1) guard=' + psum(d.execWeights.guard).toFixed(2)
+          + ' defend=' + psum(d.execWeights.defend).toFixed(2));
+
+        const okVal = await api.rules.validate(d);
+        const okValWarns = okVal.data.issues.filter(i => i.level === 'warn');
+        steps.push('默认值校验 ok=' + okVal.data.ok + ' 提示数=' + okVal.data.issues.length
+          + '（应全为 warn：原表个人权重未归一化，默认值刻意保留原样）');
+        steps.push('校验提示字段=' + okValWarns.map(i => i.field).join(','));
+
+        const bad = JSON.parse(JSON.stringify(d));
+        bad.capScore = 50;
+        bad.personalWeights.DPS.kill = 9;
+        bad.classCoef['神相'] = -1;
+        const badVal = await api.rules.validate(bad);
+        const hasErr = badVal.data.issues.some(i => i.level === 'error' && i.field === 'capScore');
+        const hasWarn = badVal.data.issues.some(i => i.level === 'warn' && i.field.indexOf('personalWeights.DPS') === 0);
+        steps.push('错误值校验 ok=' + badVal.data.ok + ' 封顶错误被拦=' + hasErr + ' 权重和警告=' + hasWarn);
+
+        const before = await api.rules.list();
+        const maxV = Math.max(0, ...before.data.map(r => r.version));
+
+        const created = await api.rules.create({ ...d, name: '自检规则A' });
+        if (!created.ok) throw new Error('新建失败: ' + created.error);
+        madeIds.push(created.data.id);
+        steps.push('新建 v' + created.data.version + '（原最大 v' + maxV + '）');
+
+        const dup = await api.rules.duplicate(created.data.id, '自检规则B');
+        if (!dup.ok) throw new Error('另存失败: ' + dup.error);
+        madeIds.push(dup.data.id);
+        steps.push('另存 v' + dup.data.version + ' 名称=' + dup.data.name);
+
+        const edited = await api.rules.update(created.data.id, { ...d, name: '自检规则A改', deathPen: 4.5 });
+        if (!edited.ok) throw new Error('编辑失败: ' + edited.error);
+        steps.push('编辑后 名称=' + edited.data.name + ' 死亡扣=' + edited.data.deathPen + ' 版本仍 v' + edited.data.version);
+
+        const act = await api.rules.setActive(dup.data.id);
+        if (!act.ok) throw new Error('激活失败: ' + act.error);
+        const listNow = await api.rules.list();
+        const activeCount = listNow.data.filter(r => r.active).length;
+        steps.push('激活后 使用中数量=' + activeCount + ' 名称=' + listNow.data.find(r => r.active).name);
+
+        const delActive = await api.rules.remove(dup.data.id);
+        steps.push('删除使用中的规则被拦=' + (delActive.ok ? '否（异常！）' : '是'));
+
+        const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.indexOf('权重与规则') >= 0);
+        nav.click();
+        const waitFor = async (fn, label, ms = 8000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+        await waitFor(() => document.querySelector('table.grid tbody tr') ? true : null, '规则列表');
+        const listRows = document.querySelectorAll('table.grid tbody tr').length;
+        const editBtn = await waitFor(() => [...document.querySelectorAll('button')]
+          .find(x => x.textContent.trim() === '编辑'), '编辑按钮');
+        editBtn.click();
+        await waitFor(() => [...document.querySelectorAll('h3')].some(h => h.textContent.indexOf('个人权重') >= 0)
+          ? true : null, '权重编辑区');
+        const coefInputs = document.querySelectorAll('.coef-item input').length;
+        const numInputs = document.querySelectorAll('input.cell-num').length;
+        const activeBadge = [...document.querySelectorAll('.badge-state')].filter(b => b.textContent.indexOf('使用中') >= 0).length;
+        steps.push('规则页 列表行=' + listRows + ' 使用中标记=' + activeBadge
+          + ' 权重输入框=' + numInputs + ' 职业系数框=' + coefInputs);
+
+        for (const id of madeIds) await api.rules.remove(id);
+        const after = await api.rules.list();
+        steps.push('清理后规则集数=' + after.data.length);
+
+        const ok = d.baseScore === 60 && d.capScore === 100 && d.scaleTeam === 20 && d.scalePersonal === 40
+          && d.deathPen === 3 && d.totalTowers === 9
+          && Math.abs(psum(d.execWeights.push) - 1) < 1e-9
+          && Math.abs(psum(d.personalWeights.DPS) - 3.6) < 1e-9
+          && okVal.data.ok === true
+          && okVal.data.issues.every(i => i.level === 'warn') && okVal.data.issues.length === 3
+          && badVal.data.ok === false && hasErr && hasWarn
+          && created.data.version === maxV + 1 && dup.data.version === maxV + 2
+          && edited.data.version === created.data.version && edited.data.deathPen === 4.5
+          && activeCount === 1 && delActive.ok === false
+          && listRows >= 1 && coefInputs === 12 && numInputs > 10 && activeBadge === 1;
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+    for (const s of rules.steps) log('[smoke] 规则:', s);
+    log('[smoke] 规则集管理        :', rules.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -898,7 +999,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
-      && detail.ok === true && signup.ok === true && iconOk;
+      && detail.ok === true && signup.ok === true && rules.ok === true && iconOk;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

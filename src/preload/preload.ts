@@ -7,8 +7,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   IPC, type AssignInput, type CombatStat, type GroupInput, type ImportPreview, type IpcResult,
-  type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type SignupInput,
-  type SquadInput,
+  type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type RuleSetInput,
+  type SignupInput, type SquadInput,
 } from '../shared/types';
 
 function invoke<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
@@ -68,6 +68,17 @@ const api = {
     board: (matchId: number) => invoke('signup:board', matchId),
     set: (input: SignupInput) => invoke('signup:set', input),
     apply: (matchId: number, playerIds: number[]) => invoke('signup:apply', matchId, playerIds),
+  },
+  rules: {
+    list: () => invoke('rules:list'),
+    active: () => invoke('rules:active'),
+    defaults: () => invoke('rules:defaults'),
+    create: (input: RuleSetInput) => invoke('rules:create', input),
+    update: (id: number, input: RuleSetInput) => invoke('rules:update', id, input),
+    duplicate: (id: number, name?: string) => invoke('rules:duplicate', id, name),
+    setActive: (id: number) => invoke('rules:setActive', id),
+    remove: (id: number) => invoke('rules:remove', id),
+    validate: (input: RuleSetInput) => invoke('rules:validate', input),
   },
   /** 通道常量透出，便于渲染层调试时核对 */
   channels: IPC,

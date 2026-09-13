@@ -5,8 +5,8 @@
 import type {
   AppInfo, AssignInput, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
-  ParticipationRow, Player, PlayerDetail, PlayerInput, SheetGrid, SheetList,
-  SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
+  ParticipationRow, Player, PlayerDetail, PlayerInput, RuleSet, RuleSetInput, RuleSetValidation,
+  SheetGrid, SheetList, SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -91,5 +91,17 @@ export const api = {
     set: (input: SignupInput): Promise<SignupRow> => unwrap(bridge().signup.set(input)),
     apply: (matchId: number, playerIds: number[]): Promise<{ applied: number }> =>
       unwrap(bridge().signup.apply(matchId, playerIds)),
+  },
+
+  rules: {
+    list: (): Promise<RuleSet[]> => unwrap(bridge().rules.list()),
+    active: (): Promise<RuleSet | null> => unwrap(bridge().rules.active()),
+    defaults: (): Promise<RuleSetInput> => unwrap(bridge().rules.defaults()),
+    create: (input: RuleSetInput): Promise<RuleSet> => unwrap(bridge().rules.create(input)),
+    update: (id: number, input: RuleSetInput): Promise<RuleSet> => unwrap(bridge().rules.update(id, input)),
+    duplicate: (id: number, name?: string): Promise<RuleSet> => unwrap(bridge().rules.duplicate(id, name)),
+    setActive: (id: number): Promise<RuleSet> => unwrap(bridge().rules.setActive(id)),
+    remove: (id: number): Promise<true> => unwrap(bridge().rules.remove(id)),
+    validate: (input: RuleSetInput): Promise<RuleSetValidation> => unwrap(bridge().rules.validate(input)),
   },
 };

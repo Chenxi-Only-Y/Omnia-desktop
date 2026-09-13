@@ -366,6 +366,18 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .roster-name-link { cursor: pointer; color: var(--text); }
 .roster-name-link:hover { color: var(--accent); text-decoration: underline; }
 
+/* ── 职业系数网格 ─────────────────────────────────────────── */
+.coef-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px;
+}
+.coef-item {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-panel-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px;
+}
+.coef-item > span { flex: 1; }
+.coef-item .cell-num { width: 62px; }
+
 /* ── 出勤率条 ─────────────────────────────────────────────── */
 .ratebar {
   display: inline-block; width: 46px; height: 5px; border-radius: 3px;

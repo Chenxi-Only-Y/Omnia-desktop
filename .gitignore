@@ -6,3 +6,5 @@ release/
 !docs/packaged-smoke.log
 .DS_Store
 dev-data/
+# 提交信息草稿（用 git commit -F 时临时生成）
+commit-msg.txt

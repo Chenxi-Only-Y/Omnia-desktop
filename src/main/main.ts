@@ -1,0 +1,317 @@
+/**
+ * 万象·Omnia —— Electron 主进程入口
+ *
+ * 数据库位置：<userData>/lis.db（可用 OMNIA_DB_PATH / LIS_DB_PATH 覆盖，便于开发与测试）
+ * 渲染层：开发时连 Vite dev server（OMNIA_DEV_SERVER_URL），生产时加载本地文件
+ */
+import { app, BrowserWindow, dialog, shell } from 'electron';
+import path from 'node:path';
+import { openDatabase, type DbHandle } from './db';
+import { registerIpc } from './ipc';
+
+/** 编译后本文件位于 dist/main/main.js，应用根目录是上一级的上一级 */
+const APP_ROOT = path.resolve(__dirname, '..', '..');
+const RENDERER_DIST = path.join(APP_ROOT, 'dist', 'renderer');
+const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
+
+/** 新变量名优先，兼容旧的 LIS_* 前缀 */
+const env = (...names: string[]): string => {
+  for (const n of names) {
+    const v = process.env[n];
+    if (v) return v;
+  }
+  return '';
+};
+
+const DEV_SERVER_URL = env('OMNIA_DEV_SERVER_URL', 'LIS_DEV_SERVER_URL');
+
+let mainWindow: BrowserWindow | null = null;
+let dbHandle: DbHandle | null = null;
+
+function dbFile(): string {
+  const override = env('OMNIA_DB_PATH', 'LIS_DB_PATH');
+  if (override) return override;
+  return path.join(app.getPath('userData'), 'lis.db');
+}
+
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
+    width: 1440,
+    height: 920,
+    minWidth: 1180,
+    minHeight: 720,
+    show: false,
+    backgroundColor: '#14161c',
+    title: '万象·Omnia',
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: PRELOAD,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  mainWindow.once('ready-to-show', () => mainWindow?.show());
+
+  // 外链一律交给系统浏览器，不在应用内开窗
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  if (DEV_SERVER_URL) {
+    void mainWindow.loadURL(DEV_SERVER_URL);
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  } else {
+    void mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
+  }
+
+  mainWindow.on('closed', () => { mainWindow = null; });
+}
+
+function bootDatabase(): boolean {
+  try {
+    dbHandle = openDatabase(dbFile());
+    console.log('[db] 已打开:', dbHandle.file);
+    const v = dbHandle.db.prepare('SELECT COALESCE(MAX(version),0) AS v FROM schema_migration').get();
+    console.log('[db] schema 版本:', v?.v);
+    registerIpc({ handle: dbHandle });
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    dialog.showErrorBox('数据库初始化失败', `${msg}\n\n数据库路径：${dbFile()}`);
+    return false;
+  }
+}
+
+/**
+ * 自检模式（OMNIA_SMOKE=1）：渲染层真正加载后，让它把 renderer→preload→IPC→SQLite
+ * 整条链路的探针结果写回主进程并打印，然后退出。
+ * 这样在没有人盯着窗口时，也能验证整条链路是否真的通。
+ */
+async function runSmokeTest(win: BrowserWindow): Promise<void> {
+  const probe = async (): Promise<{ preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null }> => {
+    const w = win.webContents;
+    const has = await w.executeJavaScript('typeof window.omnia === "object" && window.omnia !== null');
+    if (!has) return { preload: false, appInfo: false, classes: 0, players: 0, error: 'window.omnia 未注入' };
+    const res = await w.executeJavaScript(`(async () => {
+      try {
+        const info = await window.omnia.app.info();
+        const cls = await window.omnia.meta.classes();
+        const ps = await window.omnia.player.list();
+        return {
+          preload: true,
+          appInfo: !!(info && info.ok),
+          classes: cls && cls.ok ? cls.data.length : -1,
+          players: ps && ps.ok ? ps.data.length : -1,
+          error: [info, cls, ps].filter(r => r && !r.ok).map(r => r.error).join('; ') || null,
+        };
+      } catch (e) { return { preload: true, appInfo: false, classes: -1, players: -1, error: String(e) }; }
+    })()`);
+    return res as { preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null };
+  };
+
+  win.webContents.once('did-finish-load', async () => {
+    let r: Awaited<ReturnType<typeof probe>>;
+    try {
+      r = await probe();
+    } catch (err) {
+      r = { preload: false, appInfo: false, classes: -1, players: -1, error: String(err) };
+    }
+    const rootHtml = await win.webContents.executeJavaScript(
+      'document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1',
+    ).catch(() => -1);
+
+    // 写操作往返：create → update → list → remove → list
+    const crud = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      try {
+        const before = (await window.omnia.player.list()).data.length;
+        const made = await window.omnia.player.create({
+          gameId: '__smoke_probe__', name: '自检探针', mainClass: '神相', mic: '有', joinedOrder: 999,
+        });
+        if (!made.ok) throw new Error('create: ' + made.error);
+        steps.push('create ok id=' + made.data.id + ' class=' + made.data.mainClass);
+        const afterCreate = (await window.omnia.player.list()).data.length;
+        const upd = await window.omnia.player.update(made.data.id, { subClass: '潮光', remark: '自检写入' });
+        if (!upd.ok) throw new Error('update: ' + upd.error);
+        steps.push('update ok sub=' + upd.data.subClass + ' remark=' + upd.data.remark);
+        const dup = await window.omnia.player.create({ gameId: '__smoke_probe__' });
+        steps.push('重复 ID 被拦: ' + (dup.ok ? '否（异常！）' : '是'));
+        const del = await window.omnia.player.remove(made.data.id);
+        if (!del.ok) throw new Error('remove: ' + del.error);
+        const afterRemove = (await window.omnia.player.list()).data.length;
+        steps.push('before=' + before + ' afterCreate=' + afterCreate + ' afterRemove=' + afterRemove);
+        return { ok: before === afterRemove && afterCreate === before + 1, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+
+    console.log('[smoke] preload 注入        :', r.preload);
+    console.log('[smoke] app.info()         :', r.appInfo);
+    console.log('[smoke] meta.classes() 数量 :', r.classes);
+    console.log('[smoke] player.list() 数量  :', r.players);
+    console.log('[smoke] React 已渲染字符数  :', rootHtml);
+    console.log('[smoke] 错误                :', r.error ?? '无');
+    for (const s of crud.steps) console.log('[smoke] CRUD:', s);
+
+    // M3：对局 → 阵容 → 战报粘贴导入 → 校验 → 入库 → 读回
+    const m3 = await win.webContents.executeJavaScript(`(async () => {
+      const steps = [];
+      try {
+        const api = window.omnia;
+        const made = await api.player.create({ gameId: 'smoke_p1', name: '战报测试员', mainClass: '神相' });
+        if (!made.ok) throw new Error('建成员失败: ' + made.error);
+        steps.push('建档 ok id=' + made.data.id);
+
+        const m = await api.match.create({
+          date: '2026-01-01', ourSide: '我方', oppSide: '对手', result: 'WIN',
+          ourTowersLeft: 5, oppTowersLeft: 0,
+        });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        steps.push('建对局 ok id=' + m.data.match.id + ' inherited=' + m.data.inherited);
+
+        const TSV = [
+          '玩家名字\\t职业\\t击败/清泉\\t助攻\\t资源\\t对玩家伤害\\t人伤卸甲\\t对建筑伤害\\t破塔卸甲\\t治疗值\\t承受伤害\\t重伤\\t复活/清泉\\t焚骨',
+          '战报测试员\\t神相\\t 32/0\\t151\\t0\\t8930953\\t0\\t1965057\\t0\\t0\\t6489941\\t3\\t0\\t0',
+          '不在档的人\\t玄机\\t5/1\\t20\\t0\\t100\\t0\\t200\\t0\\t0\\t300\\t1\\t0\\t0',
+          '战报测试员\\t神相\\t1/0\\t1\\t0\\t1\\t0\\t1\\t0\\t0\\t1\\t0\\t0\\t0',
+        ].join('\\n');
+
+        // 严格模式：应出现 1 个「不在主档」错误 + 1 个重复错误
+        const strict = await api.match.importPreview(TSV, 'roster');
+        if (!strict.ok) throw new Error('预览失败: ' + strict.error);
+        steps.push('严格模式 total=' + strict.data.summary.total
+          + ' 匹配=' + strict.data.summary.matched
+          + ' 未匹配=' + strict.data.summary.unmatched
+          + ' 错误=' + strict.data.summary.errors
+          + ' 警告=' + strict.data.summary.warnings);
+        const codes = strict.data.issues.map(i => i.code).join(',');
+        steps.push('问题分类=' + codes);
+        const r0 = strict.data.rows[0];
+        steps.push('解析复合列 击败=' + r0.stat.kills + ' 清泉=' + r0.stat.fountainKills
+          + ' 有效人伤=' + (r0.stat.dmgPlayer + r0.stat.dmgPlayerArmor)
+          + ' 有效塔伤=' + (r0.stat.dmgBuilding + r0.stat.dmgBuildingArmor));
+
+        // 有 error 时必须拒绝入库
+        const blocked = await api.match.importCommit(m.data.match.id, strict.data);
+        steps.push('有错误时提交被拒: ' + (blocked.ok ? '否（异常！）' : '是'));
+
+        // 完整模式：允许不在档的人自动建档
+        const full = await api.match.importPreview(TSV, 'full');
+        if (!full.ok) throw new Error('完整模式预览失败: ' + full.error);
+        const clean = { ...full.data, rows: full.data.rows.slice(0, 2) };
+        const committed = await api.match.importCommit(m.data.match.id, clean);
+        if (!committed.ok) throw new Error('入库失败: ' + committed.error);
+        steps.push('入库 ok written=' + committed.data.written + ' 自动建档=' + committed.data.created);
+
+        const parts = await api.match.participations(m.data.match.id);
+        if (!parts.ok) throw new Error('读回失败: ' + parts.error);
+        const mine = parts.data.find(p => p.name === '战报测试员');
+        if (!mine) throw new Error('读回里找不到刚写入的队员');
+        steps.push('读回 ok 参战=' + parts.data.length
+          + ' 有效击杀=' + (mine.stat.kills + mine.stat.fountainKills)
+          + ' 助攻=' + mine.stat.assists
+          + ' statFilled=' + mine.statFilled);
+
+        const list = await api.match.list();
+        if (!list.ok) throw new Error('对局列表失败: ' + list.error);
+        steps.push('对局列表 ok 场次=' + list.data.length + ' 我方参战=' + list.data[0].ourCount
+          + ' 已录战报=' + list.data[0].statFilled);
+
+        // 清理
+        await api.match.remove(m.data.match.id);
+        for (const p of [made.data.id]) await api.player.remove(p);
+        const np = await api.player.list();
+        steps.push('清理后成员数=' + np.data.length);
+
+        const ok = strict.data.summary.errors >= 1
+          && strict.data.rows[0].stat.kills === 32
+          && strict.data.rows[0].stat.fountainKills === 0
+          && blocked.ok === false
+          && committed.data.written === 2
+          && mine.stat.assists === 151;
+        return { ok, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`);
+
+    for (const s of m3.steps) console.log('[smoke] M3:', s);
+    console.log('[smoke] M3 对局与战报      :', m3.ok ? 'PASS' : 'FAIL');
+
+    // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
+    const icons = await win.webContents.executeJavaScript(`(async () => {
+      const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
+      const probe = (file) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ file, ok: img.naturalWidth > 0, w: img.naturalWidth });
+        img.onerror = () => resolve({ file, ok: false, w: 0 });
+        img.src = base + 'class-icons/' + file;
+      });
+      const results = await Promise.all([
+        probe('image4.png'), probe('image11.png'), probe('image2.png'),
+      ]);
+
+      // 种一个带主职业的成员，切到成员主档页，确认职业图标真的渲染成 DOM
+      const made = await window.omnia.player.create({ gameId: '__icon_probe__', name: '图标探针', mainClass: '素问' });
+      const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('成员主档'));
+      if (nav) nav.click();
+      await new Promise(r => setTimeout(r, 700));
+      const chipIcons = document.querySelectorAll('img.chip-icon').length;
+      const firstSrc = document.querySelector('img.chip-icon')?.getAttribute('src') || '';
+      if (made.ok) await window.omnia.player.remove(made.data.id);
+      return { base, results, dom: chipIcons, firstSrc };
+    })()`);
+    const iconOk = icons.results.every((x: { ok: boolean }) => x.ok) && icons.dom > 0;
+    console.log('[smoke] M8 图标 base       :', icons.base);
+    console.log('[smoke] M8 图标加载        :', iconOk ? 'PASS' : 'FAIL',
+      icons.results.map((x: { file: string; ok: boolean; w: number }) => `${x.file}:${x.ok ? x.w + 'px' : '失败'}`).join(' '));
+    console.log('[smoke] M8 页面渲染图标    :', icons.dom, '个，首个 src =', icons.firstSrc);
+
+    const pass =
+      r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
+      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && iconOk;
+    console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
+    console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
+    app.exit(pass ? 0 : 1);
+  });
+}
+
+// 单实例锁：避免两个进程同时写同一个 SQLite 文件
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(() => {
+    if (!bootDatabase()) {
+      app.exit(1);
+      return;
+    }
+    createWindow();
+
+    if (env('OMNIA_SMOKE', 'LIS_SMOKE') === '1' && mainWindow) {
+      void runSmokeTest(mainWindow);
+    }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  }).catch((err: unknown) => {
+    dialog.showErrorBox('启动失败', err instanceof Error ? err.message : String(err));
+    app.exit(1);
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('before-quit', () => {
+    try { dbHandle?.db.close(); } catch { /* 忽略关闭异常 */ }
+    dbHandle = null;
+  });
+}

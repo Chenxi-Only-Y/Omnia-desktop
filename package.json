@@ -1,0 +1,51 @@
+{
+  "name": "omnia-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "万象·Omnia —— 联赛集成系统桌面端（Electron + 本地 SQLite）。All leagues. One universe.",
+  "author": "辰兮Only-Y",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "fix:electron": "node scripts/fix-electron.mjs",
+    "postinstall": "node scripts/fix-electron.mjs",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
+    "build:node": "tsc -p tsconfig.node.json",
+    "build:renderer": "vite build",
+    "build": "npm run clean && npm run build:node && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "dev": "node scripts/dev.mjs",
+    "start:only": "electron .",
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "dist": "npm run build && electron-builder --win --x64",
+    "dist:dir": "npm run build && electron-builder --win --x64 --dir"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^37.7.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "build": {
+    "appId": "cn.omnia.league.desktop",
+    "productName": "万象Omnia",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "Omnia-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

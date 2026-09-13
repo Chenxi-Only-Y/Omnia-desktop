@@ -117,6 +117,66 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
   const log = makeLogger();
 
   /**
+   * 注入到每个渲染层探针开头的 helper：返回一个会把 push 的内容同时投递到
+   * window.__smokeSteps 的数组。主进程在探针运行期间轮询那个数组，
+   * 于是探针挂死时日志里能看到"最后走到哪一步"，而不是只有一句超时。
+   */
+  // 注意：helper 与探针脚本一起被塞进同一个 IIFE，避免 helper 的顶层 const
+  // 泄漏到页面全局，也避免各探针之间互相污染。
+  const SMOKE_HELPER = `
+    const smokeSteps = () => {
+      const arr = [];
+      window.__smokeSteps = window.__smokeSteps || [];
+      const live = window.__smokeSteps;
+      arr.push = function (...items) {
+        for (const it of items) live.push(String(it));
+        return Array.prototype.push.apply(this, items);
+      };
+      return arr;
+    };
+    // 探针自建的数据必须登记，主进程在探针结束后（含超时）统一清理。
+    // 起因：打包环境里拖拽探针 90s 超时，它造的两个成员没被删掉，
+    // 后面的评分探针就按 8 个人算分（应为 6），连带报名探针一起误报。
+    // 探针之间不该靠"上一个探针正常跑完"来保证隔离。
+    const smokeMade = (kind, id) => {
+      window.__smokeMade = window.__smokeMade || [];
+      window.__smokeMade.push([kind, id]);
+      return id;
+    };
+  `;
+  /** 把探针脚本包成自调用函数：helper 在函数作用域内，脚本的 return 透传出去 */
+  const wrapProbe = (script: string): string => `(function(){${SMOKE_HELPER}\nreturn ${script}\n})()`;
+
+  /**
+   * 清掉探针登记的自建数据。探针正常跑完时它自己已经删过一遍（这里为空操作），
+   * 真正起作用的是探针超时/抛错的情况 —— 不清理就会污染后续探针的断言。
+   */
+  const sweepProbeRows = async (label: string): Promise<void> => {
+    try {
+      const made = (await win.webContents.executeJavaScript(
+        '(() => { const m = window.__smokeMade || []; window.__smokeMade = []; return m; })()',
+      )) as unknown;
+      if (!Array.isArray(made) || !made.length) return;
+      const removed = await win.webContents.executeJavaScript(`(async () => {
+        let n = 0;
+        for (const [kind, id] of ${JSON.stringify(made)}) {
+          const api = window.omnia;
+          try {
+            if (kind === 'player') { await api.player.remove(id); n++; }
+            else if (kind === 'match') { await api.match.remove(id); n++; }
+            else if (kind === 'season') { await api.season.remove(id); n++; }
+            else if (kind === 'rule') { await api.rules.remove(id); n++; }
+          } catch (e) { /* 已经被探针自己删掉了 */ }
+        }
+        return n;
+      })()`);
+      log(`[smoke] 清理残留（${label}）:`, removed, '条，登记', made.length, '条');
+    } catch (err) {
+      log(`[smoke] 清理残留失败（${label}）:`, String(err));
+    }
+  };
+
+  /**
    * 可选截图：设置 OMNIA_SMOKE_SHOTS=<目录> 时，把界面真实样子写成 PNG。
    * 用途是"别只看断言通过，要看一眼长什么样"——尤其是排表/赛季这类布局密集的页面。
    */
@@ -142,29 +202,53 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
    * 关键：executeJavaScript 在脚本抛错时会**拒绝 Promise**；不接住的话自检函数
    * 既不退出也不继续（表现为挂死到外部超时）。这里统一接住并限时，
    * 任何脚本错误都退化成一条 ERR 记录，保证自检总能跑完并给出结论。
+   *
+   * 另外：探针里的 steps 只有在探针**跑完**才会交回主进程，所以一旦某个探针挂死
+   * （打包环境里就踩到过：探针 90s 超时，日志里只剩"ERR 超时"，完全看不出卡在哪）。
+   * 这里在探针运行期间轮询 window.__smokeSteps，把已产生的步骤实时落进日志，
+   * 挂死时就地留下最后一步 —— 这是排障唯一可靠的线索。
    */
   const guarded = async (
     script: string, label: string, timeoutMs = 90_000,
   ): Promise<{ ok: boolean; steps: string[]; value?: unknown }> => {
     let timer: NodeJS.Timeout | undefined;
+    let live: NodeJS.Timeout | undefined;
+    let seen = 0;
+    const drain = async (): Promise<void> => {
+      try {
+        const pending = (await win.webContents.executeJavaScript(
+          `(window.__smokeSteps || []).slice(${seen})`,
+        )) as unknown;
+        if (!Array.isArray(pending) || !pending.length) return;
+        for (const line of pending) log(`[smoke] ${label} ·`, line);
+        seen += pending.length;
+      } catch { /* 探针正在切换页面时可能取不到，下一轮再取 */ }
+    };
     try {
+      await win.webContents.executeJavaScript('window.__smokeSteps = []; window.__smokeMade = []');
+      live = setInterval(() => { void drain(); }, 800);
       const raw = await Promise.race([
-        win.webContents.executeJavaScript(script),
+        win.webContents.executeJavaScript(wrapProbe(script)),
         new Promise((_, reject) => {
           timer = setTimeout(() => reject(new Error(`${label} 探针超时（${timeoutMs}ms）`)), timeoutMs);
         }),
       ]);
-      // 探针脚本按约定返回 { ok, steps }；其余返回结构（如 { base, results, dom }）
-      // 原样放进 value，调用方自行取用。
+      // 探针脚本按约定返回 { ok, steps, value? }；value 必须一起带出来，
+      // 否则调用方拿不到颜色/图标/清理句柄这类附加数据。
       if (raw && typeof raw === 'object' && 'ok' in (raw as object) && 'steps' in (raw as object)) {
-        return raw as { ok: boolean; steps: string[] };
+        const env = raw as { ok: boolean; steps: string[]; value?: unknown };
+        if (!env.ok) await sweepProbeRows(label);
+        return env;
       }
       return { ok: true, steps: [], value: raw };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return { ok: false, steps: [`ERR 渲染层脚本失败：${msg}`] };
+      await drain();   // 超时/异常时把最后一步捞出来，这是定位挂点的关键
+      await sweepProbeRows(label);
+      return { ok: false, steps: [`ERR 渲染层脚本失败：${msg}（最后一步见上方 ${label} · 行）`] };
     } finally {
       if (timer) clearTimeout(timer);
+      if (live) clearInterval(live);
     }
   };
 
@@ -204,7 +288,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 写操作往返：create → update → list → remove → list
     const crud = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const before = (await window.omnia.player.list()).data.length;
         const made = await window.omnia.player.create({
@@ -236,7 +320,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // M3：对局 → 阵容 → 战报粘贴导入 → 校验 → 入库 → 读回
     const m3 = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const api = window.omnia;
         const made = await api.player.create({ gameId: 'smoke_p1', name: '战报测试员', mainClass: '神相' });
@@ -319,7 +403,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // M5：战斗组/小队建制（数据驱动）+ 排表看板渲染
     const m5 = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const api = window.omnia;
         const cat = await api.meta.squads();
@@ -403,7 +487,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // M6：看板统计 + 首页主视觉渲染
     const m6 = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       const created = { players: [], matches: [] };
       try {
         const api = window.omnia;
@@ -583,7 +667,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 导入向导的界面接线：切到成员主档点「从 xlsx 导入」，确认弹窗出来了
     const wizard = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const waitFor = async (fn, label, ms = 6000) => {
           const t0 = Date.now();
@@ -616,7 +700,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 拖拽排表：用原生拖拽事件驱动看板，验证队员真的换了小队
     const dnd = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const api = window.omnia;
         const waitFor = async (fn, label, ms = 6000) => {
@@ -629,9 +713,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const p1 = await api.player.create({ gameId: 'smoke_dnd_1', name: '拖拽甲', mainClass: '神相' });
         const p2 = await api.player.create({ gameId: 'smoke_dnd_2', name: '拖拽乙', mainClass: '素问' });
         if (!p1.ok || !p2.ok) throw new Error('建档失败');
+        smokeMade('player', p1.data.id);
+        smokeMade('player', p2.data.id);
         const m = await api.match.create({ date: '2026-04-01', ourSide: '我方', oppSide: '拖拽队', result: 'WIN' });
         if (!m.ok) throw new Error('建对局失败: ' + m.error);
         const mid = m.data.match.id;
+        smokeMade('match', mid);
         await api.match.upsertParticipation({ matchId: mid, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY' });
         await api.match.upsertParticipation({ matchId: mid, playerId: p2.data.id, state: 'PLAY' });
 
@@ -729,7 +816,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 成员详情：个人汇总 / 雷达对比 / 页面渲染
     const detail = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       const made = { players: [], matches: [] };
       try {
         const api = window.omnia;
@@ -814,7 +901,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 报名 / 请假：标记 → 应用上场名单 → 校验状态流转
     const signup = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       const made = { players: [], matches: [] };
       try {
         const api = window.omnia;
@@ -922,7 +1009,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 规则集：默认值/校验/新建/版本递增/编辑/另存/激活/删除保护/页面渲染
     const rules = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       const madeIds = [];
       try {
         const api = window.omnia;
@@ -1023,7 +1110,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 攻略图库：13 张图真实加载 + 装备卡速查 + 灯箱
     const guide = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const waitFor = async (fn, label, ms = 10000) => {
           const t0 = Date.now();
@@ -1104,7 +1191,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // 评分引擎（M1）：口径来自规则中心；验证分解合计、封顶、幂等、改规则会改分
     const scoring = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       const made = { players: [], matches: [], rules: [] };
       try {
         const api = window.omnia;
@@ -1280,7 +1367,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
     // M8：赛季——口径隔离的载体（对局/规则集打标，成员与建制跨赛季）
     const season = await guarded(`(async () => {
-      const steps = [];
+      const steps = smokeSteps();
       try {
         const api = window.omnia;
         const active0 = await api.season.active();
@@ -1411,10 +1498,11 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const chipIcons = document.querySelectorAll('img.chip-icon').length;
       const firstSrc = document.querySelector('img.chip-icon')?.getAttribute('src') || '';
       if (made.ok) await window.omnia.player.remove(made.data.id);
-      return { base, results, dom: chipIcons, firstSrc };
+      // 和其它探针统一走 { ok, steps, value } 信封，值放 value 里
+      return { ok: true, steps: [], value: { base, results, dom: chipIcons, firstSrc } };
     })()`, '探针12');
     type IconProbe = { base: string; results: { file: string; ok: boolean; w: number }[]; dom: number; firstSrc: string };
-    const icons = (iconProbe.value ?? { base: '', results: [], dom: 0, firstSrc: '' }) as IconProbe;
+    const icons = ((iconProbe.value as IconProbe | undefined) ?? { base: '', results: [], dom: 0, firstSrc: '' });
     const iconOk = icons.results.length > 0
       && icons.results.every((x) => x.ok) && icons.dom > 0;
     log('[smoke] M8 图标 base       :', icons.base);

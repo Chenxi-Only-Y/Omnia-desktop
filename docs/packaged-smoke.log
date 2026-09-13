@@ -2,7 +2,7 @@
 [smoke] app.info()         : true
 [smoke] meta.classes() 数量 : 12
 [smoke] player.list() 数量  : 0
-[smoke] React 已渲染字符数  : 4936
+[smoke] React 已渲染字符数  : 5199
 [smoke] 错误                : 无
 [smoke] CRUD: create ok id=1 class=神相
 [smoke] CRUD: update ok sub=潮光 remark=自检写入
@@ -40,7 +40,19 @@
 [smoke] M6: 设置页 战斗组表行数=16
 [smoke] M6: 清理后场次=0 成员=1
 [smoke] M6 看板与首页      : PASS
-[smoke] M7 真实旧表导入    : SKIP（未提供样本，设 OMNIA_SAMPLE_XLSX 指向旧表即可验证）
+[smoke] M7: 样本=LIS_original.xlsx 字节=8360693
+[smoke] M7: 工作表(10)=首页/排表/信息数据库/数据导入/数据处理1/数据处理2/下滑预选/大盘数据可视化/攻略/WpsReserved_CellImgList
+[smoke] M7: 信息数据库 表头行=5 总行数=91 成员行=79
+[smoke] M7: 表头前 6 列=入帮排序|·|角色ID|·|填表|·
+[smoke] M7: 首个成员=草莓酱板鸭
+[smoke] M7: 数据导入 表头行=6 表头=玩家名字|职业|击败/清泉|助攻|资源|对玩家伤害|人伤卸甲|对建筑伤害
+[smoke] M7: 信息数据库 D 列（疑似职业列）非空数=0（实测应为 0：该表不含职业）
+[smoke] M7: C 列角色ID=79 人 · I 列麦=73 人 · L 列备注=11 人
+[smoke] M7: 网格→TSV→解析 得到 79 名成员，首条=草莓酱板鸭/入帮序=1/麦=有/备注角色=指挥
+[smoke] M7: 显式 headerRow=6 → 该行首列=1
+[smoke] M7: 读不存在的表 → 按预期报错
+[smoke] M7: Uint8Array 入参 → 行数=91
+[smoke] M7 真实旧表导入    : PASS
 [smoke] 向导: 弹窗标题="导入成员主档" 有选文件按钮=true 有表头说明=true
 [smoke] 向导: 点击关闭后弹窗已消失=true
 [smoke] 导入向导界面接线  : PASS
@@ -74,6 +86,76 @@
 [smoke] 报名: 再次应用后 甲 squad=防守一-1（应保留 防守一-1）
 [smoke] 报名: 报名页 行数=5 每行标记按钮组=5 标题="2026-06-01 第 1 场 · 我方 vs 报名队"
 [smoke] 报名与请假        : PASS
+[smoke] 规则: 默认值 基础=60 封顶=100 团队x20 个人x40 死亡扣3 塔=9
+[smoke] 规则: 默认个人权重和 DPS=3.600 T=2.600 HEAL=1.800
+[smoke] 规则: 默认战术权重和 push=1.0000 (应=1) guard=1.00 defend=1.00
+[smoke] 规则: 默认值校验 ok=true 提示数=3（应全为 warn：原表个人权重未归一化，默认值刻意保留原样）
+[smoke] 规则: 校验提示字段=personalWeights.DPS,personalWeights.T,personalWeights.HEAL
+[smoke] 规则: 错误值校验 ok=false 封顶错误被拦=true 权重和警告=true
+[smoke] 规则: 新建 v2（原最大 v1）
+[smoke] 规则: 另存 v3 名称=自检规则B
+[smoke] 规则: 编辑后 名称=自检规则A改 死亡扣=4.5 版本仍 v2
+[smoke] 规则: 激活后 使用中数量=1 名称=自检规则B
+[smoke] 规则: 删除使用中的规则被拦=是
+[smoke] 规则: 规则页 列表行=1 使用中标记=1 权重输入框=34 职业系数框=12
+[smoke] 规则: 清理后规则集数=2
+[smoke] 规则集管理        : PASS
+[smoke] 探针11 · 图库卡片数=13 分类按钮=5
+[smoke] 探针11 · 图片尺寸抽样=image14.png:591x939 image23.png:561x989 image15.png:513x147 image16.png:501x138
+[smoke] 探针11 · 加载失败的图=无
+[smoke] 探针11 · 装备卡表行数=7
+[smoke] 探针11 · 首行（按装评降序）=如意·錾花锁1694012珍
+[smoke] 探针11 · 筛选「装备选择」后卡片数=7
+[smoke] 攻略: 图库卡片数=13 分类按钮=5
+[smoke] 攻略: 图片尺寸抽样=image14.png:591x939 image23.png:561x989 image15.png:513x147 image16.png:501x138
+[smoke] 攻略: 加载失败的图=无
+[smoke] 攻略: 装备卡表行数=7
+[smoke] 攻略: 首行（按装评降序）=如意·錾花锁1694012珍
+[smoke] 攻略: 筛选「装备选择」后卡片数=7
+[smoke] 攻略: 灯箱标题="帮战 · 防守保镖" src=./guide/image14.png
+[smoke] 攻略: 要点卡片=4 要点条数=13
+[smoke] 攻略: 首页立绘卡=2 尺寸=810x276 867x264
+[smoke] 攻略图库          : PASS
+[smoke] 评分: 使用中的规则=自检规则B v3
+[smoke] 评分: 参评人数=6 均分=83.28 区间=[71.81,94.39] 触顶=0
+[smoke] 评分: 引擎=omnia-default-v1 规则=自检规则B
+[smoke] 评分: 区分度：不同总分数=6 个 / 6 人
+[smoke] 评分: 抽样 评分甲 团队=11.33 个人=23.06 附加=0 扣分=0.00 总分=94.39
+[smoke] 评分: 明细字段=有效击杀,有效人伤,有效塔伤,助攻,治疗,承伤,重伤,复活,个人原始加权,个人归一,职业系数,战术类型,小队执行分,分会项
+[smoke] 评分: 小队执行分 防御一-1=0.5667 战术=defend 职业系数=1.2
+[smoke] 评分: 落库条数 第一次=6 重算后=6（应相同）
+[smoke] 评分: 落库按总分降序=true
+[smoke] 评分: 评己(6 死) 旧规则=71.81 高死亡扣分规则=29.81 差=-42.00
+[smoke] 评分: 两套规则的分数并存条数=12（应=12）
+[smoke] 评分: 展开前后表格行数 6 → 7，明细项=0
+[smoke] 评分: 评分页 组件载入=6 按钮="按当前规则重算" 表格行=6 数字单元格=36 明细项=0 面板错误=""
+[smoke] 评分: 评分面板 最终 data-scores=6 data-error=""
+[smoke] 评分: 判定明细={"scored6":true,"inRange":true,"capped":true,"distinct":true,"composeOk":true,"detailNum":true,"idem":true,"ruleChanged":true,"bothRules":true,"ui":true}
+[smoke] 评分引擎          : PASS
+[smoke] 赛季 · 初始当前赛季=默认赛季（id=1）
+[smoke] 赛季 · 新建赛季 id=2 名称=__smoke_s1__
+[smoke] 赛季 · 重名赛季被拦=是
+[smoke] 赛季 · 空名赛季被拦=是
+[smoke] 赛季 · 切换后 使用中数量=1 当前=__smoke_s1__
+[smoke] 赛季 · 删除当前赛季被拦=是
+[smoke] 赛季 · 新对局自动归属当前赛季=true（seasonId=2，当前赛季=2）
+[smoke] 赛季 · 归档对局 移动数=1 归属=3（应=3）
+[smoke] 赛季 · 归档后 s1 对局数=0（应=0，已搬走）数据区间=—→—
+[smoke] 赛季 · 删除探针赛季 s2=成功 赛季已移除=true 对局仍在=true 归属=null
+[smoke] 赛季: 初始当前赛季=默认赛季（id=1）
+[smoke] 赛季: 新建赛季 id=2 名称=__smoke_s1__
+[smoke] 赛季: 重名赛季被拦=是
+[smoke] 赛季: 空名赛季被拦=是
+[smoke] 赛季: 切换后 使用中数量=1 当前=__smoke_s1__
+[smoke] 赛季: 删除当前赛季被拦=是
+[smoke] 赛季: 新对局自动归属当前赛季=true（seasonId=2，当前赛季=2）
+[smoke] 赛季: 归档对局 移动数=1 归属=3（应=3）
+[smoke] 赛季: 归档后 s1 对局数=0（应=0，已搬走）数据区间=—→—
+[smoke] 赛季: 删除探针赛季 s2=成功 赛季已移除=true 对局仍在=true 归属=null
+[smoke] 赛季: 赛季页 表格行=2 有当前标记=true 有新建按钮=true
+[smoke] 赛季: 当前导航="⟳赛季" 卡片标题=当前赛季|赛季列表|历史对局归档
+[smoke] 赛季: 判定明细={"created":true,"dupBlocked":true,"emptyBlocked":true,"singleActive":true,"delActiveBlocked":true,"autoTaggedActive":true,"assigned":true,"counted":true,"unassignKeepsMatch":true,"ui":true}
+[smoke] 赛季模块          : PASS
 [smoke] M8 图标 base       : file:///D:/AI/ds.5/lis-desktop/release/win-unpacked/resources/app.asar/dist/renderer/
 [smoke] M8 图标加载        : PASS image4.png:108px image11.png:96px image2.png:102px
 [smoke] M8 页面渲染图标    : 2 个，首个 src = ./class-icons/image9.png

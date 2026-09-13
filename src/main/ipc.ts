@@ -7,6 +7,7 @@ import { app, ipcMain, shell } from 'electron';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type { MatchInput, ParticipationInput, CombatStat, ImportPreview, GroupInput, SquadInput } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
+import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import type { DbHandle } from './db';
 import { PlayerRepo } from './repositories/playerRepo';
 import { MatchRepo } from './repositories/matchRepo';
@@ -189,6 +190,40 @@ export function registerIpc(ctx: IpcContext): void {
 
   // ── 数据看板（M6） ─────────────────────────────────────────────
   ipcMain.handle(IPC.dashboardData, safe(() => dashboard.load()));
+
+  // ── xlsx 读表（应用内导入旧表） ─────────────────────────────────
+  ipcMain.handle(IPC.metaXlsxSheets, safe((data: Uint8Array) => {
+    const buf = Buffer.from(data);
+    return { sheets: listSheets(buf) };
+  }));
+
+  ipcMain.handle(IPC.metaXlsxGrid, safe((data: Uint8Array, sheet: string | number, headerRow?: number) => {
+    const buf = Buffer.from(data);
+    const grid = readXlsx(buf, { sheet });
+    const header = headerRow && headerRow > 0 ? headerRow : detectHeaderRow(grid);
+    const headerCells = (grid[header - 1] ?? []).map((c) => c.trim());
+    const width = grid.reduce((w, r) => Math.max(w, r.length), 0);
+    const norm = (r: string[]) => {
+      const out = r.slice();
+      while (out.length < width) out.push('');
+      return out;
+    };
+    const dataStart = header + 1;
+    const before = grid.slice(Math.max(0, header - 4), header - 1).map((r, i) => ({
+      row: Math.max(1, header - 3) + i, cells: norm(r),
+    }));
+    const rows = grid.slice(header).map((r, i) => ({ row: dataStart + i, cells: norm(r) }));
+
+    return {
+      sheet: typeof sheet === 'string' ? sheet : `#${sheet}`,
+      headerRow: header,
+      headers: headerCells,
+      rows,
+      dataStartRow: dataStart,
+      previewBeforeHeader: before,
+      totalRows: grid.length,
+    };
+  }));
 
   // 外部链接走系统浏览器，而不是在应用内开窗
   ipcMain.handle('shell:openExternal', safe((url: string) => {

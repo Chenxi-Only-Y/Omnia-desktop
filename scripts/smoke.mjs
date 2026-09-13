@@ -31,7 +31,14 @@ for (const suffix of ['', '-wal', '-shm']) {
 const child = spawn(electronBin, ['.'], {
   cwd: ROOT,
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: { ...process.env, OMNIA_SMOKE: '1', OMNIA_DB_PATH: dbFile },
+  env: {
+    ...process.env,
+    OMNIA_SMOKE: '1',
+    OMNIA_DB_PATH: dbFile,
+    // 有旧表样本就顺带验证真实 xlsx 导入路径（没有则该项 SKIP）
+    OMNIA_SAMPLE_XLSX: process.env.OMNIA_SAMPLE_XLSX
+      || path.resolve(ROOT, '..', 'work', 'LIS_original.xlsx'),
+  },
 });
 
 let out = '';

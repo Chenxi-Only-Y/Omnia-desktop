@@ -6,8 +6,11 @@
  */
 import { app, BrowserWindow, dialog, shell } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
+import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import { openDatabase, type DbHandle } from './db';
 import { registerIpc } from './ipc';
+import { parseTableText } from '../shared/tableText';
 
 /** 编译后本文件位于 dist/main/main.js，应用根目录是上一级的上一级 */
 const APP_ROOT = path.resolve(__dirname, '..', '..');
@@ -405,6 +408,103 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of m6.steps) console.log('[smoke] M6:', s);
     console.log('[smoke] M6 看板与首页      :', m6.ok ? 'PASS' : 'FAIL');
 
+    // M7：用真实旧表验证「列工作表 → 探测表头 → 网格 → TSV → 解析」
+    // 走编译产物的核心函数（与 IPC 处理函数同一套逻辑），轻量且确定性；
+    // 若有样本再额外验一次 "bytes → grid" 以便报出字节数。
+    // 样本路径由 OMNIA_SAMPLE_XLSX 指定；没有样本时 SKIP（不算失败）。
+    const samplePath = env('OMNIA_SAMPLE_XLSX', 'LIS_SAMPLE_XLSX');
+    let m7: { ok: boolean; steps: string[]; skipped?: boolean } = { ok: true, steps: [], skipped: true };
+    if (samplePath && fs.existsSync(samplePath)) {
+      const steps: string[] = [];
+      let ok = true;
+      try {
+        const buf = fs.readFileSync(samplePath);
+        steps.push(`样本=${path.basename(samplePath)} 字节=${buf.length}`);
+
+        const sheets = listSheets(buf);
+        const names = sheets.map((s) => s.name);
+        steps.push(`工作表(${names.length})=${names.join('/')}`);
+
+        // 成员主档：应命中「信息数据库」，表头探测在第 5 行
+        const g1 = readXlsx(buf, { sheet: '信息数据库' });
+        const h1 = detectHeaderRow(g1);
+        const head1 = (g1[h1 - 1] ?? []).map((c) => c.trim());
+        const members = g1.slice(h1).filter((r) => (r[2] ?? '').trim() !== '');
+        steps.push(`信息数据库 表头行=${h1} 总行数=${g1.length} 成员行=${members.length}`);
+        steps.push(`表头前 6 列=${head1.slice(0, 6).map((h) => h || '·').join('|')}`);
+        steps.push(`首个成员=${(members[0]?.[2] ?? '').trim()}`);
+
+        // 战报：应命中「数据导入」，表头探测在第 6 行
+        const g2 = readXlsx(buf, { sheet: '数据导入' });
+        const h2 = detectHeaderRow(g2);
+        const head2 = (g2[h2 - 1] ?? []).map((c) => c.trim()).filter(Boolean);
+        steps.push(`数据导入 表头行=${h2} 表头=${head2.slice(0, 8).join('|')}`);
+
+        // 网格 → TSV → 真实解析（成员名单走已有列名映射）
+        // 实测：信息数据库里**没有职业列**（索引 3 全空），
+        // 职业信息只存在于「数据导入」战报表。所以成员导入后主职业为空是预期行为，
+        // 需要靠战报或手工补齐。这里把该事实固化成断言，避免以后误以为是 bug。
+        let dColFilled = 0;
+        for (let r = h1; r < g1.length; r++) if ((g1[r]?.[3] ?? '').trim() !== '') dColFilled++;
+        steps.push(`信息数据库 D 列（疑似职业列）非空数=${dColFilled}（实测应为 0：该表不含职业）`);
+
+        // C 列角色ID / I 列麦 / L 列备注 应有数据
+        const idCol = g1.slice(h1).filter((r) => (r[2] ?? '').trim() !== '').length;
+        const micCol = g1.slice(h1).filter((r) => (r[8] ?? '').trim() !== '').length;
+        const noteCol = g1.slice(h1).filter((r) => (r[11] ?? '').trim() !== '').length;
+        steps.push(`C 列角色ID=${idCol} 人 · I 列麦=${micCol} 人 · L 列备注=${noteCol} 人`);
+
+        const tsv = [
+          head1.join('\t'),
+          ...g1.slice(h1)
+            .map((r) => r.map((c) => (c ?? '').replace(/[\t\r\n]+/g, ' ').trim()).join('\t'))
+            .filter((l) => l.replace(/\t/g, '').trim() !== ''),
+        ].join('\n');
+        const parsed = parseTableText(tsv);
+        steps.push(`网格→TSV→解析 得到 ${parsed.length} 名成员，首条=${parsed[0]?.gameId ?? '无'}/入帮序=${parsed[0]?.joinedOrder ?? '?'}/麦=${parsed[0]?.mic ?? '无'}/备注角色=${parsed[0]?.noteRole ?? '无'}`);
+
+        // 显式指定表头行应被尊重：第 6 行是数据首行（角色ID=1）
+        const hExplicit = 6;
+        const g4 = readXlsx(buf, { sheet: '信息数据库', headerRow: hExplicit, maxRows: hExplicit + 1 });
+        steps.push(`显式 headerRow=${hExplicit} → 该行首列=${(g4[hExplicit - 1]?.[0] ?? '') || '（空）'}`);
+
+        // 不存在的表必须报错，不能静默回退
+        let badThrew = false;
+        try { readXlsx(buf, { sheet: '不存在的表' }); } catch { badThrew = true; }
+        steps.push(`读不存在的表 → ${badThrew ? '按预期报错' : '未报错（异常！）'}`);
+
+        // bytes → grid（验证 IPC 入参类型 Uint8Array 也能走通）
+        const fromBytes = readXlsx(Buffer.from(buf), { sheet: '信息数据库' });
+        steps.push(`Uint8Array 入参 → 行数=${fromBytes.length}`);
+
+        ok = names.length === 10
+          && names.includes('信息数据库') && names.includes('数据导入')
+          && h1 === 5
+          && head1[0] === '入帮排序' && head1[2] === '角色ID'
+          && dColFilled === 0
+          && idCol >= 79 && micCol >= 70 && noteCol >= 10
+          && members.length >= 79
+          && h2 === 6
+          && head2.includes('玩家名字') && head2.includes('击败/清泉') && head2.includes('焚骨')
+          && parsed.length >= 79
+          && parsed[0]?.gameId === '草莓酱板鸭'
+          && parsed[0]?.joinedOrder === 1
+          && parsed[0]?.mic === '有'
+          && parsed[0]?.noteRole === '指挥'
+          && (g4[hExplicit - 1]?.[0] ?? '') === '1'
+          && badThrew
+          && fromBytes.length === g1.length;
+      } catch (err) {
+        ok = false;
+        steps.push('ERR ' + (err instanceof Error ? err.message : String(err)));
+      }
+      m7 = { ok, steps };
+      for (const s of m7.steps) console.log('[smoke] M7:', s);
+      console.log('[smoke] M7 真实旧表导入    :', m7.ok ? 'PASS' : 'FAIL');
+    } else {
+      console.log('[smoke] M7 真实旧表导入    : SKIP（未提供样本，设 OMNIA_SAMPLE_XLSX 指向旧表即可验证）');
+    }
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     const icons = await win.webContents.executeJavaScript(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
@@ -437,7 +537,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
-      && m6.ok === true && iconOk;
+      && m6.ok === true && m7.ok === true && iconOk;
     console.log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     console.log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

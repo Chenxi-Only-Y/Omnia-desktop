@@ -421,3 +421,21 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .hero__class img { width: 26px; height: 26px; object-fit: contain; }
 .hero__class i { width: 26px; height: 26px; border-radius: 50%; display: block; opacity: .85; }
 .hero__class em { font-style: normal; font-size: 10px; }
+
+/* ─────────────────────────────────────────────────────────────
+   xlsx 导入向导
+   ───────────────────────────────────────────────────────────── */
+.modal__box--wide { width: min(1180px, 95vw); }
+.sheet-preview { max-height: 46vh; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+table.grid--sheet { font-size: 11px; }
+table.grid--sheet th, table.grid--sheet td {
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-right: 1px solid var(--border);
+}
+table.grid--sheet th { background: #262d3c; color: #d7e2f2; position: sticky; top: 0; }
+table.grid--sheet th.rownum, table.grid--sheet td.rownum {
+  position: sticky; left: 0; width: 46px; text-align: right;
+  background: #1b1f29; color: var(--text-faint);
+}
+table.grid--sheet tr.sheet-row--before td { background: #1c2029; color: var(--text-faint); }
+table.grid--sheet tr.sheet-row--before td.rownum { background: #171a22; }

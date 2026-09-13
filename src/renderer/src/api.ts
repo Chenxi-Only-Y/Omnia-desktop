@@ -5,7 +5,7 @@
 import type {
   AppInfo, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput, ImportPreview,
   IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput, ParticipationRow,
-  Player, PlayerInput, SquadCatalog, SquadInput, SquadRow,
+  Player, PlayerInput, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -41,6 +41,9 @@ export const api = {
     removeGroup: (id: number): Promise<true> => unwrap(bridge().meta.removeGroup(id)),
     createSquad: (input: SquadInput): Promise<SquadRow> => unwrap(bridge().meta.createSquad(input)),
     removeSquad: (id: number): Promise<true> => unwrap(bridge().meta.removeSquad(id)),
+    xlsxSheets: (data: Uint8Array): Promise<SheetList> => unwrap(bridge().meta.xlsxSheets(data)),
+    xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number): Promise<SheetGrid> =>
+      unwrap(bridge().meta.xlsxGrid(data, sheet, headerRow)),
   },
 
   player: {

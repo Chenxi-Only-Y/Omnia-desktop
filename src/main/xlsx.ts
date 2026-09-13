@@ -201,6 +201,28 @@ export function listSheets(buf: Buffer): SheetInfo[] {
   return names.map((name, index) => ({ name, index }));
 }
 
+/**
+ * 探测表头行（1 基）。
+ *
+ * 启发式：在前 20 行里找「非空单元格最多、且文本多于数字」的一行。
+ * 旧表里表头常在第 5~6 行（上面是标题/说明），直接假设第 1 行会读错。
+ */
+export function detectHeaderRow(grid: string[][], scanRows = 20): number {
+  let best = 1;
+  let bestScore = -1;
+  const limit = Math.min(scanRows, grid.length);
+  for (let i = 0; i < limit; i++) {
+    const row = grid[i] ?? [];
+    const filled = row.filter((c) => c !== '').length;
+    if (filled < 2) continue;
+    const texty = row.filter((c) => c !== '' && !/^-?\d+(\.\d+)?$/.test(c)).length;
+    // 文本列越多越像表头；纯数字行（数据行）会被 texty 压低
+    const score = texty * 2 + filled - (filled - texty) * 2;
+    if (score > bestScore) { bestScore = score; best = i + 1; }
+  }
+  return best;
+}
+
 /** 读成二维字符串数组（空单元格为 ''，行/列按需要补齐） */
 export function readXlsx(buf: Buffer, opts: ReadOptions = {}): string[][] {
   const zip = readZip(buf);

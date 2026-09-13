@@ -3,6 +3,7 @@ import type { Player, PlayerInput } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
+import ImportWizard from '../components/ImportWizard';
 import { parseTableText, toCsv } from '../lib/importer';
 
 interface Props extends PageProps {
@@ -39,6 +40,7 @@ export default function RosterPage({ classes, classMap, onCount }: Props) {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editId, setEditId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -259,15 +261,27 @@ export default function RosterPage({ classes, classMap, onCount }: Props) {
           </select>
           <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }}
                  onChange={(e) => void handleFile(e.target.files?.[0])} />
+          <button className="btn primary" onClick={() => setWizard(true)}>从 xlsx 导入</button>
           <button className="btn" onClick={() => fileRef.current?.click()}>导入 CSV / JSON</button>
           <button className="btn" onClick={handleExport} disabled={!players.length}>导出 CSV</button>
           <button className="btn ghost" onClick={() => void load()}>刷新</button>
         </div>
         <div className="hint">
           导入按「角色 ID」幂等合并：新 ID 新增，已有 ID 只覆盖非空字段。
+          xlsx 导入会自动列出工作表并探测表头行（旧表的表头在第 5~6 行也能认）；
           CSV 需带表头，支持列名：角色ID / 玩家名字 / 主职业 / 副职 / 入帮排序 / 麦克风 / 备注 等。
         </div>
       </div>
+
+      {wizard && (
+        <ImportWizard
+          classes={classes}
+          classMap={classMap}
+          mode="player"
+          onClose={() => setWizard(false)}
+          onDone={(msg) => { setNotice(msg); void load(); }}
+        />
+      )}
 
       <div className="card">
         <h3>成员列表（{filtered.length} / {players.length}）</h3>

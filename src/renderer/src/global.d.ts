@@ -1,7 +1,7 @@
 import type {
   AppInfo, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput, ImportPreview,
   IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput, ParticipationRow,
-  Player, PlayerInput, Match, SquadCatalog, SquadInput, SquadRow,
+  Player, PlayerInput, Match, SheetGrid, SheetList, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 declare global {
@@ -25,6 +25,8 @@ declare global {
         removeGroup(id: number): Promise<IpcResult<true>>;
         createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
         removeSquad(id: number): Promise<IpcResult<true>>;
+        xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
+        xlsxGrid(data: Uint8Array, sheet: string | number, headerRow?: number): Promise<IpcResult<SheetGrid>>;
       };
       match: {
         list(): Promise<IpcResult<MatchSummary[]>>;

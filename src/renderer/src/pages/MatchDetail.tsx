@@ -6,6 +6,7 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
 import LineupBoard from '../components/LineupBoard';
+import ImportWizard from '../components/ImportWizard';
 import {
   BENCH_SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
 } from '@shared/domain';
@@ -448,6 +449,9 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       {tab === 'import' && (
         <StatImportPanel
           matchId={matchId}
+          classes={classes}
+          classMap={classMap}
+          matchLabel={match ? `${match.date} 第 ${match.indexInDay} 场` : ''}
           onDone={() => { void load(); onChanged(); }}
         />
       )}
@@ -550,13 +554,22 @@ function AddPlayerPicker({
 }
 
 // ── 批量导入战报 ─────────────────────────────────────────────────
-function StatImportPanel({ matchId, onDone }: { matchId: number; onDone: () => void }) {
+function StatImportPanel({
+  matchId, classes, classMap, matchLabel, onDone,
+}: {
+  matchId: number;
+  classes: PageProps['classes'];
+  classMap: PageProps['classMap'];
+  matchLabel: string;
+  onDone: () => void;
+}) {
   const [text, setText] = useState('');
   const [mode, setMode] = useState<JoinMode>('roster');
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function doPreview(payload?: string) {
@@ -604,15 +617,16 @@ function StatImportPanel({ matchId, onDone }: { matchId: number; onDone: () => v
     <div className="card">
       <h3>批量导入战报</h3>
       <div className="toolbar">
+        <button className="btn primary" onClick={() => setWizard(true)}>从 xlsx 导入</button>
+        <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" style={{ display: 'none' }}
+               onChange={(e) => void pickFile(e.target.files?.[0])} />
+        <button className="btn" onClick={() => fileRef.current?.click()}>选择 CSV/TSV 文件</button>
         <label className="field"><span>名单模式</span>
           <select className="select" value={mode} onChange={(e) => setMode(e.target.value as JoinMode)}>
             <option value="roster">严格：必须在成员主档里</option>
             <option value="full">完整：不在档的自动建档</option>
           </select>
         </label>
-        <input ref={fileRef} type="file" accept=".csv,.txt,.tsv" style={{ display: 'none' }}
-               onChange={(e) => void pickFile(e.target.files?.[0])} />
-        <button className="btn" onClick={() => fileRef.current?.click()}>选择 CSV/TSV 文件</button>
         <button className="btn primary" onClick={() => void doPreview()} disabled={busy}>校验预览</button>
         {preview && (
           <button className="btn primary" onClick={() => void doCommit()} disabled={busy || preview.summary.errors > 0}>
@@ -620,6 +634,18 @@ function StatImportPanel({ matchId, onDone }: { matchId: number; onDone: () => v
           </button>
         )}
       </div>
+
+      {wizard && (
+        <ImportWizard
+          classes={classes}
+          classMap={classMap}
+          mode="stat"
+          matchId={matchId}
+          matchLabel={matchLabel}
+          onClose={() => setWizard(false)}
+          onDone={(msg) => { setNotice(msg); onDone(); }}
+        />
+      )}
 
       <textarea
         className="input"

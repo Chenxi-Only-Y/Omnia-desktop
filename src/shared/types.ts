@@ -269,6 +269,25 @@ export interface SquadInput {
   size?: number;
 }
 
+// ── xlsx 导入（应用内直接读旧表） ────────────────────────────────
+export interface SheetList {
+  sheets: { name: string; index: number }[];
+}
+
+export interface SheetGrid {
+  sheet: string;
+  /** 探测到的表头行（1 基）。旧表常在 5/6 行。 */
+  headerRow: number;
+  /** 选中的表头行内容（已 trim） */
+  headers: string[];
+  /** 表头下方的数据行（前 N 行，行号从 1 起） */
+  rows: { row: number; cells: string[] }[];
+  /** 探测到的数据起始行（1 基） */
+  dataStartRow: number;
+  /** 表头之前的原始行（用于让用户确认选对了表头） */
+  previewBeforeHeader: { row: number; cells: string[] }[];
+  totalRows: number;
+}
 // ── 数据看板（M6，先做不依赖评分算法的部分） ─────────────────────
 export interface AttendanceRow {
   playerId: number;
@@ -363,6 +382,9 @@ export interface OmniaApi {
     removeGroup(id: number): Promise<IpcResult<true>>;
     createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
     removeSquad(id: number): Promise<IpcResult<true>>;
+    /** 读取 xlsx：先列工作表，再取某个工作表的网格与表头探测 */
+    xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
+    xlsxGrid(data: Uint8Array, sheet: string | number, headerRow?: number): Promise<IpcResult<SheetGrid>>;
   };
   match: {
     list(): Promise<IpcResult<MatchSummary[]>>;
@@ -397,6 +419,8 @@ export const IPC = {
   metaGroupRemove: 'meta:group:remove',
   metaSquadCreate: 'meta:squad:create',
   metaSquadRemove: 'meta:squad:remove',
+  metaXlsxSheets: 'meta:xlsx:sheets',
+  metaXlsxGrid: 'meta:xlsx:grid',
 
   // M3 对局与战报
   matchList: 'match:list',

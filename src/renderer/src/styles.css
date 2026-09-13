@@ -426,6 +426,12 @@ textarea.input { resize: vertical; line-height: 1.5; }
   box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
 }
 
+/* 评分明细的键值对 */
+.kv { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.kv__item { display: inline-flex; align-items: baseline; gap: 5px; font-size: 11px; }
+.kv__item i { color: var(--text-faint); font-style: normal; }
+.kv__item b { color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* ── 出勤率条 ─────────────────────────────────────────────── */
 .ratebar {
   display: inline-block; width: 46px; height: 5px; border-radius: 3px;

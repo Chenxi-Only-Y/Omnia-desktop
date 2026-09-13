@@ -17,13 +17,26 @@ const num = (v: number): string => (v === 0 ? '—' : v.toLocaleString());
 
 export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) {
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
+  const [scores, setScores] = useState<Record<number, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
   const [onlyFilled, setOnlyFilled] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setDetail(await api.player.detail(playerId));
+      const d = await api.player.detail(playerId);
+      setDetail(d);
+      // 逐场得分：按参与记录 id 关联（分数按规则集分开存，这里取该场当前分数）
+      const pairs = await Promise.all(d.matches.map(async (m) => {
+        const s = await api.match.scores(m.matchId);
+        return [m.matchId, s] as const;
+      }));
+      const map: Record<number, number> = {};
+      for (const [matchId, list] of pairs) {
+        const hit = list.find((x) => x.playerId === playerId);
+        if (hit) map[matchId] = hit.total;
+      }
+      setScores(map);
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -54,6 +67,11 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
   const listRows = onlyFilled
     ? detail.matches.filter((m) => m.statFilled)
     : detail.matches;
+  /** 有分数的场次（用于均分与趋势） */
+  const scoredRows = detail.matches.filter((m) => scores[m.matchId] !== undefined);
+  const avgScore = scoredRows.length
+    ? scoredRows.reduce((n, m) => n + scores[m.matchId], 0) / scoredRows.length
+    : null;
 
   const cell = (v: number, extra?: string) => (
     <td className="num" style={v === 0 ? { color: 'var(--text-faint)' } : undefined}>
@@ -111,6 +129,14 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
           <div className="v" style={{ fontSize: 18 }}>{totals.deaths}<small> / {totals.revives}</small></div>
           <div className="hint" style={{ marginTop: 4 }}>
             场均重伤 {totals.statFilled ? (totals.deaths / totals.statFilled).toFixed(2) : '—'}
+          </div>
+        </div>
+        <div className="stat"><div className="k">已有评分的场次</div>
+          <div className="v">{scoredRows.length}<small> 场</small></div>
+          <div className="hint" style={{ marginTop: 4 }}>
+            {avgScore === null
+              ? '还没算过分（去对局的「本场评分」页签计算）'
+              : `平均 ${avgScore.toFixed(1)} 分`}
           </div>
         </div>
       </div>
@@ -240,6 +266,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
                   <th style={{ width: 100 }}>小队</th>
                   <th style={{ width: 80 }}>职业</th>
                   <th style={{ width: 70 }}>状态</th>
+                  <th className="num" style={{ width: 80 }}>总分</th>
                   <th className="num">有效击杀</th>
                   <th className="num">助攻</th>
                   <th className="num">有效人伤</th>
@@ -270,13 +297,16 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
                     </td>
                     {m.statFilled ? (
                       <>
+                        <td className="num" style={{ fontWeight: 600, color: scores[m.matchId] !== undefined ? 'var(--text)' : 'var(--text-faint)' }}>
+                          {scores[m.matchId] !== undefined ? scores[m.matchId].toFixed(2) : '未算'}
+                        </td>
                         {cell(m.effKills)}{cell(m.assists)}
                         {cell(m.effDmg)}{cell(m.effTower)}
                         {cell(m.healing)}{cell(m.taken)}
                         {cell(m.deaths)}{cell(m.revives)}
                       </>
                     ) : (
-                      <td colSpan={8} style={{ color: 'var(--text-faint)' }}>未填战报</td>
+                      <td colSpan={9} style={{ color: 'var(--text-faint)' }}>未填战报</td>
                     )}
                   </tr>
                 ))}

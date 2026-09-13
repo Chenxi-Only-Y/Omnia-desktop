@@ -371,6 +371,43 @@ export interface RuleSetValidation {
   issues: { level: 'error' | 'warn'; field: string; message: string }[];
 }
 
+// ── 评分结果 ─────────────────────────────────────────────────────
+export interface SavedScore {
+  participationId: number;
+  playerId: number;
+  playerName: string;
+  squad: string;
+  personalScore: number;
+  teamScore: number;
+  bonus: number;
+  deathPenalty: number;
+  total: number;
+  engine: string;
+  computedAt: string;
+}
+
+export interface ScoreRunSummary {
+  matchId: number;
+  ruleSetId: number;
+  ruleSetName: string;
+  engine: string;
+  /** 被评分的人数 */
+  scored: number;
+  /** 覆盖率统计，便于判断"这场算全了吗" */
+  stats: { min: number; max: number; avg: number; capped: number };
+  lines: {
+    playerName: string;
+    squad: string;
+    role: string;
+    personalScore: number;
+    teamScore: number;
+    bonus: number;
+    deathPenalty: number;
+    total: number;
+    detail: Record<string, number | string>;
+  }[];
+}
+
 // ── 数据看板（M6，先做不依赖评分算法的部分） ─────────────────────
 export interface AttendanceRow {
   playerId: number;
@@ -558,6 +595,10 @@ export interface OmniaApi {
     saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
     importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;
     importCommit(matchId: number, preview: ImportPreview): Promise<IpcResult<{ written: number; created: number }>>;
+    /** 按规则集重算并保存某场分数 */
+    runScore(matchId: number, ruleSetId?: number): Promise<IpcResult<ScoreRunSummary>>;
+    /** 读取已保存的分数 */
+    scores(matchId: number, ruleSetId?: number): Promise<IpcResult<SavedScore[]>>;
   };
   dashboard: {
     data(): Promise<IpcResult<DashboardData>>;
@@ -633,6 +674,8 @@ export const IPC = {
   matchStatSave: 'match:stat:save',
   matchImportPreview: 'match:import:preview',
   matchImportCommit: 'match:import:commit',
+  matchRunScore: 'match:score:run',
+  matchScores: 'match:score:list',
 
   // M6 看板
   dashboardData: 'dashboard:data',

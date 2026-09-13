@@ -2,7 +2,7 @@ import type {
   AppInfo, AssignInput, ClassInfo, CombatStat, CombatGroupRow, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, MatchInput, MatchSummary, OmniaApi, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, Match, RuleSet, RuleSetInput,
-  RuleSetValidation, SheetGrid, SheetList,
+  RuleSetValidation, SavedScore, ScoreRunSummary, SheetGrid, SheetList,
   SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
@@ -45,6 +45,8 @@ declare global {
         saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
         importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;
         importCommit(matchId: number, preview: ImportPreview): Promise<IpcResult<{ written: number; created: number }>>;
+        runScore(matchId: number, ruleSetId?: number): Promise<IpcResult<ScoreRunSummary>>;
+        scores(matchId: number, ruleSetId?: number): Promise<IpcResult<SavedScore[]>>;
       };
       shell: { openExternal(url: string): Promise<IpcResult<true>> };
       dashboard: { data(): Promise<IpcResult<DashboardData>> };

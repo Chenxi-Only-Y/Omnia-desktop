@@ -115,7 +115,39 @@ function makeLogger(): (...args: unknown[]) => void {
 
 async function runSmokeTest(win: BrowserWindow): Promise<void> {
   const log = makeLogger();
-  const probe = async (): Promise<{ preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null }> => {
+
+  /**
+   * 执行渲染层探针并兜底。
+   * 关键：executeJavaScript 在脚本抛错时会**拒绝 Promise**；不接住的话自检函数
+   * 既不退出也不继续（表现为挂死到外部超时）。这里统一接住并限时，
+   * 任何脚本错误都退化成一条 ERR 记录，保证自检总能跑完并给出结论。
+   */
+  const guarded = async (
+    script: string, label: string, timeoutMs = 90_000,
+  ): Promise<{ ok: boolean; steps: string[]; value?: unknown }> => {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const raw = await Promise.race([
+        win.webContents.executeJavaScript(script),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`${label} 探针超时（${timeoutMs}ms）`)), timeoutMs);
+        }),
+      ]);
+      // 探针脚本按约定返回 { ok, steps }；其余返回结构（如 { base, results, dom }）
+      // 原样放进 value，调用方自行取用。
+      if (raw && typeof raw === 'object' && 'ok' in (raw as object) && 'steps' in (raw as object)) {
+        return raw as { ok: boolean; steps: string[] };
+      }
+      return { ok: true, steps: [], value: raw };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, steps: [`ERR 渲染层脚本失败：${msg}`] };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
+  const preloadProbe = async (): Promise<{ preload: boolean; appInfo: boolean; classes: number; players: number; error: string | null }> => {
     const w = win.webContents;
     const has = await w.executeJavaScript('typeof window.omnia === "object" && window.omnia !== null');
     if (!has) return { preload: false, appInfo: false, classes: 0, players: 0, error: 'window.omnia 未注入' };
@@ -137,18 +169,20 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
   };
 
   win.webContents.once('did-finish-load', async () => {
-    let r: Awaited<ReturnType<typeof probe>>;
+    let r: Awaited<ReturnType<typeof preloadProbe>>;
     try {
-      r = await probe();
+      r = await preloadProbe();
     } catch (err) {
       r = { preload: false, appInfo: false, classes: -1, players: -1, error: String(err) };
     }
-    const rootHtml = await win.webContents.executeJavaScript(
-      'document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1',
-    ).catch(() => -1);
+    const rootProbeResult = await guarded(
+      `document.getElementById("root") ? document.getElementById("root").innerHTML.length : -1`,
+      '根节点渲染',
+    );
+    const rootHtml = typeof rootProbeResult.value === 'number' ? rootProbeResult.value : -1;
 
     // 写操作往返：create → update → list → remove → list
-    const crud = await win.webContents.executeJavaScript(`(async () => {
+    const crud = await guarded(`(async () => {
       const steps = [];
       try {
         const before = (await window.omnia.player.list()).data.length;
@@ -169,7 +203,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('before=' + before + ' afterCreate=' + afterCreate + ' afterRemove=' + afterRemove);
         return { ok: before === afterRemove && afterCreate === before + 1, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针2');
 
     log('[smoke] preload 注入        :', r.preload);
     log('[smoke] app.info()         :', r.appInfo);
@@ -180,7 +214,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of crud.steps) log('[smoke] CRUD:', s);
 
     // M3：对局 → 阵容 → 战报粘贴导入 → 校验 → 入库 → 读回
-    const m3 = await win.webContents.executeJavaScript(`(async () => {
+    const m3 = await guarded(`(async () => {
       const steps = [];
       try {
         const api = window.omnia;
@@ -257,13 +291,13 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && mine.stat.assists === 151;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针3');
 
     for (const s of m3.steps) log('[smoke] M3:', s);
     log('[smoke] M3 对局与战报      :', m3.ok ? 'PASS' : 'FAIL');
 
     // M5：战斗组/小队建制（数据驱动）+ 排表看板渲染
-    const m5 = await win.webContents.executeJavaScript(`(async () => {
+    const m5 = await guarded(`(async () => {
       const steps = [];
       try {
         const api = window.omnia;
@@ -342,12 +376,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && s1.data.name === '演练组-1' && s2.data.name === '演练组-2'
           && blocks === 12 && hasTarget;        return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针4');
     for (const s of m5.steps) log('[smoke] M5:', s);
     log('[smoke] M5 建制与看板      :', m5.ok ? 'PASS' : 'FAIL');
 
     // M6：看板统计 + 首页主视觉渲染
-    const m6 = await win.webContents.executeJavaScript(`(async () => {
+    const m6 = await guarded(`(async () => {
       const steps = [];
       const created = { players: [], matches: [] };
       try {
@@ -425,7 +459,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && heroBrand.includes('Omnia') && heroClasses === 12 && heroButtons === 4;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针5');
     for (const s of m6.steps) log('[smoke] M6:', s);
     log('[smoke] M6 看板与首页      :', m6.ok ? 'PASS' : 'FAIL');
 
@@ -527,7 +561,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     }
 
     // 导入向导的界面接线：切到成员主档点「从 xlsx 导入」，确认弹窗出来了
-    const wizard = await win.webContents.executeJavaScript(`(async () => {
+    const wizard = await guarded(`(async () => {
       const steps = [];
       try {
         const waitFor = async (fn, label, ms = 6000) => {
@@ -555,12 +589,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('点击关闭后弹窗已消失=' + closed);
         return { ok: title.includes('导入成员主档') && hasFileBtn && hasHint && closed, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针6');
     for (const s of wizard.steps) log('[smoke] 向导:', s);
     log('[smoke] 导入向导界面接线  :', wizard.ok ? 'PASS' : 'FAIL');
 
     // 拖拽排表：用原生拖拽事件驱动看板，验证队员真的换了小队
-    const dnd = await win.webContents.executeJavaScript(`(async () => {
+    const dnd = await guarded(`(async () => {
       const steps = [];
       try {
         const api = window.omnia;
@@ -668,12 +702,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && !!chip;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针7');
     for (const s of dnd.steps) log('[smoke] 拖拽:', s);
     log('[smoke] 看板拖拽排表      :', dnd.ok ? 'PASS' : 'FAIL');
 
     // 成员详情：个人汇总 / 雷达对比 / 页面渲染
-    const detail = await win.webContents.executeJavaScript(`(async () => {
+    const detail = await guarded(`(async () => {
       const steps = [];
       const made = { players: [], matches: [] };
       try {
@@ -753,12 +787,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && polygons === 2 && labels.length >= 6;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针8');
     for (const s of detail.steps) log('[smoke] 详情:', s);
     log('[smoke] 成员详情页        :', detail.ok ? 'PASS' : 'FAIL');
 
     // 报名 / 请假：标记 → 应用上场名单 → 校验状态流转
-    const signup = await win.webContents.executeJavaScript(`(async () => {
+    const signup = await guarded(`(async () => {
       const steps = [];
       const made = { players: [], matches: [] };
       try {
@@ -861,12 +895,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && rows >= 4 && marks >= 4;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针9');
     for (const s of signup.steps) log('[smoke] 报名:', s);
     log('[smoke] 报名与请假        :', signup.ok ? 'PASS' : 'FAIL');
 
     // 规则集：默认值/校验/新建/版本递增/编辑/另存/激活/删除保护/页面渲染
-    const rules = await win.webContents.executeJavaScript(`(async () => {
+    const rules = await guarded(`(async () => {
       const steps = [];
       const madeIds = [];
       try {
@@ -962,12 +996,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && listRows >= 1 && coefInputs === 12 && numInputs > 10 && activeBadge === 1;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针10');
     for (const s of rules.steps) log('[smoke] 规则:', s);
     log('[smoke] 规则集管理        :', rules.ok ? 'PASS' : 'FAIL');
 
     // 攻略图库：13 张图真实加载 + 装备卡速查 + 灯箱
-    const guide = await win.webContents.executeJavaScript(`(async () => {
+    const guide = await guarded(`(async () => {
       const steps = [];
       try {
         const waitFor = async (fn, label, ms = 10000) => {
@@ -1043,12 +1077,188 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && banners.length === 2 && banners.every(b => b.naturalWidth > 500);
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
-    })()`);
+    })()`, '探针11');
     for (const s of guide.steps) log('[smoke] 攻略:', s);
     log('[smoke] 攻略图库          :', guide.ok ? 'PASS' : 'FAIL');
 
+    // 评分引擎（M1）：口径来自规则中心；验证分解合计、封顶、幂等、改规则会改分
+    const scoring = await guarded(`(async () => {
+      const steps = [];
+      const made = { players: [], matches: [], rules: [] };
+      try {
+        const api = window.omnia;
+        const psum = (o) => Object.values(o).reduce((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+
+        // 6 人：神相x3（两小队各若干）+ 素问x2 + 铁衣x1，覆盖三种定位
+        const spec = [
+          ['sc_1', '评分甲', '神相', '防守一-1'],
+          ['sc_2', '评分乙', '神相', '防守一-1'],
+          ['sc_3', '评分丙', '素问', '防守一-1'],
+          ['sc_4', '评分丁', '神相', '进攻一-1'],
+          ['sc_5', '评分戊', '素问', '进攻一-1'],
+          ['sc_6', '评分己', '铁衣', '进攻一-1'],
+        ];
+        const ids = {};
+        for (const [gid, name, cls, squad] of spec) {
+          const p = await api.player.create({ gameId: gid, name, mainClass: cls });
+          if (!p.ok) throw new Error('建档失败 ' + name + ': ' + p.error);
+          made.players.push(p.data.id);
+          ids[name] = { id: p.data.id, cls, squad };
+        }
+
+        const m = await api.match.create({ date: '2026-07-01', ourSide: '我方', oppSide: '评分队', result: 'WIN', ourTowersLeft: 6, oppTowersLeft: 1 });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        const mid = m.data.match.id;
+        made.matches.push(mid);
+
+        // 给不同量级的表现，制造区分度
+        const stats = {
+          评分甲: { kills: 30, fountainKills: 2, assists: 60, dmgPlayer: 9000000, dmgPlayerArmor: 100000, dmgBuilding: 2000000, damageTaken: 6000000, deaths: 1 },
+          评分乙: { kills: 12, assists: 30, dmgPlayer: 4000000, dmgBuilding: 500000, damageTaken: 5000000, deaths: 2 },
+          评分丙: { assists: 80, healing: 8000000, damageTaken: 3000000, deaths: 1, revives: 6 },
+          评分丁: { kills: 20, assists: 40, dmgPlayer: 7000000, dmgBuilding: 1200000, damageTaken: 4000000, deaths: 3 },
+          评分戊: { assists: 70, healing: 7000000, damageTaken: 2500000, deaths: 2, revives: 5 },
+          评分己: { assists: 50, damageTaken: 9000000, deaths: 6 },
+        };
+        for (const [name, st] of Object.entries(stats)) {
+          const r = await api.match.upsertParticipation({
+            matchId: mid, playerId: ids[name].id, squad: ids[name].squad, state: 'PLAY', stat: st,
+          });
+          if (!r.ok) throw new Error('写战报失败 ' + name + ': ' + r.error);
+        }
+
+        const active = await api.rules.active();
+        steps.push('使用中的规则=' + (active.ok && active.data ? active.data.name + ' v' + active.data.version : '无'));
+
+        const run1 = await api.match.runScore(mid);
+        if (!run1.ok) throw new Error('算分失败: ' + run1.error);
+        const s1 = run1.data;
+        const totals1 = s1.lines.map(l => l.total);
+        steps.push('参评人数=' + s1.scored + ' 均分=' + s1.stats.avg.toFixed(2)
+          + ' 区间=[' + s1.stats.min.toFixed(2) + ',' + s1.stats.max.toFixed(2) + ']'
+          + ' 触顶=' + s1.stats.capped);
+        steps.push('引擎=' + s1.engine + ' 规则=' + s1.ruleSetName);
+
+        // 分解合计 = 总分（含基础分与封顶）
+        const one = s1.lines[0];
+        const base = active.ok && active.data ? active.data.baseScore : 60;
+        const cap = active.ok && active.data ? active.data.capScore : 100;
+        const composeOk = s1.lines.every((l) => {
+          const raw = base + l.teamScore + l.personalScore + l.bonus - l.deathPenalty;
+          return Math.abs(Math.min(raw, cap) - l.total) < 1e-9 || Math.abs(l.total - cap) < 1e-9;
+        });
+        const distinct = new Set(totals1.map(t => t.toFixed(2))).size;
+        steps.push('区分度：不同总分数=' + distinct + ' 个 / ' + totals1.length + ' 人');
+        steps.push('抽样 ' + one.playerName + ' 团队=' + one.teamScore.toFixed(2)
+          + ' 个人=' + one.personalScore.toFixed(2) + ' 附加=' + one.bonus
+          + ' 扣分=' + one.deathPenalty.toFixed(2) + ' 总分=' + one.total.toFixed(2));
+        steps.push('明细字段=' + Object.keys(one.detail).join(','));
+        steps.push('小队执行分 防御一-1=' + one.detail['小队执行分'] + ' 战术=' + one.detail['战术类型']
+          + ' 职业系数=' + one.detail['职业系数']);
+
+        // 落库 + 幂等
+        const saved1 = await api.match.scores(mid);
+        await api.match.runScore(mid);
+        const saved2 = await api.match.scores(mid);
+        steps.push('落库条数 第一次=' + saved1.data.length + ' 重算后=' + saved2.data.length + '（应相同）');
+        const orderOk = saved2.data.every((x, i) => i === 0 || saved2.data[i - 1].total >= x.total);
+        steps.push('落库按总分降序=' + orderOk);
+
+        // 改规则 → 重算分数应变化（证明参数真的生效）
+        const cur = active.data;
+        const { id, seasonId, version, active: act, createdAt, ...curInput } = cur;
+        const tweaked = JSON.parse(JSON.stringify(curInput));
+        tweaked.name = '自检·高死亡扣分';
+        tweaked.deathPen = 15;
+        const nr = await api.rules.create(tweaked);
+        if (!nr.ok) throw new Error('建规则失败: ' + nr.error);
+        made.rules.push(nr.data.id);
+        await api.rules.setActive(nr.data.id);
+        const run2 = await api.match.runScore(mid, nr.data.id);
+        if (!run2.ok) throw new Error('按新规则算分失败: ' + run2.error);
+        const before = s1.lines.find(l => l.playerName === '评分己').total;
+        const after = run2.data.lines.find(l => l.playerName === '评分己').total;
+        steps.push('评己(6 死) 旧规则=' + before.toFixed(2) + ' 高死亡扣分规则=' + after.toFixed(2)
+          + ' 差=' + (after - before).toFixed(2));
+        const savedBoth = await api.match.scores(mid);
+        steps.push('两套规则的分数并存条数=' + savedBoth.data.length + '（应=12）');
+
+        // 界面：本场评分页签
+        const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.indexOf('对局与战报') >= 0);
+        nav.click();
+        const waitFor = async (fn, label, ms = 8000) => {
+          const t0 = Date.now();
+          while (Date.now() - t0 < ms) { const r = fn(); if (r) return r; await new Promise(res => setTimeout(res, 150)); }
+          throw new Error('等待超时：' + label);
+        };
+        const tEnter = Date.now();
+        while (Date.now() - tEnter < 6000) {
+          const btn = [...document.querySelectorAll('table.grid button')].find(x => x.textContent.trim() === '进入');
+          if (btn) { btn.click(); break; }
+          if (document.querySelector('button.tab')) break;
+          await new Promise(res => setTimeout(res, 150));
+        }
+        const tab = await waitFor(() => [...document.querySelectorAll('button.tab')]
+          .find(x => x.textContent.indexOf('本场评分') >= 0), '本场评分页签');
+        tab.click();
+
+        // 先等面板把它自己的数据读完：data-scores 是组件内部状态，最可靠
+        await waitFor(() => {
+          const el = document.querySelector('[data-scores]');
+          return el && Number(el.getAttribute('data-scores')) > 0 ? el : null;
+        }, '评分面板载入分数');
+        const panel = document.querySelector('[data-scores]');
+        const loadedCount = Number(panel.getAttribute('data-scores'));
+        const btnText = ([...document.querySelectorAll('button.btn.primary')]
+          .find(x => x.textContent.indexOf('算') >= 0)?.textContent ?? '').trim();
+
+        await waitFor(() => document.querySelector('table.grid tbody tr') ? true : null, '评分表');
+        const rows = document.querySelectorAll('table.grid tbody tr').length;
+        const scoreCells = document.querySelectorAll('table.grid tbody tr td.num').length;
+
+        const expand = [...document.querySelectorAll('button.btn.sm.ghost')].find(x => x.textContent.trim() === '展开');
+        let kvItems = 0;
+        let rowsAfterExpand = rows;
+        if (expand) {
+          expand.click();
+          await new Promise(res => setTimeout(res, 400));
+          rowsAfterExpand = document.querySelectorAll('table.grid tbody tr').length;
+          kvItems = document.querySelectorAll('.kv__item').length;
+        }
+        steps.push('展开前后表格行数 ' + rows + ' → ' + rowsAfterExpand + '，明细项=' + kvItems);
+        steps.push('评分页 组件载入=' + loadedCount + ' 按钮=' + JSON.stringify(btnText)
+          + ' 表格行=' + rows + ' 数字单元格=' + scoreCells + ' 明细项=' + kvItems
+          + ' 面板错误=' + JSON.stringify(panel.getAttribute('data-error') ?? ''));
+
+        for (const id2 of made.rules) await api.rules.remove(id2).catch(() => {});
+        for (const id2 of made.matches) await api.match.remove(id2);
+        for (const id2 of made.players) await api.player.remove(id2);
+
+        const panelEl = document.querySelector('[data-scores]');
+        steps.push('评分面板 最终 data-scores=' + (panelEl?.getAttribute('data-scores') ?? '（找不到）')
+          + ' data-error=' + JSON.stringify(panelEl?.getAttribute('data-error') ?? ''));
+
+        const cond = {
+          scored6: s1.scored === 6,
+          inRange: totals1.every(t => t >= 0 && t <= 100),
+          capped: s1.stats.capped >= 0 && s1.stats.capped <= 5 && s1.stats.max <= cap + 1e-9,
+          distinct: distinct >= 4,
+          composeOk,
+          detailNum: typeof one.detail['小队执行分'] === 'number' && typeof one.detail['职业系数'] === 'number',
+          idem: saved1.data.length === 6 && saved2.data.length === 6 && orderOk,
+          ruleChanged: after < before,
+          bothRules: savedBoth.data.length === 12,
+          ui: loadedCount === 6 && rows >= 6 && scoreCells >= 24 && rowsAfterExpand === rows + 1,
+        };
+        steps.push('判定明细=' + JSON.stringify(cond));
+        const ok = Object.values(cond).every(Boolean);
+        return { ok, steps };      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`, '评分引擎');
+    for (const s of scoring.steps) log('[smoke] 评分:', s);
+    log('[smoke] 评分引擎          :', scoring.ok ? 'PASS' : 'FAIL');
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
-    const icons = await win.webContents.executeJavaScript(`(async () => {
+    const iconProbe = await guarded(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
       const probe = (file) => new Promise((resolve) => {
         const img = new Image();
@@ -1069,18 +1279,22 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const firstSrc = document.querySelector('img.chip-icon')?.getAttribute('src') || '';
       if (made.ok) await window.omnia.player.remove(made.data.id);
       return { base, results, dom: chipIcons, firstSrc };
-    })()`);
-    const iconOk = icons.results.every((x: { ok: boolean }) => x.ok) && icons.dom > 0;
+    })()`, '探针12');
+    type IconProbe = { base: string; results: { file: string; ok: boolean; w: number }[]; dom: number; firstSrc: string };
+    const icons = (iconProbe.value ?? { base: '', results: [], dom: 0, firstSrc: '' }) as IconProbe;
+    const iconOk = icons.results.length > 0
+      && icons.results.every((x) => x.ok) && icons.dom > 0;
     log('[smoke] M8 图标 base       :', icons.base);
     log('[smoke] M8 图标加载        :', iconOk ? 'PASS' : 'FAIL',
-      icons.results.map((x: { file: string; ok: boolean; w: number }) => `${x.file}:${x.ok ? x.w + 'px' : '失败'}`).join(' '));
+      icons.results.map((x) => `${x.file}:${x.ok ? x.w + 'px' : '失败'}`).join(' '));
     log('[smoke] M8 页面渲染图标    :', icons.dom, '个，首个 src =', icons.firstSrc);
 
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
-      && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true && iconOk;
+      && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
+      && scoring.ok === true && iconOk;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

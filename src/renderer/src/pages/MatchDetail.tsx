@@ -9,6 +9,7 @@ import LineupBoard from '../components/LineupBoard';
 import CellPicker from '../components/CellPicker';
 import AddPlayerPicker from '../components/AddPlayerPicker';
 import StatImportPanel from '../components/StatImportPanel';
+import ScoringPanel from '../components/ScoringPanel';
 import SignupPage from './SignupPage';
 import {
   BENCH_SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
@@ -20,7 +21,7 @@ interface Props extends PageProps {
   onChanged: () => void;
 }
 
-type TabKey = 'lineup' | 'stats' | 'import' | 'signup';
+type TabKey = 'lineup' | 'stats' | 'import' | 'signup' | 'score';
 
 /** 小队下拉选项来自建制（组件内用 catalog 计算） */
 
@@ -265,7 +266,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       </div>
 
       <div className="tabs">
-        {([['lineup', `阵容编排（${stats.assigned}/60）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['signup', '报名 / 请假'], ['import', '批量导入战报']] as const)
+        {([['lineup', `阵容编排（${stats.assigned}/60）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['signup', '报名 / 请假'], ['score', '本场评分'], ['import', '批量导入战报']] as const)
           .map(([k, label]) => (
             <button key={k} className={`tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{label}</button>
           ))}
@@ -480,6 +481,8 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
           onChanged={() => { void load(); onChanged(); }}
         />
       )}
+
+      {tab === 'score' && <ScoringPanel matchId={matchId} playerCount={playing.length} />}
 
       {tab === 'import' && (
         <StatImportPanel

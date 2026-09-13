@@ -18,6 +18,7 @@ import { SquadRepo } from './repositories/squadRepo';
 import { DashboardRepo } from './repositories/dashboardRepo';
 import { SignupRepo } from './repositories/signupRepo';
 import { RuleSetRepo, validate as validateRuleSet } from './repositories/ruleSetRepo';
+import { scoreMatch } from '../shared/scoreEngine';
 
 export interface IpcContext {
   handle: DbHandle;
@@ -117,6 +118,47 @@ export function registerIpc(ctx: IpcContext): void {
     matches.unassign(playerId, matchId);
     return true as const;
   }));
+
+  // ── 评分（M1） ─────────────────────────────────────────────────
+  ipcMain.handle(IPC.matchRunScore, safe((matchId: number, ruleSetId?: number) => {
+    const rule = ruleSetId ? rules.get(ruleSetId) : rules.active();
+    if (!rule) throw new Error('没有可用的规则集，请先在「权重与规则」里建一套');
+    const input = matches.scoreInput(matchId);
+    const out = scoreMatch(input, rule);
+    matches.saveScores(matchId, rule.id, out);
+
+    const totals = out.lines.map((l) => l.total);
+    const stats = totals.length
+      ? {
+        min: Math.min(...totals),
+        max: Math.max(...totals),
+        avg: totals.reduce((a, b) => a + b, 0) / totals.length,
+        capped: totals.filter((t) => t >= rule.capScore - 1e-9).length,
+      }
+      : { min: 0, max: 0, avg: 0, capped: 0 };
+
+    return {
+      matchId,
+      ruleSetId: rule.id,
+      ruleSetName: rule.name,
+      engine: out.engine,
+      scored: out.lines.length,
+      stats,
+      lines: out.lines.map((l) => ({
+        playerName: l.playerName,
+        squad: l.squad,
+        role: l.role,
+        personalScore: l.personalScore,
+        teamScore: l.teamScore,
+        bonus: l.bonus,
+        deathPenalty: l.deathPenalty,
+        total: l.total,
+        detail: l.detail,
+      })),
+    };
+  }));
+  ipcMain.handle(IPC.matchScores, safe((matchId: number, ruleSetId?: number) =>
+    matches.savedScores(matchId, ruleSetId)));
   ipcMain.handle(IPC.matchParticipationRemove, safe((id: number) => {
     if (!matches.removeParticipation(id)) throw new Error(`参战记录不存在：id=${id}`);
     return true as const;

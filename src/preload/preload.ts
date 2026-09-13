@@ -57,6 +57,8 @@ const api = {
       invoke('match:import:preview', text, mode),
     importCommit: (matchId: number, preview: ImportPreview) =>
       invoke('match:import:commit', matchId, preview),
+    runScore: (matchId: number, ruleSetId?: number) => invoke('match:score:run', matchId, ruleSetId),
+    scores: (matchId: number, ruleSetId?: number) => invoke('match:score:list', matchId, ruleSetId),
   },
   shell: {
     openExternal: (url: string) => invoke('shell:openExternal', url),

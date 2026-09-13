@@ -13,6 +13,7 @@ import type {
   ParticipationInput, ParticipationRow,
 } from '../../shared/types';
 import { BENCH_SQUADS, EMPTY_COMBAT_STAT, findClass, tacticKind } from '../../shared/domain';
+import type { MatchScoreInput, MatchScoreOutput } from '../../shared/scoreEngine';
 import { SquadRepo } from './squadRepo';
 
 interface MatchRow {
@@ -437,6 +438,141 @@ export class MatchRepo {
        GROUP BY squad`,
     ).all(matchId) as unknown as { squad: string; c: number }[];
     return Object.fromEntries(rows.map((r) => [r.squad, n(r.c)]));
+  }
+
+  /**
+   * 组装评分引擎需要的输入：对局级字段 + 参战/战报/职业定位。
+   * 定位用职业查 class 表（铁衣=T、素问/妙音=治疗、其余=DPS）。
+   */
+  scoreInput(matchId: number): MatchScoreInput {
+    const m = this.get(matchId);
+    if (!m) throw new Error(`对局不存在：id=${matchId}`);
+
+    const rows = this.db.prepare(`
+      SELECT p.id AS participation_id, p.player_id, pl.name AS player_name,
+             COALESCE(NULLIF(p.class_used,''), pl.main_class) AS class_used,
+             COALESCE(c.role, 'DPS') AS role,
+             p.squad, p.tactic, p.team_role, p.note_role, p.state,
+             cs.kills, cs.fountain_kills, cs.assists, cs.resource,
+             cs.dmg_player, cs.dmg_player_armor, cs.dmg_building, cs.dmg_building_armor,
+             cs.healing, cs.damage_taken, cs.deaths, cs.revives, cs.bone_burn
+      FROM participation p
+      JOIN player pl ON pl.id = p.player_id
+      LEFT JOIN class c ON c.name = COALESCE(NULLIF(p.class_used,''), pl.main_class)
+      LEFT JOIN combat_stat cs ON cs.participation_id = p.id
+      WHERE p.match_id = ? AND p.side = 'our'
+      ORDER BY p.id
+    `).all(matchId) as unknown as {
+      participation_id: number; player_id: number; player_name: string;
+      class_used: string; role: string; squad: string; tactic: string;
+      team_role: string; note_role: string; state: string;
+      kills: number | null; fountain_kills: number | null; assists: number | null;
+      resource: number | null; dmg_player: number | null; dmg_player_armor: number | null;
+      dmg_building: number | null; dmg_building_armor: number | null; healing: number | null;
+      damage_taken: number | null; deaths: number | null; revives: number | null; bone_burn: number | null;
+    }[];
+
+    return {
+      matchId,
+      ourTowersLeft: m.ourTowersLeft,
+      oppTowersLeft: m.oppTowersLeft,
+      result: m.result,
+      rows: rows.map((r) => ({
+        participationId: r.participation_id,
+        playerId: r.player_id,
+        playerName: r.player_name,
+        classUsed: r.class_used || '',
+        role: (r.role === 'T' || r.role === 'HEAL' ? r.role : 'DPS') as MatchScoreInput['rows'][number]['role'],
+        squad: r.squad || '',
+        tactic: (r.tactic || '') as MatchScoreInput['rows'][number]['tactic'],
+        teamRole: (r.team_role === '防守' ? '防守' : r.team_role === '进攻' ? '进攻' : ''),
+        noteRole: r.note_role || '',
+        state: (r.state === 'BENCH' ? 'BENCH' : r.state === 'LEAVE' ? 'LEAVE' : 'PLAY'),
+        stat: {
+          kills: n(r.kills), fountainKills: n(r.fountain_kills), assists: n(r.assists),
+          resource: n(r.resource), dmgPlayer: n(r.dmg_player), dmgPlayerArmor: n(r.dmg_player_armor),
+          dmgBuilding: n(r.dmg_building), dmgBuildingArmor: n(r.dmg_building_armor),
+          healing: n(r.healing), damageTaken: n(r.damage_taken), deaths: n(r.deaths),
+          revives: n(r.revives), boneBurn: n(r.bone_burn),
+        },
+      })),
+    };
+  }
+
+  /**
+   * 计算并保存某场分数。
+   * 幂等：同一 (participation, rule_set) 上覆盖写，不会产生重复记录。
+   */
+  saveScores(matchId: number, ruleSetId: number, out: MatchScoreOutput): number {
+    const stmt = this.db.prepare(
+      `INSERT INTO score (participation_id, rule_set_id, engine, eff_json,
+                          personal_raw, personal_ratio, personal_score, team_score,
+                          bonus, death_penalty, total, computed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))
+       ON CONFLICT(participation_id, rule_set_id) DO UPDATE SET
+         engine = excluded.engine, eff_json = excluded.eff_json,
+         personal_raw = excluded.personal_raw, personal_ratio = excluded.personal_ratio,
+         personal_score = excluded.personal_score, team_score = excluded.team_score,
+         bonus = excluded.bonus, death_penalty = excluded.death_penalty,
+         total = excluded.total, computed_at = excluded.computed_at`,
+    );
+
+    this.db.exec('BEGIN');
+    try {
+      for (const line of out.lines) {
+        stmt.run(
+          line.participationId, ruleSetId, out.engine, JSON.stringify(line.detail),
+          Number(line.detail['个人原始加权'] ?? 0), Number(line.detail['个人归一'] ?? 0),
+          line.personalScore, line.teamScore, line.bonus, line.deathPenalty, line.total,
+        );
+      }
+      // 该场该规则下的旧记录里，已不在上场名单的（如改成请假）要清掉
+      this.db.prepare(
+        `DELETE FROM score WHERE rule_set_id = ? AND participation_id IN (
+           SELECT id FROM participation WHERE match_id = ? AND side = 'our' AND state <> 'PLAY'
+         )`,
+      ).run(ruleSetId, matchId);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return out.lines.length;
+  }
+
+  /** 读取某场已保存的分数（按总分降序） */
+  savedScores(matchId: number, ruleSetId?: number): {
+    participationId: number; playerId: number; playerName: string; squad: string;
+    personalScore: number; teamScore: number; bonus: number; deathPenalty: number;
+    total: number; engine: string; computedAt: string;
+  }[] {
+    const rows = this.db.prepare(`
+      SELECT s.participation_id, p.player_id, pl.name AS player_name, p.squad,
+             s.personal_score, s.team_score, s.bonus, s.death_penalty, s.total,
+             s.engine, s.computed_at
+      FROM score s
+      JOIN participation p ON p.id = s.participation_id
+      JOIN player pl ON pl.id = p.player_id
+      WHERE p.match_id = ? AND (? IS NULL OR s.rule_set_id = ?)
+      ORDER BY s.total DESC, pl.joined_order IS NULL, pl.joined_order, pl.id
+    `).all(matchId, ruleSetId ?? null, ruleSetId ?? null) as unknown as {
+      participation_id: number; player_id: number; player_name: string; squad: string;
+      personal_score: number; team_score: number; bonus: number; death_penalty: number;
+      total: number; engine: string; computed_at: string;
+    }[];
+    return rows.map((r) => ({
+      participationId: r.participation_id,
+      playerId: r.player_id,
+      playerName: r.player_name,
+      squad: r.squad || '',
+      personalScore: r.personal_score,
+      teamScore: r.team_score,
+      bonus: r.bonus,
+      deathPenalty: r.death_penalty,
+      total: r.total,
+      engine: r.engine,
+      computedAt: r.computed_at,
+    }));
   }
 }
 

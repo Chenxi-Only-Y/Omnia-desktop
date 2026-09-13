@@ -6,7 +6,8 @@ import type {
   AppInfo, AssignInput, ClassInfo, CombatGroupRow, CombatStat, DashboardData, GroupInput,
   ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, RuleSet, RuleSetInput, RuleSetValidation,
-  SheetGrid, SheetList, SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
+  SavedScore, ScoreRunSummary, SheetGrid, SheetList,
+  SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -80,6 +81,10 @@ export const api = {
       unwrap(bridge().match.importPreview(text, mode)),
     importCommit: (matchId: number, preview: ImportPreview) =>
       unwrap(bridge().match.importCommit(matchId, preview)),
+    runScore: (matchId: number, ruleSetId?: number): Promise<ScoreRunSummary> =>
+      unwrap(bridge().match.runScore(matchId, ruleSetId)),
+    scores: (matchId: number, ruleSetId?: number): Promise<SavedScore[]> =>
+      unwrap(bridge().match.scores(matchId, ruleSetId)),
   },
 
   dashboard: {

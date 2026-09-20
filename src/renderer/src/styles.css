@@ -438,8 +438,9 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* 没有职业（或未登记）时退回浅底深字 */
 .pcard--noclass { background: var(--surface-2); color: var(--text); }
 
-/* 三行字号（用户口径）：职业为基准，ID 名与技能备注各比它大一号。
-   全部走容器查询按卡宽自适应，改 --pcard-w 时文字自动跟上。 */
+/* 三行字号（用户口径）：以职业为基准，**ID 名 +2 号**，**技能备注 +1 号**。
+   全部走容器查询按卡宽自适应，改 --pcard-w 时文字自动跟上。
+   174px 卡宽下：职业 16 / ID 18 / 备注 17。 */
 .pcard__id {
   font-size: 11px; font-weight: 700; line-height: 1.2; letter-spacing: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -453,22 +454,22 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 
 @container (min-width: 88px) {
-  .pcard__id { font-size: 13px; }
+  .pcard__id { font-size: 14px; }
   .pcard__cls { font-size: 12px; }
   .pcard__note { font-size: 13px; }
 }
 @container (min-width: 120px) {
-  .pcard__id { font-size: 15px; }
+  .pcard__id { font-size: 16px; }
   .pcard__cls { font-size: 14px; }
   .pcard__note { font-size: 15px; }
 }
 @container (min-width: 150px) {
-  .pcard__id { font-size: 17px; }
+  .pcard__id { font-size: 18px; }
   .pcard__cls { font-size: 16px; }
   .pcard__note { font-size: 17px; }
 }
 @container (min-width: 190px) {
-  .pcard__id { font-size: 19px; }
+  .pcard__id { font-size: 20px; }
   .pcard__cls { font-size: 18px; }
   .pcard__note { font-size: 19px; }
 }

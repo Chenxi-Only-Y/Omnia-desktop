@@ -1,9 +1,10 @@
 [smoke] schema 版本        : 6 （迁移应已跑到最新）
+[smoke] 截图: D:\AI\ds.5\lis-desktop\dev-data\shots\overview.png 2139x1325
 [smoke] preload 注入        : true
 [smoke] app.info()         : true
 [smoke] meta.classes() 数量 : 12
 [smoke] player.list() 数量  : 0
-[smoke] React 已渲染字符数  : 5199
+[smoke] React 已渲染字符数  : 5123
 [smoke] 错误                : 无
 [smoke] CRUD: create ok id=1 class=神相
 [smoke] CRUD: update ok sub=潮光 remark=自检写入
@@ -104,22 +105,9 @@
 [smoke] 规则: 规则页 列表行=1 使用中标记=1 权重输入框=34 职业系数框=12
 [smoke] 规则: 清理后规则集数=2
 [smoke] 规则集管理        : PASS
-[smoke] 探针11 · 图库卡片数=13 分类按钮=5
-[smoke] 探针11 · 图片尺寸抽样=image14.png:591x939 image23.png:561x989 image15.png:513x147 image16.png:501x138
-[smoke] 探针11 · 加载失败的图=无
-[smoke] 探针11 · 装备卡表行数=7
-[smoke] 探针11 · 首行（按装评降序）=如意·錾花锁1694012珍
-[smoke] 探针11 · 筛选「装备选择」后卡片数=7
-[smoke] 攻略: 图库卡片数=13 分类按钮=5
-[smoke] 攻略: 图片尺寸抽样=image14.png:591x939 image23.png:561x989 image15.png:513x147 image16.png:501x138
-[smoke] 攻略: 加载失败的图=无
-[smoke] 攻略: 装备卡表行数=7
-[smoke] 攻略: 首行（按装评降序）=如意·錾花锁1694012珍
-[smoke] 攻略: 筛选「装备选择」后卡片数=7
-[smoke] 攻略: 灯箱标题="帮战 · 防守保镖" src=./guide/image14.png
-[smoke] 攻略: 要点卡片=4 要点条数=13
-[smoke] 攻略: 首页立绘卡=2 尺寸=810x276 867x264
-[smoke] 攻略图库          : PASS
+[smoke] 首页: 首页立绘卡=2 尺寸=810x276 867x264
+[smoke] 首页: 导航里仍有「攻略」=false
+[smoke] 首页立绘与导航    : PASS
 [smoke] 评分: 使用中的规则=自检规则B v3
 [smoke] 评分: 参评人数=6 均分=83.28 区间=[71.81,94.39] 触顶=0
 [smoke] 评分: 引擎=omnia-default-v1 规则=自检规则B
@@ -160,6 +148,7 @@
 [smoke] 赛季: 当前导航="⟳赛季" 卡片标题=当前赛季|赛季列表|历史对局归档
 [smoke] 赛季: 判定明细={"created":true,"dupBlocked":true,"emptyBlocked":true,"singleActive":true,"delActiveBlocked":true,"autoTaggedActive":true,"assigned":true,"counted":true,"unassignKeepsMatch":true,"ui":true}
 [smoke] 赛季模块          : PASS
+[smoke] 截图: D:\AI\ds.5\lis-desktop\dev-data\shots\season.png 2139x1325
 [smoke] M8 图标 base       : file:///D:/AI/ds.5/lis-desktop/release/win-unpacked/resources/app.asar/dist/renderer/
 [smoke] M8 图标加载        : PASS image4.png:108px image11.png:96px image2.png:102px
 [smoke] M8 页面渲染图标    : 2 个，首个 src = ./class-icons/image9.png

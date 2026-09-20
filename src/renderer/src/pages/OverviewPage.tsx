@@ -14,7 +14,7 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import { classIconSrc } from '../lib/assets';
-import { BannerCards } from './GuidePage';
+import { BannerCards } from '../components/BannerCards';
 
 /** 换成真实立绘时填文件名，例如 'hero/cover.png'（相对 public/） */
 const HERO_IMAGE: string | null = null;

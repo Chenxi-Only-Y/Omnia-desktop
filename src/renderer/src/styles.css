@@ -385,47 +385,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .coef-item > span { flex: 1; }
 .coef-item .cell-num { width: 62px; }
 
-/* ─────────────────────────────────────────────────────────────
-   攻略图库
-   ───────────────────────────────────────────────────────────── */
-.gallery {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 12px; margin-top: 12px;
-}
-.shot {
-  margin: 0; background: var(--bg-panel); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; cursor: zoom-in;
-  display: flex; flex-direction: column;
-}
-.shot:hover { border-color: var(--border-strong); }
-.shot--wide { grid-column: span 2; }
-.shot__img {
-  width: 100%; display: block; background: #0f1218;
-  max-height: 190px; object-fit: contain;
-}
-.shot--wide .shot__img { max-height: 240px; }
-.shot figcaption {
-  padding: 8px 10px; display: flex; flex-direction: column; gap: 3px;
-  border-top: 1px solid var(--border);
-}
-.shot figcaption b { font-size: 12px; font-weight: 600; color: var(--text); }
-.shot figcaption span { font-size: 11px; color: var(--text-faint); line-height: 1.4; }
-
-.notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; margin-top: 12px; }
-.note ul { margin: 0; padding-left: 18px; color: var(--text-dim); font-size: 12px; line-height: 1.7; }
-.note li { margin-bottom: 3px; }
-
-.lightbox { align-items: center; padding-top: 4vh; }
-.lightbox__box {
-  width: min(1400px, 94vw); max-height: 92vh; overflow: auto;
-  background: var(--bg-panel); border: 1px solid var(--border-strong);
-  border-radius: 10px; padding: 14px 16px;
-}
-.lightbox__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.lightbox__head h3 { margin: 0; font-size: 14px; }
-.lightbox__img { width: 100%; display: block; border-radius: 6px; background: #0f1218; }
-
-/* 首页的三职业立绘卡 */
+/* 首页的三职业立绘卡（原攻略页已删除，只留这一块） */
 .banner-cards { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 .banner-cards img {
   flex: 1 1 320px; min-width: 260px; max-width: 520px;

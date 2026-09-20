@@ -72,10 +72,8 @@
   --icon-plate-bg: #FFFFFF;
   /* 卡片文字色：白字（用户口径，不做描边/阴影等处理） */
   --ink-on-class: #FFFFFF;
-  /* 队员卡片尺寸：6 张 + 队名列(58) + 间隙 + 内边距 正好铺满一行（~1135px）。
-     16:9 → 174 / 1.778 ≈ 98。改这两个值即可整体缩放卡片（字号会跟着走）。 */
-  --pcard-w: 174px;
-  --pcard-h: 98px;
+  /* 卡片尺寸已改为按行宽自动分配（flex + aspect-ratio 16:9），不再用固定宽高。
+     三行字号保持绝对值：ID 22px / 技能备注 15px / 职业 13px。 */
 
   --radius: 8px;
   --radius-sm: 5px;
@@ -422,10 +420,15 @@ textarea.input { resize: vertical; line-height: 1.5; }
    文字统一白色（用户口径），为保证浅色职业底上也读得清，
    卡片内叠一层半透明黑把底色压暗 —— 颜色仍是该职业的颜色，只是深一档。 */
 /* 队员卡片：16:9 横版圆角矩形，**底色 = 纯职业色**（内联，与职业色板完全一致），
-   文字白字（用户口径）。尺寸显式给死，不让 aspect-ratio 参与 flex 分配。 */
+   文字白字（用户口径）。
+   宽度由 flex 自动分配（6 张把行宽吃满，右边不留空），高度由 aspect-ratio 从宽度推出。
+   必须 align-self: flex-start —— 父级是 align-items: stretch，
+   否则卡片会被行高拉高、把 aspect-ratio 覆盖掉（实测会走成 1.34）。 */
 .pcard {
   position: relative;
-  flex: 0 0 auto; width: var(--pcard-w); height: var(--pcard-h);
+  flex: 1 1 0; min-width: 0;
+  align-self: flex-start;
+  aspect-ratio: 16 / 9;
   container-type: inline-size;
   border: 0; text-align: left; font: inherit;
   background: var(--surface-3); color: var(--ink-on-class);
@@ -439,8 +442,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .pcard--noclass { background: var(--surface-2); color: var(--text); }
 
 /* 三行字号（用户口径，绝对值）：ID 名 22px / 技能备注 15px / 职业 13px。
-   直接写死，不再走容器查询按档缩放 —— 用户给的是确定值，缩放会把它盖掉。
-   卡片 --pcard-w/--pcard-h 若整体缩放，这三个值需要手工同步。 */
+   写死不用容器查询缩放 —— 用户给的是确定值，缩放会把它盖掉。 */
 .pcard__id {
   font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;

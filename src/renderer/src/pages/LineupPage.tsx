@@ -27,7 +27,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   const [rows, setRows] = useState<ParticipationRow[]>([]);
   const [roster, setRoster] = useState<Player[]>([]);
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
-  const [cellPick, setCellPick] = useState<string | null>(null);
+  const [cellPick, setCellPick] = useState<{ squad: string; slotIndex: number } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -95,11 +95,13 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
     }
   }
 
-  async function assign(playerIds: number[], squad: string) {
+  async function assign(playerIds: number[], squad: string, slotIndex?: number) {
     if (matchId === null) return;
     await run(async () => {
-      const res = await api.match.assignBulk({ matchId, playerIds, squad, allowOverfill: true });
-      setNotice(`已把 ${res.moved} 名队员移到「${squad}」`);
+      const res = await api.match.assignBulk({ matchId, playerIds, squad, allowOverfill: true, slotIndex });
+      setNotice(slotIndex === undefined
+        ? `已把 ${res.moved} 名队员移到「${squad}」`
+        : `已把 ${res.moved} 名队员放到「${squad}」第 ${slotIndex + 1} 格`);
     });
   }
 
@@ -174,7 +176,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           classMap={classMap}
           rows={our}
           catalog={catalog}
-          onPickSlot={(squad) => setCellPick(squad)}
+          onPickSlot={(squad, slotIndex) => setCellPick({ squad, slotIndex })}
           onAssign={(playerIds, squad) => void assign(playerIds, squad)}
           onUnassign={(playerId) => void unassign(playerId)}
           onRemoveRow={(id) => {
@@ -197,13 +199,14 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
 
       {cellPick && (
         <CellPicker
-          squad={cellPick}
+          squad={cellPick.squad}
           roster={roster}
           rows={our}
           classMap={classMap}
           onClose={() => setCellPick(null)}
           onAssign={async (playerId, targetSquad) => {
-            await assign([playerId], targetSquad);
+            // 点的是第几格就放第几格 —— 不再总是挤到最左边
+            await assign([playerId], targetSquad, cellPick.slotIndex);
             setCellPick(null);
           }}
         />

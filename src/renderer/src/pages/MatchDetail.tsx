@@ -54,7 +54,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   /** 看板上被点开的小队槽位（空字符串表示未打开） */
-  const [cellPick, setCellPick] = useState<string | null>(null);
+  const [cellPick, setCellPick] = useState<{ squad: string; slotIndex: number } | null>(null);
   /** 战斗组 / 小队建制（数据驱动，可新增） */
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
 
@@ -161,14 +161,16 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
     }
   }
 
-  /** 把某人放进指定小队（看板点格子后的落点） */
-  async function addPlayerToSquad(playerId: number, squad: string) {
+  /** 把某人放进指定小队（看板点格子后的落点）；slotIndex 有值时按格子精确落位 */
+  async function addPlayerToSquad(playerId: number, squad: string, slotIndex?: number) {
     try {
-      await api.match.upsertParticipation({ matchId, playerId, squad, state: 'PLAY' });
+      await api.match.assignBulk({ matchId, playerIds: [playerId], squad, allowOverfill: true, slotIndex });
       setError(null);
       await load();
       onChanged();
-      setNotice(`已把队员放入「${squad}」`);
+      setNotice(slotIndex === undefined
+        ? `已把队员放入「${squad}」`
+        : `已把队员放到「${squad}」第 ${slotIndex + 1} 格`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -280,7 +282,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
               classMap={classMap}
               rows={our}
               catalog={catalog}
-              onPickSlot={(squad) => setCellPick(squad)}
+              onPickSlot={(squad, slotIndex) => setCellPick({ squad, slotIndex })}
               onAssign={async (playerIds, squad) => {
                 try {
                   const res = await api.match.assignBulk({ matchId, playerIds, squad, allowOverfill: true });
@@ -347,13 +349,14 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
 
           {cellPick && (
             <CellPicker
-              squad={cellPick}
+              squad={cellPick.squad}
               roster={roster}
               rows={our}
               classMap={classMap}
               onClose={() => setCellPick(null)}
               onAssign={async (playerId, targetSquad) => {
-                await addPlayerToSquad(playerId, targetSquad);
+                // 点的是第几格就放第几格
+                await addPlayerToSquad(playerId, targetSquad, cellPick.slotIndex);
                 setCellPick(null);
               }}
             />

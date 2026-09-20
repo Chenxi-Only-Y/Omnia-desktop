@@ -389,6 +389,15 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 9,
+    name: 'participation_slot_no',
+    up: (db) => {
+      // 落位槽号：排表页要「点哪个空位就填哪个位置」，必须知道谁站在第几格。
+      // 挂在 participation（人 × 场）上；-1 表示未指定（按加入顺序排）。
+      db.exec(`ALTER TABLE participation ADD COLUMN slot_no INTEGER NOT NULL DEFAULT -1`);
+    },
+  },
 ];
 
 export interface DbHandle {

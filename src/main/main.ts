@@ -573,7 +573,68 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of m5.steps) log('[smoke] M5:', s);
     log('[smoke] M5 建制与看板      :', m5.ok ? 'PASS' : 'FAIL');
 
-    // M6：看板统计 + 首页主视觉渲染
+    // 落位：点哪个空位就填哪个位置（不是总挤到最左边）
+    const slot = await guarded(`(async () => {
+      const steps = smokeSteps();
+      let pid1 = null, pid2 = null, mid = null;
+      try {
+        const api = window.omnia;
+        const p1 = await api.player.create({ gameId: 'smoke_slot_1', name: '落位甲', mainClass: '神相' });
+        const p2 = await api.player.create({ gameId: 'smoke_slot_2', name: '落位乙', mainClass: '素问' });
+        if (!p1.ok || !p2.ok) throw new Error('建档失败');
+        pid1 = p1.data.id; pid2 = p2.data.id;
+        smokeMade('player', pid1); smokeMade('player', pid2);
+        const m = await api.match.create({ date: '2026-09-09', ourSide: '我方', oppSide: '落位队' });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        mid = m.data.match.id;
+        smokeMade('match', mid);
+
+        // 甲放进「防守一-1」第 4 格（index 3）
+        await api.match.assignBulk({ matchId: mid, playerIds: [pid1], squad: '防守一-1', slotIndex: 3 });
+        let parts = await api.match.participations(mid);
+        const a = parts.data.find(r => r.name === '落位甲');
+        steps.push('甲 放到第 4 格 → 落库 slotNo=' + a?.slotNo + '（应=3）');
+
+        // 乙放进同一队第 2 格（index 1）
+        await api.match.assignBulk({ matchId: mid, playerIds: [pid2], squad: '防守一-1', slotIndex: 1 });
+        parts = await api.match.participations(mid);
+        const a2 = parts.data.find(r => r.name === '落位甲');
+        const b2 = parts.data.find(r => r.name === '落位乙');
+        steps.push('乙 放到第 2 格 → 甲 slotNo=' + a2?.slotNo + ' 乙 slotNo=' + b2?.slotNo + '（应 3 / 1）');
+
+        // 再点回甲占着的第 4 格（用第三人占位验证互换不丢人）：
+        // 让乙改放到第 4 格 → 乙占 4，甲被顶到乙原来的 1
+        await api.match.assignBulk({ matchId: mid, playerIds: [pid2], squad: '防守一-1', slotIndex: 3 });
+        parts = await api.match.participations(mid);
+        const a3 = parts.data.find(r => r.name === '落位甲');
+        const b3 = parts.data.find(r => r.name === '落位乙');
+        steps.push('乙 改放第 4 格 → 乙=' + b3?.slotNo + ' 甲=' + a3?.slotNo
+          + '（互换：乙应 3，甲应 1，两人都不能丢）');
+
+        // 移出小队要清掉格号
+        await api.match.unassign(mid, pid1);
+        parts = await api.match.participations(mid);
+        const a4 = parts.data.find(r => r.name === '落位甲');
+        steps.push('移出小队后 slotNo=' + a4?.slotNo + '（应=-1）');
+
+        const cond = {
+          exact4: a?.slotNo === 3,
+          twoSlots: a2?.slotNo === 3 && b2?.slotNo === 1,
+          swap: b3?.slotNo === 3 && a3?.slotNo === 1,
+          cleared: a4?.slotNo === -1,
+        };
+        steps.push('判定=' + JSON.stringify(cond));
+        // 自己造的数据自己清：不然会污染后面的 M6/拖拽/报名/评分等探针
+        await api.match.remove(mid);
+        await api.player.remove(pid1);
+        await api.player.remove(pid2);
+        steps.push('清理完成');
+        return { ok: Object.values(cond).every(Boolean), steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`, '探针4b');
+    for (const s of slot.steps) log('[smoke] 落位:', s);
+    log('[smoke] 落位到指定格      :', slot.ok ? 'PASS' : 'FAIL');
+
     const m6 = await guarded(`(async () => {
       const steps = smokeSteps();
       const created = { players: [], matches: [] };
@@ -1802,7 +1863,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
       && scoring.ok === true && season.ok === true && iconOk && lineup.ok === true
-      && geom.ok === true && r.schemaVersion >= 6;
+      && geom.ok === true && slot.ok === true && r.schemaVersion >= 9;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

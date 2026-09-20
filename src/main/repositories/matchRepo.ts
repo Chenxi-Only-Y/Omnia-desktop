@@ -27,7 +27,7 @@ interface MatchRow {
 interface PartRow {
   id: number; match_id: number; player_id: number; side: string;
   squad: string; tactic: string; team_role: string; class_used: string;
-  note_role: string; skill_note: string; mic: string; state: string;
+  note_role: string; skill_note: string; slot_no: number; mic: string; state: string;
   game_id: string; name: string; main_class: string;
   kills: number | null; fountain_kills: number | null; assists: number | null;
   resource: number | null; dmg_player: number | null; dmg_player_armor: number | null;
@@ -247,6 +247,7 @@ export class MatchRepo {
         mainClass: r.main_class || '',
         noteRole: (r.note_role || '') as NoteRole,
         skillNote: r.skill_note || '',
+        slotNo: Number.isFinite(r.slot_no) ? r.slot_no : -1,
         mic: (r.mic || '') as ParticipationRow['mic'],
         state: (r.state || 'PLAY') as PartState,
         stat,
@@ -353,6 +354,17 @@ export class MatchRepo {
       'SELECT id FROM participation WHERE match_id = ? AND player_id = ? AND side = ?',
     ).get(matchId, playerId, 'our') as { id: number };
 
+    // 落位槽号：显式传就用传入值；换队则清掉（原队的格号对新队无意义）；
+    // 同队且没传就保持不动（排表页点空位时由 assignBulk 随后写入）。
+    if (input.slotNo !== undefined) {
+      this.db.prepare('UPDATE participation SET slot_no = ? WHERE id = ?')
+        .run(Math.floor(Number(input.slotNo)), row.id);
+    } else {
+      this.db.prepare(
+        "UPDATE participation SET slot_no = -1 WHERE id = ? AND squad <> ?",
+      ).run(row.id, squad);
+    }
+
     if (input.stat) this.saveStat(row.id, input.stat);
     return row.id;
   }
@@ -364,6 +376,13 @@ export class MatchRepo {
   /**
    * 批量把队员放进某小队（拖拽落点用）。
    * 单事务执行：任一条失败则整体回滚，避免拖拽后出现半截状态。
+   */
+  /**
+   * 把队员放进一个小队。
+   *
+   * input.slotIndex 有值时 = **指定落位**（排表页点哪个空位就填哪个）：
+   * 该格已有人，则两人互换（新人占该格，原占位者退到新人原来的格子）。
+   * 不传 slotIndex = 顺序追加（拖拽落点、批量调整用）。
    */
   assignBulk(input: AssignInput): number {
     const { matchId, playerIds, squad } = input;
@@ -389,15 +408,46 @@ export class MatchRepo {
       throw new Error(`「${squad}」已满（${already.c}/${size}），无法再放 ${incoming.length} 人`);
     }
 
+    const slot = input.slotIndex !== undefined && input.slotIndex >= 0
+      ? Math.floor(input.slotIndex)
+      : -1;
+
     this.db.exec('BEGIN');
     try {
       for (const pid of playerIds) {
+        // 落位：记录新人原来的格（互换用），以及目标格现在站着谁
+        const mine = slot >= 0
+          ? (this.db.prepare(
+            "SELECT slot_no FROM participation WHERE match_id=? AND player_id=? AND side='our'",
+          ).get(matchId, pid) as { slot_no: number } | undefined)
+          : undefined;
+        const myOld = mine ? mine.slot_no : -1;
+
         this.upsertParticipation({
           matchId,
           playerId: pid,
           squad,
           state: isBench ? (squad === '请假' ? 'LEAVE' : 'BENCH') : 'PLAY',
         });
+
+        if (slot >= 0) {
+          // 目标格里的人（不含自己）→ 让位到新人原来的格子，形成互换
+          const occupant = this.db.prepare(
+            `SELECT player_id FROM participation
+              WHERE match_id=? AND squad=? AND side='our' AND slot_no=? AND player_id<>?`,
+          ).get(matchId, squad, slot, pid) as { player_id: number } | undefined;
+
+          this.db.prepare(
+            "UPDATE participation SET slot_no=? WHERE match_id=? AND player_id=? AND side='our'",
+          ).run(slot, matchId, pid);
+
+          if (occupant) {
+            // 新人原本没格（新加进来的）→ 被顶掉的人退到"未指定"末尾，不会凭空消失
+            this.db.prepare(
+              "UPDATE participation SET slot_no=? WHERE match_id=? AND player_id=? AND side='our'",
+            ).run(myOld >= 0 ? myOld : this.nextFreeSlot(matchId, squad, slot), matchId, occupant.player_id);
+          }
+        }
       }
       this.db.exec('COMMIT');
     } catch (err) {
@@ -407,10 +457,23 @@ export class MatchRepo {
     return playerIds.length;
   }
 
+  /** 找一个还没被占的格号（用于把被顶掉的人安置到空位） */
+  private nextFreeSlot(matchId: number, squad: string, exceptSlot: number): number {
+    const taken = new Set(
+      (this.db.prepare(
+        `SELECT slot_no FROM participation
+          WHERE match_id=? AND squad=? AND side='our' AND slot_no>=0 AND slot_no<>?`,
+      ).all(matchId, squad, exceptSlot) as unknown as { slot_no: number }[]).map((r) => r.slot_no),
+    );
+    let i = 0;
+    while (taken.has(i)) i += 1;
+    return i;
+  }
+
   /** 把队员移出小队（保留在名单里，成为"未分配"） */
   unassign(playerId: number, matchId: number): void {
     this.db.prepare(
-      `UPDATE participation SET squad = '', tactic = '', team_role = ''
+      `UPDATE participation SET squad = '', tactic = '', team_role = '', slot_no = -1
        WHERE match_id = ? AND player_id = ? AND side = 'our'`,
     ).run(matchId, playerId);
   }

@@ -100,6 +100,8 @@ export interface ParticipationInput {
   noteRole?: NoteRole;
   /** 本场技能备注：排表页卡片上直接填的自由文本（每人每场各自一份） */
   skillNote?: string;
+  /** 落位槽号（从 0 起；-1 = 未指定）。一般由 assignBulk 的 slotIndex 维护 */
+  slotNo?: number;
   state?: PartState;
   stat?: Partial<CombatStat>;
 }
@@ -110,6 +112,12 @@ export interface ParticipationInput {
   squad: string;
   /** 目标小队已满时是否照常放入（默认 true，超出只是提示） */
   allowOverfill?: boolean;
+  /**
+   * 指定落位：点哪个空位就放哪个位置（从 0 起）。
+   * 该位置已有人时，两人互换 —— 这样"点空位补人"不会总是挤到最左边。
+   * 不传则按顺序追加（拖拽落点用）。
+   */
+  slotIndex?: number;
 }
 
 // ── 评分引擎（M1 占位，算法待定） ────────────────────────────────
@@ -157,6 +165,8 @@ export interface ParticipationRow {
   noteRole: NoteRole;
   /** 本场技能备注（排表页可编辑） */
   skillNote: string;
+  /** 落位槽号（从 0 起；-1 = 未指定，按加入顺序排） */
+  slotNo: number;
   mic: Player['mic'];
   state: PartState;
   stat: CombatStat;

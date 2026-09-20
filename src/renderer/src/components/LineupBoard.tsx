@@ -261,7 +261,17 @@ function SquadRowView({
   onRemoveSquad?: (squadId: number, name: string) => void;
 }) {
   const slots: (ParticipationRow | null)[] = [];
-  for (let i = 0; i < squad.size; i++) slots.push(members[i] ?? null);
+  // 按落位槽号排（-1 = 未指定的排后面，保持原顺序），这样"点哪个空位就填哪个"
+  // 才对得上：比如点第 4 格加人，他就在第 4 格，而不是挤到最左边。
+  const ordered = [...members].sort((a, b) => {
+    const sa = a.slotNo ?? -1;
+    const sb = b.slotNo ?? -1;
+    if (sa < 0 && sb < 0) return 0;
+    if (sa < 0) return 1;
+    if (sb < 0) return -1;
+    return sa - sb;
+  });
+  for (let i = 0; i < squad.size; i++) slots.push(ordered[i] ?? null);
   const tone = squad.kind === 'defend' ? 'defend' : 'attack';
 
   return (

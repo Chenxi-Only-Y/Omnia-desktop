@@ -623,6 +623,12 @@ export interface OmniaApi {
     removeSquad(id: number): Promise<IpcResult<true>>;
     /** 只改某小队的战术（塔后拆/塔前拆/保镖/防守），不碰名称与人数 */
     setSquadTactic(id: number, tactic: string): Promise<IpcResult<SquadRow>>;
+    /**
+     * 把窗口内某个元素当前的可见区域截成 PNG 并保存（弹保存对话框）。
+     * 只传选择器字符串：矩形由主进程在页面里自行量取 —— 这条通道上传
+     * 对象实参会丢失（见 ipc.ts 注释）。返回保存路径，取消则 path 为 null。
+     */
+    captureRegion(selector: string): Promise<IpcResult<{ path: string | null; width: number; height: number }>>;
     /** 读取 xlsx：先列工作表，再取某个工作表的网格与表头探测 */
     xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
     xlsxGrid(data: Uint8Array, sheet: string | number, headerRow?: number): Promise<IpcResult<SheetGrid>>;
@@ -704,6 +710,8 @@ export const IPC = {
   metaSquadAppend: 'meta:squad:append',
   metaSquadRemove: 'meta:squad:remove',
   metaSquadTactic: 'meta:squad:tactic',
+  /** 截取窗口内某个区域的图片（排表功能区导出用） */
+  captureRegion: 'app:capture-region',
   metaXlsxSheets: 'meta:xlsx:sheets',
   metaXlsxGrid: 'meta:xlsx:grid',
 

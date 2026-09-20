@@ -1637,7 +1637,28 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       }
     }
 
-    // 评分引擎（M1）：口径来自规则中心；验证分解合计、封顶、幂等、改规则会改分
+    // 截取图片：验证「截取图片」按钮存在，且真能截出功能区 PNG。
+    // 自检下走 OMNIA_CAPTURE_DIR 出口（不弹模态保存框，否则会卡住无人值守自检）。
+    const cap = await guarded(`(async () => {
+      const steps = smokeSteps();
+      try {
+        const btn = [...document.querySelectorAll('button')]
+          .find(b => b.textContent.trim() === '截取图片');
+        if (!btn) throw new Error('工具栏里没有「截取图片」按钮');
+        steps.push('按钮存在=true');
+        // 只传选择器字符串（矩形由主进程自量）
+        const res = await window.omnia.meta.captureRegion('.board');
+        if (!res.ok) throw new Error('截图失败: ' + res.error);
+        const b = document.querySelector('.board').getBoundingClientRect();
+        steps.push('截图返回 path=' + JSON.stringify(res.data.path)
+          + ' 尺寸=' + res.data.width + 'x' + res.data.height
+          + ' 看板实测=' + Math.round(b.width) + 'x' + Math.round(b.height));
+        return { ok: res.ok === true && !!res.data.path && res.data.width > 300, steps };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`, '探针11f');
+    for (const s of cap.steps) log('[smoke] 截取图片:', s);
+    log('[smoke] 截取图片          :', cap.ok ? 'PASS' : 'FAIL');
+
     const scoring = await guarded(`(async () => {
       const steps = smokeSteps();
       const made = { players: [], matches: [], rules: [] };
@@ -1973,7 +1994,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
       && scoring.ok === true && season.ok === true && iconOk && lineup.ok === true
-      && geom.ok === true && slot.ok === true && r.schemaVersion >= 9;
+      && geom.ok === true && slot.ok === true && cap.ok === true && r.schemaVersion >= 9;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

@@ -47,6 +47,19 @@ export const api = {
     removeSquad: (id: number): Promise<true> => unwrap(bridge().meta.removeSquad(id)),
     setSquadTactic: (id: number, tactic: string): Promise<SquadRow> =>
       unwrap(bridge().meta.setSquadTactic(id, tactic)),
+    /**
+     * 把页面上某个元素的可见区域截成 PNG（弹保存对话框）。
+     * 只传选择器；矩形由主进程在页面里自量 —— 这条通道上传实参会丢失。
+     */
+    captureElement: async (
+      selector: string,
+    ): Promise<{ path: string | null; width: number; height: number }> => {
+      const el = document.querySelector(selector);
+      if (!el) throw new Error(`页面上找不到要截取的区域：${selector}`);
+      el.scrollIntoView({ block: 'start' });
+      await new Promise((r) => setTimeout(r, 150));   // 等滚动落定
+      return unwrap(bridge().meta.captureRegion(selector));
+    },
     xlsxSheets: (data: Uint8Array): Promise<SheetList> => unwrap(bridge().meta.xlsxSheets(data)),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number): Promise<SheetGrid> =>
       unwrap(bridge().meta.xlsxGrid(data, sheet, headerRow)),

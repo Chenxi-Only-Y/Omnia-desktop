@@ -3,7 +3,8 @@
  * 所有处理函数都返回 IpcResult<T>，异常被捕获并转成 { ok:false, error }，
  * 避免 IPC 序列化丢失堆栈。
  */
-import { app, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import fs from 'node:fs';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type {
   MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput,
@@ -263,10 +264,71 @@ export function registerIpc(ctx: IpcContext): void {
   }));
   ipcMain.handle(IPC.metaSquadCreate, safe((input: SquadInput) => squads.createSquad(input)));
   ipcMain.handle(IPC.metaSquadAppend, safe((groupId: number) => squads.appendSquad(groupId)));
-  ipcMain.handle(IPC.metaSquadTactic, safe((id: number, tactic: string) => squads.setTactic(id, tactic)));
+  ipcMain.handle(IPC.metaSquadTactic, safe((...a: unknown[]) => {
+    console.log('[tactic] 实收参数个数=', a.length, ' a=', JSON.stringify(a));
+    const id = Number(a[0]);
+    const tactic = String(a[1] ?? '');
+    return squads.setTactic(id, tactic);
+  }));
   ipcMain.handle(IPC.metaSquadRemove, safe((id: number) => {
     if (!squads.removeSquad(id)) throw new Error(`小队不存在：id=${id}`);
     return true as const;
+  }));
+
+  // ── 截取窗口区域（排表功能区导出图片） ──────────────────────────
+  // 目标区域固定为排表功能区（.board），**不从渲染层传参**：
+  // 这条通道上渲染层的实参始终到不了主进程（排查记录：同一次运行里
+  // setSquadTactic 的两参传递正常；两参形式只到第二个、单对象参数、
+  // JSON 字符串、换通道名、清空 dist 重建 —— 全部无效），
+  // 所以只用一个「触发」语义，区域由主进程自己在页面里量。
+  ipcMain.handle(IPC.captureRegion, safe(async () => {
+    const boardSel = '.board';
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    if (!win) throw new Error('找不到窗口，无法截图');
+
+    let rect: { x: number; y: number; width: number; height: number } | null = null;
+    let diag = '';
+    try {
+      const raw = await win.webContents.executeJavaScript(`(function () {
+        var el = document.querySelector(${JSON.stringify(boardSel)});
+        if (!el) return JSON.stringify({ err: 'no-element' });
+        var r = el.getBoundingClientRect();
+        return JSON.stringify({ x: r.left, y: r.top, w: r.width, h: r.height });
+      })()`);
+      diag = String(raw);
+      const o = JSON.parse(diag) as { err?: string; x?: number; y?: number; w?: number; h?: number };
+      if (o.err) throw new Error(`页面里找不到 ${boardSel}`);
+      rect = {
+        x: Math.round(o.x ?? 0), y: Math.round(o.y ?? 0),
+        width: Math.round(o.w ?? 0), height: Math.round(o.h ?? 0),
+      };
+    } catch (err) {
+      throw new Error(`量取区域失败：${err instanceof Error ? err.message : String(err)}｜diag=${diag}`);
+    }
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      throw new Error(`区域无效：${JSON.stringify(rect)}｜diag=${diag}`);
+    }
+
+    const img = await win.webContents.capturePage(rect);
+    // 直接用 capturePage 的返回：它就是 rect 那块区域（部分 DPI 下是等比的
+    // 物理像素，内容完整）。**不要**再按 CSS 像素裁 —— 那样会裁掉一部分内容（踩过）。
+    const cropped = img;
+    const size = cropped.getSize();
+    const defaultName = `排表_${new Date().toISOString().slice(0, 10)}.png`;
+    const outDir = process.env.OMNIA_CAPTURE_DIR;
+    if (outDir) {
+      fs.mkdirSync(outDir, { recursive: true });
+      const p = require('node:path').join(outDir, defaultName);
+      fs.writeFileSync(p, cropped.toPNG());
+      return { path: p, width: size.width, height: size.height };
+    }
+    const picked = await dialog.showSaveDialog(win, {
+      title: '保存截图', defaultPath: defaultName,
+      filters: [{ name: 'PNG 图片', extensions: ['png'] }],
+    });
+    if (picked.canceled || !picked.filePath) return { path: null, width: size.width, height: size.height };
+    fs.writeFileSync(picked.filePath, cropped.toPNG());
+    return { path: picked.filePath, width: size.width, height: size.height };
   }));
 
   // ── 报名 / 请假 ────────────────────────────────────────────────

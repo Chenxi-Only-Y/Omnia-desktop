@@ -39,6 +39,8 @@ const api = {
     appendSquad: (groupId: number) => invoke('meta:squad:append', groupId),
     removeSquad: (id: number) => invoke('meta:squad:remove', id),
     setSquadTactic: (id: number, tactic: string) => invoke('meta:squad:tactic', id, tactic),
+    // 只传选择器字符串：矩形由主进程自量（这条通道上传对象实参会丢失，见 ipc.ts）
+    captureRegion: (selector: string) => invoke('app:capture-region', selector),
     xlsxSheets: (data: Uint8Array) => invoke('meta:xlsx:sheets', data),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number) =>
       invoke('meta:xlsx:grid', data, sheet, headerRow),

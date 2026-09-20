@@ -127,6 +127,18 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
     await run(() => api.match.removeParticipation(row.id), `已把 ${row.name} 移出本场`);
   }
 
+  /** 把整个排表功能区截成 PNG（主进程 capturePage + 保存对话框） */
+  async function captureBoard() {
+    try {
+      const res = await api.meta.captureElement('.board');
+      setError(null);
+      setNotice(res.path ? `已保存截图：${res.path}` : '已取消截图');
+    } catch (err) {
+      setNotice(null);
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
+
   if (loading) return <div className="card"><div className="empty">正在读取对局…</div></div>;
 
   if (!matches.length) {
@@ -168,6 +180,9 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           <div style={{ flex: 1 }} />
           <button className="btn" onClick={() => setShowAdd((v) => !v)}>
             {showAdd ? '收起' : '添加队员'}
+          </button>
+          <button className="btn" title="把整个排表功能区截成 PNG 图片" onClick={() => void captureBoard()}>
+            截取图片
           </button>
           <button className="btn" onClick={() => void loadMatches()}>刷新场次</button>
         </div>

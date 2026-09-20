@@ -320,18 +320,19 @@ function PlayerCard({
            title="点击换人 / 放入队员">
         {cls || '未登记职业'}
       </div>
-      <textarea
+      {/* 技能备注：单行、无框，看起来就是一行普通文字（用户口径） */}
+      <input
         className="pcard__note"
         value={note}
-        placeholder="技能备注…"
+        placeholder="技能备注"
         disabled={!onSkillNote}
-        title="本场技能备注（每人每场各自保存）｜Ctrl+Enter 收起"
+        title="本场技能备注（每人每场各自保存，回车保存）"
         onChange={(e) => setNote(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          if (e.key === 'Enter') {
             commit();
-            (e.target as HTMLTextAreaElement).blur();
+            (e.target as HTMLInputElement).blur();
           }
           if (e.key === 'Escape') setNote(row.skillNote ?? '');
         }}

@@ -70,8 +70,10 @@
   /* 图标托底：职业图标保持原色（用户要求），靠一层浅色托底 + 深色描边提可读性 */
   --icon-plate: rgba(74, 68, 89, .30);
   --icon-plate-bg: #FFFFFF;
-  /* 队员卡片尺寸：6 张 + 队名列(58) + 间隙(3×5) + 内边距(2×5) 正好铺满 ~1135px 行宽。
-     16:9 → 174 / 1.778 ≈ 98。改这两个值即可整体缩放卡片。 */
+  /* 卡片文字色：白字（用户口径，不做描边/阴影等处理） */
+  --ink-on-class: #FFFFFF;
+  /* 队员卡片尺寸：6 张 + 队名列(58) + 间隙 + 内边距 正好铺满一行（~1135px）。
+     16:9 → 174 / 1.778 ≈ 98。改这两个值即可整体缩放卡片（字号会跟着走）。 */
   --pcard-w: 174px;
   --pcard-h: 98px;
 
@@ -419,87 +421,80 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* 队员卡片：16:9 横版圆角矩形，底色 = 职业色（内联）。
    文字统一白色（用户口径），为保证浅色职业底上也读得清，
    卡片内叠一层半透明黑把底色压暗 —— 颜色仍是该职业的颜色，只是深一档。 */
-/* 队员卡片：16:9 横版圆角矩形，底色 = 职业色（内联）。
-   尺寸**显式给死**而不是让 aspect-ratio 参与 flex 分配 ——
-   aspect-ratio 与 flex 争宽度时会把行高顶大（实测行高 106→卡片被拉高），
-   也会让「空位卡」这种不继承比例的 button 被拉伸成大方块。
-   显式 width/height 让已填卡和空位卡完全一致，且 6 张正好铺满一行。 */
+/* 队员卡片：16:9 横版圆角矩形，**底色 = 纯职业色**（内联，与职业色板完全一致），
+   文字白字（用户口径）。尺寸显式给死，不让 aspect-ratio 参与 flex 分配。 */
 .pcard {
   position: relative;
   flex: 0 0 auto; width: var(--pcard-w); height: var(--pcard-h);
   container-type: inline-size;
   border: 0; text-align: left; font: inherit;
-  background: var(--surface-3); color: #fff;
-  border-radius: 10px; padding: 4px 6px;
-  display: flex; flex-direction: column; gap: 1px;
+  background: var(--surface-3); color: var(--ink-on-class);
+  border-radius: 10px; padding: 5px 8px;
+  display: flex; flex-direction: column; gap: 2px;
   cursor: grab; overflow: hidden;
 }
-/* 压暗层：让白字在任意职业色上都可读；用 overlay 而不是改颜色本身 */
-.pcard::before {
-  content: ''; position: absolute; inset: 0;
-  background: rgba(16, 18, 26, .42); pointer-events: none;
-}
-.pcard > * { position: relative; z-index: 1; }
 .pcard:active { cursor: grabbing; }
 .pcard--dragging { opacity: .35; }
-/* 没有职业（或未登记）时退回浅底深字，和职业底色卡能区分开 */
+/* 没有职业（或未登记）时退回浅底深字 */
 .pcard--noclass { background: var(--surface-2); color: var(--text); }
-.pcard--noclass::before { background: rgba(255, 255, 255, .12); }
 
-/* ID 名：卡片里最显眼的一行。字号随卡宽自适应（容器查询），
-   长 ID 折两行显示完整 —— 与其截断成 "smoke_1…"，不如折行。
-   卡宽 174px（6 张铺满一行）时命中最大档 18px。 */
+/* 三行字号（用户口径）：职业为基准，ID 名与技能备注各比它大一号。
+   全部走容器查询按卡宽自适应，改 --pcard-w 时文字自动跟上。 */
 .pcard__id {
-  font-size: 11px; font-weight: 800; line-height: 1.15; letter-spacing: 0;
+  font-size: 11px; font-weight: 700; line-height: 1.2; letter-spacing: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; word-break: break-all;
-  cursor: pointer; text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  cursor: pointer;
 }
-@container (min-width: 88px) { .pcard__id { font-size: 14px; } }
-@container (min-width: 120px) { .pcard__id { font-size: 16px; } }
-@container (min-width: 150px) { .pcard__id { font-size: 18px; } }
-@container (min-width: 190px) { .pcard__id { font-size: 20px; } }
-.pcard--noclass .pcard__id { text-shadow: none; }
-.pcard__id:hover { text-decoration: underline; }
-
-/* 职业行：字号同样随卡宽走 */
 .pcard__cls {
   display: flex; align-items: center; gap: 4px;
-  font-size: 10px; line-height: 1.25; opacity: .95; cursor: pointer;
+  font-size: 10px; line-height: 1.25; opacity: .92; cursor: pointer;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-@container (min-width: 88px) { .pcard__cls { font-size: 12px; } }
-@container (min-width: 120px) { .pcard__cls { font-size: 13px; } }
-@container (min-width: 150px) { .pcard__cls { font-size: 14px; } }
+
+@container (min-width: 88px) {
+  .pcard__id { font-size: 13px; }
+  .pcard__cls { font-size: 12px; }
+  .pcard__note { font-size: 13px; }
+}
+@container (min-width: 120px) {
+  .pcard__id { font-size: 15px; }
+  .pcard__cls { font-size: 14px; }
+  .pcard__note { font-size: 15px; }
+}
+@container (min-width: 150px) {
+  .pcard__id { font-size: 17px; }
+  .pcard__cls { font-size: 16px; }
+  .pcard__note { font-size: 17px; }
+}
+@container (min-width: 190px) {
+  .pcard__id { font-size: 19px; }
+  .pcard__cls { font-size: 18px; }
+  .pcard__note { font-size: 19px; }
+}
+
+.pcard__id:hover { text-decoration: underline; }
+.pcard__cls:hover { text-decoration: underline; }
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .pcard__cls:hover { text-decoration: underline; }
 
-/* 技能备注：可直接改动填写。**与卡片同色**（不加异色底），
-   只用一条半透明描边表示"这里能填"，文字同样白色（用户口径） */
+/* 技能备注：单行、**无框**（用户口径）。与卡片同色，只在获得焦点时
+   用一条极轻的底线提示"这里能改"，平时看起来就是一行普通文字。
+   宽度用 100% + box-sizing 撑满卡片 —— 不能用 width:auto，
+   那样 input 只会缩成默认 20 字符宽。 */
 .pcard__note {
-  margin-top: auto; width: 100%;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, .42);
-  border-radius: 5px; padding: 2px 6px;
-  font-size: 11px; line-height: 1.3; color: #fff;
-  cursor: text; resize: none;
-  min-height: 24px; max-height: 48px;
-  font-family: inherit;
+  margin-top: auto; width: 100%; box-sizing: border-box;
+  background: transparent; border: 0; border-bottom: 1px solid transparent;
+  border-radius: 0; padding: 1px 0 2px;
+  font-size: 10px; line-height: 1.3; color: inherit;
+  cursor: text; font-family: inherit;
 }
-@container (min-width: 88px) { .pcard__note { font-size: 12px; } }
-@container (min-width: 120px) { .pcard__note { font-size: 13px; } }
-@container (min-width: 150px) { .pcard__note { font-size: 14px; } }
-.pcard--noclass .pcard__note {
-  background: transparent; border-color: var(--line-strong); color: var(--text);
-}
-.pcard__note::placeholder { color: rgba(255, 255, 255, .6); }
-.pcard--noclass .pcard__note::placeholder { color: var(--text-faint); }
+.pcard__note::placeholder { color: currentColor; opacity: .42; }
 .pcard__note:focus {
-  outline: none; background: rgba(255, 255, 255, .16);
-  border-color: #fff;
+  outline: none;
+  border-bottom-color: currentColor;
 }
-.pcard--noclass .pcard__note:focus { background: var(--surface); border-color: var(--fg); }
 .pcard__note:disabled { opacity: .55; cursor: default; }
 
 /* 空位卡（button）：尺寸与已填卡完全一致 */

@@ -3,7 +3,7 @@
 [smoke] app.info()         : true
 [smoke] meta.classes() 数量 : 12
 [smoke] player.list() 数量  : 0
-[smoke] React 已渲染字符数  : 5490
+[smoke] React 已渲染字符数  : 5599
 [smoke] 错误                : 无
 [smoke] CRUD: create ok id=1 class=神相
 [smoke] CRUD: update ok sub=潮光 remark=自检写入
@@ -106,10 +106,15 @@
 [smoke] 规则集管理        : PASS
 [smoke] 首页: 首页立绘卡=2 尺寸=810x276 867x264
 [smoke] 首页: 导航里仍有「攻略」=false
+[smoke] 首页: 主题 页面背景=rgb(230, 225, 230)（应 rgb(230,225,230)） 卡片=rgb(252, 248, 253)（应 rgb(252,248,253)）
 [smoke] 首页: 折叠前 侧栏=216px 标签可见=true grid=216px 1210px
 [smoke] 首页: 折叠后 侧栏=56px 标签可见=false nav-collapsed=true 落库 navCollapsed="1"
 [smoke] 首页: 再展开 侧栏=216px 标签可见=true 落库 navCollapsed="0"
 [smoke] 首页立绘与导航    : PASS
+[smoke] 排表: 排表页 方块=12 场次选择器=true 场次选项=1
+[smoke] 排表: 看板小队（前4）=防守一-1,防守一-2,防守一-3,防守二-1 有未分配区=true 显示本场队员=true
+[smoke] 排表: 当前导航="▦排表"
+[smoke] 排表页            : PASS
 [smoke] 评分: 使用中的规则=自检规则B v3
 [smoke] 评分: 参评人数=6 均分=83.28 区间=[71.81,94.39] 触顶=0
 [smoke] 评分: 引擎=omnia-default-v1 规则=自检规则B

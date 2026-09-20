@@ -1334,6 +1334,70 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     })()`, '探针11c');
     for (const s of lineup.steps) log('[smoke] 排表:', s);
     log('[smoke] 排表页            :', lineup.ok ? 'PASS' : 'FAIL');
+
+    // 排表页尺寸实测：卡片 16:9 是否真的成立、看板有没有占满可用区域。
+    // 这类"比例对不对"的问题，肉眼看截图判断不了，必须量。
+    const geom = await guarded(`(async () => {
+      const steps = smokeSteps();
+      const r = (el) => { const b = el.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; };
+      const card = document.querySelector('.pcard:not(.pcard--empty)') || document.querySelector('.pcard');
+      const row = document.querySelector('.squadrow');
+      const board = document.querySelector('.board');
+      const scroll = document.querySelector('.board__scroll');
+      const content = document.querySelector('.content');
+      const halves = document.querySelector('.board__halves');
+      const cs = card ? getComputedStyle(card) : null;
+      const cardBox = card ? r(card) : { w: 0, h: 0 };
+      const ratio = cardBox.h ? +(cardBox.w / cardBox.h).toFixed(3) : 0;
+      const boardBox = board ? r(board) : { w: 0, h: 0 };
+      const contentBox = content ? r(content) : { w: 0, h: 0 };
+      const scrollBox = scroll ? r(scroll) : { w: 0, h: 0 };
+      const halvesBox = halves ? r(halves) : { w: 0, h: 0 };
+      const rowBox = row ? r(row) : { w: 0, h: 0 };
+      const rows = document.querySelectorAll('.squadrow').length;
+      const cols = document.querySelectorAll('.squadrow__cards > *').length;
+      const cardsPerRow = rows ? Math.round(cols / rows) : 0;
+      const head = document.querySelector('.squadrow__head');
+      const headBox = head ? r(head) : { w: 0, h: 0 };
+      steps.push('卡片=' + cardBox.w + 'x' + cardBox.h + ' 比例=' + ratio + '（16:9=1.778）');
+      steps.push('一队=' + rowBox.w + 'x' + rowBox.h + ' 每行卡片数=' + cardsPerRow
+        + ' 队名列=' + headBox.w);
+      steps.push('看板=' + boardBox.w + 'x' + boardBox.h
+        + ' 滚动区=' + scrollBox.w + 'x' + scrollBox.h
+        + ' 半区总宽=' + halvesBox.w);
+      steps.push('内容区=' + contentBox.w + 'x' + contentBox.h
+        + ' → 横向留白=' + (contentBox.w - boardBox.w));
+      // 逐层量：内容区 → card(内边距) → board → scroll → halves，看空间丢在哪一层
+      const cardEl = document.querySelector('.content .card .board')
+        ? document.querySelector('.content .card .board').closest('.card') : null;
+      const layers = [];
+      let el = board ? board.parentElement : null;
+      while (el && el !== content) {
+        const b = r(el);
+        layers.push((el.className || el.tagName) + '=' + b.w + 'x' + b.h);
+        el = el.parentElement;
+      }
+      steps.push('外层链=' + layers.join(' ← '));
+      if (cardEl) {
+        const cb = r(cardEl);
+        const ccs = getComputedStyle(cardEl);
+        steps.push('card=' + cb.w + 'x' + cb.h + ' padding=' + ccs.padding
+          + ' → 看板可用宽=' + (cb.w - parseFloat(ccs.paddingLeft) - parseFloat(ccs.paddingRight))
+          + ' 可用高=' + (cb.h - parseFloat(ccs.paddingTop) - parseFloat(ccs.paddingBottom)));
+      }
+      const toolbar = document.querySelector('.content .card .toolbar');
+      if (toolbar) {
+        const tb = r(toolbar);
+        steps.push('场次工具条=' + tb.w + 'x' + tb.h);
+      }
+      // 竖直方向：行数 × 行高 是否装得下内容区
+      const rowsPerHalf = Math.ceil(rows / 2);
+      const needH = rowsPerHalf * rowBox.h + rowsPerHalf * 8;
+      steps.push('单半区需要高度≈' + needH + ' 可用高度≈' + contentBox.h
+        + ' 装得下=' + (needH <= contentBox.h));
+      return { ok: true, steps, value: { cardBox, rowBox, boardBox, contentBox, scrollBox, halvesBox, rows } };
+    })()`, '探针11d');
+    for (const s of geom.steps) log('[smoke] 排表尺寸:', s);
     await shot('lineup', 900);
     // 前面几个探针会切页，等排表页真正画出来再截第二张（截图只信合成帧，必须留足时间）
     await guarded(`(async () => {

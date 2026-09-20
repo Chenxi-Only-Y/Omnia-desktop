@@ -140,7 +140,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   }
 
   return (
-    <>
+    // page-fill：让排表看板那张卡撑满内容区高度（否则会缩在上半部分）
+    <div className="page-fill">
       {error && <div className="msg error">{error}</div>}
       {notice && <div className="msg ok">{notice}</div>}
 
@@ -167,7 +168,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
         </div>
       </div>
 
-      <div className="card" style={{ padding: '12px 14px' }}>
+      <div className="card card--fill" style={{ padding: '12px 14px' }}>
         <LineupBoard
           classes={classes}
           classMap={classMap}
@@ -216,6 +217,6 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           />
         )}
       </div>
-    </>
+    </div>
   );
 }

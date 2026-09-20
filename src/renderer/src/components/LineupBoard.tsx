@@ -15,7 +15,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
-import { classIconSrc } from '../lib/assets';
 
 interface Props extends PageProps {
   rows: ParticipationRow[];
@@ -299,7 +298,6 @@ function PlayerCard({
 
   const cls = row.classUsed || row.mainClass || '';
   const def = classMap.get(cls);
-  const icon = cls ? classIconSrc(cls) : null;
   const commit = () => {
     if (onSkillNote && note !== row.skillNote) onSkillNote(row.playerId, note);
   };
@@ -307,28 +305,21 @@ function PlayerCard({
   return (
     <div
       className={`pcard${dragging ? ' pcard--dragging' : ''}${def ? '' : ' pcard--noclass'}`}
-      /* 卡片底色 = 职业色；文字固定深色，浅底亮底都可读（用户要求图标/职业色不变） */
-      style={def ? { background: def.color, color: 'var(--on-class)' } : undefined}
+      /* 卡片底色 = 职业色；文字统一白色（用户口径），
+         浅色职业底由 CSS 的压暗层保证可读 */
+      style={def ? { background: def.color } : undefined}
       title={`${cls || '未登记职业'} · 拖动可换小队`}
       {...dragProps([row.playerId], row.name)}
     >
-      {/* 标题：角色 ID 名（游戏 ID）。点它移出本场 */}
+      {/* 只留三行：ID 名 / 职业 / 技能备注（用户口径，不要多余东西） */}
       <div className="pcard__id" onClick={() => onRemoveRow(row.id)}
            title={`${row.name}（ID: ${row.gameId}）· 点击移出本场`}>
         {row.gameId || row.name}
-        {row.mic === '有' && <span className="pcard__mic" title="有麦">◉</span>}
-        {row.mic === '无' && <span className="pcard__mic pcard__mic--off" title="无麦">○</span>}
       </div>
-
-      {/* 第一行小字：职业。点它换人 */}
       <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
            title="点击换人 / 放入队员">
-        {icon && <img className="pcard__icon" src={icon} alt="" />}
-        <span>{cls || '未登记职业'}</span>
-        {row.tactic && <em className="pcard__tactic">{row.tactic}</em>}
+        {cls || '未登记职业'}
       </div>
-
-      {/* 第二行小字：技能备注，可直接改动填写（多行文本框，Ctrl+Enter 收起） */}
       <textarea
         className="pcard__note"
         value={note}

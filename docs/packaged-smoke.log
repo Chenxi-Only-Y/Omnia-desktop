@@ -1,4 +1,4 @@
-[smoke] schema 版本        : 6 （迁移应已跑到最新）
+[smoke] schema 版本        : 7 （迁移应已跑到最新）
 [smoke] preload 注入        : true
 [smoke] app.info()         : true
 [smoke] meta.classes() 数量 : 12
@@ -28,9 +28,9 @@
 [smoke] M5: 清理完成
 [smoke] M5: 旧写法「防守一2」写入=成功 落库小队="防守一-2" 战术="防守"
 [smoke] M5: 未知小队被拦=是
-[smoke] M5: 看板渲染小队方块=12 含职业图标=2 有姓名=2
-[smoke] M5: 方块小队名（前5）=防守一-1,防守一-2,防守一-3,防守二-1,防守二-2
-[smoke] M5: 别名成员落在 防守一-2 同一格=true
+[smoke] M5: 看板渲染小队行=12 含职业图标=2 有 ID 名=2 技能备注输入框=2
+[smoke] M5: 小队名（前5）=防守一-1,防守一-2,防守一-3,防守二-1,防守二-2
+[smoke] M5: 别名成员落在 防守一-2 同一行=true
 [smoke] M5 建制与看板      : PASS
 [smoke] M6: 总场次=2 成员=4 参战记录=6
 [smoke] M6: 战报完整度=4/5 = 80%
@@ -61,7 +61,9 @@
 [smoke] 向导: 点击关闭后弹窗已消失=true
 [smoke] 导入向导界面接线  : PASS
 [smoke] 拖拽: 进入方式=自动进入详情
-[smoke] 拖拽: 拖拽前 防守一-1 含 拖拽甲=true
+[smoke] 拖拽: 参战记录=[{"name":"拖拽甲","gameId":"smoke_dnd_1","squad":"防守一-1","state":"PLAY","side":"our"},{"name":"拖拽乙","gameId":"smoke_dnd_2","squad":"","state":"PLAY","side":"our"}]
+[smoke] 拖拽: 看板里的 ID 名=["smoke_dnd_1"]
+[smoke] 拖拽: 拖拽前 防守一-1 含 拖拽甲(ID)=true
 [smoke] 拖拽: new DataTransfer() 可用，回读="probe"
 [smoke] 拖拽: dragstart 写入的载荷={"playerIds":[9],"label":"拖拽甲"}
 [smoke] 拖拽: 落库后 拖拽甲.squad=进攻一-1 state=PLAY tactic=塔后拆
@@ -111,8 +113,8 @@
 [smoke] 首页: 折叠后 侧栏=56px 标签可见=false nav-collapsed=true 落库 navCollapsed="1"
 [smoke] 首页: 再展开 侧栏=216px 标签可见=true 落库 navCollapsed="0"
 [smoke] 首页立绘与导航    : PASS
-[smoke] 排表: 排表页 方块=12 场次选择器=true 场次选项=1
-[smoke] 排表: 看板小队（前4）=防守一-1,防守一-2,防守一-3,防守二-1 有未分配区=true 显示本场队员=true
+[smoke] 排表: 排表页 小队行=12 场次选择器=true 场次选项=1
+[smoke] 排表: 卡片=72 技能备注框=1 小队（前4）=防守一-1,防守一-2,防守一-3,防守二-1 有未分配区=true 显示本场队员=true
 [smoke] 排表: 当前导航="▦排表"
 [smoke] 排表页            : PASS
 [smoke] 评分: 使用中的规则=自检规则B v3

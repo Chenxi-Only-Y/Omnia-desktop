@@ -291,7 +291,7 @@ function SquadRowView({
       {...dropProps(squad.name)}
     >
       <div className="squadrow__head">
-        <span>{squad.name}</span>
+        <span className="squadrow__name">{squad.name}</span>
         <span className="squadrow__count">{members.length}/{squad.size}</span>
         {/* 战术直接就地可改：看起来就是一行字，点开才出现选项，不加额外控件 */}
         {onChangeTactic ? (

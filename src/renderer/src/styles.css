@@ -588,9 +588,20 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 .board__chip:hover { background: var(--hover); }
 
-.half__group { display: flex; flex-direction: column; gap: 6px; }
-.half__groupname { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; padding-left: 2px; }
+/* 组名行：组名 + 队数 + 「＋ 加一队」（每组队数不固定，按需加） */
+.half__groupname {
+  font-size: 11px; color: var(--text-dim); letter-spacing: 1px; padding-left: 2px;
+  display: flex; align-items: center; gap: 8px;
+}
+.half__groupcount { color: var(--text-faint); font-size: 10px; letter-spacing: 0; }
+.half__addbtn { padding: 1px 7px; font-size: 11px; }
 .half__emptygroup { color: var(--text-faint); font-size: 11px; padding: 6px 2px; }
+/* 队名栏里的「×」删队按钮：默认淡，hover 才明显，免得误点 */
+.squadrow__del {
+  margin-top: 2px; border: 0; background: transparent; cursor: pointer;
+  color: var(--text-faint); font-size: 12px; line-height: 1; padding: 0 3px;
+}
+.squadrow__del:hover { color: var(--danger); }
 
 /* ─────────────────────────────────────────────────────────────
    首页主视觉（Hero）

@@ -361,6 +361,34 @@ const MIGRATIONS: Migration[] = [
       db.exec(`ALTER TABLE participation ADD COLUMN skill_note TEXT NOT NULL DEFAULT ''`);
     },
   },
+  {
+    version: 8,
+    name: 'ensure_default_squads',
+    up: (db) => {
+      // 把初始建制的 12 队（4 组 × 3 队）补齐到老库里。
+      // **只加不删**：同名队伍已存在就跳过（ON CONFLICT DO NOTHING），
+      // 不覆盖用户自己改过的战术/人数，也绝不删任何已有队伍。
+      // 「每组队数不固定」由界面负责：排表页可随时＋加一队 / ×删队。
+      const grp = db.prepare(
+        'INSERT INTO combat_group (name, kind, sort_order) VALUES (?, ?, ?) ON CONFLICT(name) DO NOTHING',
+      );
+      const sqd = db.prepare(
+        `INSERT INTO squad (group_id, index_in_group, name, tactic, size, sort_order)
+         VALUES ((SELECT id FROM combat_group WHERE name = ?), ?, ?, ?, ?, ?)
+         ON CONFLICT(name) DO NOTHING`,
+      );
+      const alias = db.prepare(
+        `INSERT INTO squad_alias (squad_id, alias)
+         SELECT id, ? FROM squad WHERE name = ?
+         ON CONFLICT DO NOTHING`,
+      );
+      for (const g of DEFAULT_SQUADS) {
+        grp.run(g.group, g.kind, g.sortOrder);
+        sqd.run(g.group, g.indexInGroup, g.name, g.tactic, g.size, g.sortOrder);
+        alias.run(`${g.group}${g.indexInGroup}`, g.name);   // 旧写法别名：防守一3
+      }
+    },
+  },
 ];
 
 export interface DbHandle {

@@ -27,6 +27,10 @@ interface Props extends PageProps {
   onUnassign?: (playerId: number) => void;
   /** 卡片上直接填写技能备注（人 × 场） */
   onSkillNote?: (playerId: number, note: string) => void;
+  /** 给某组再加一队（每组队数不固定，按需加） */
+  onAddSquad?: (groupId: number) => void;
+  /** 删掉某一队（有历史记录时后端会拒绝） */
+  onRemoveSquad?: (squadId: number, name: string) => void;
 }
 
 /** 拖拽携带的数据格式（自定义 MIME，避免和外部拖入的文件混淆） */
@@ -49,6 +53,7 @@ function readDrag(ev: React.DragEvent): DragPayload | null {
 
 export default function LineupBoard({
   rows, catalog, classMap, onPickSlot, onRemoveRow, onAssign, onUnassign, onSkillNote,
+  onAddSquad, onRemoveSquad,
 }: Props) {
   // 上场的都看得到：只排除明确"替补/请假"的。
   // 注意不能写成 state === 'PLAY' —— 参战记录的 state 可能是空串（历史数据/未设置），
@@ -131,6 +136,7 @@ export default function LineupBoard({
             <Half title="防守半区" groups={defendGroups} squads={squads} bySquad={bySquad}
                   classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                   onSkillNote={onSkillNote}
+                  onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad}
                   dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
                   draggingIds={dragIds.current} />
           )}
@@ -141,6 +147,7 @@ export default function LineupBoard({
             <Half title="进攻半区" groups={attackGroups} squads={squads} bySquad={bySquad}
                   classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                   onSkillNote={onSkillNote}
+                  onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad}
                   dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
                   draggingIds={dragIds.current} />
           )}
@@ -182,7 +189,7 @@ export default function LineupBoard({
 
 function Half({
   title, groups, squads, bySquad, classMap, onPickSlot, onRemoveRow, onSkillNote,
-  dragProps, dropProps, hoverSquad, draggingIds,
+  dragProps, dropProps, hoverSquad, draggingIds, onAddSquad, onRemoveSquad,
 }: {
   title: string;
   groups: SquadCatalog['groups'];
@@ -196,6 +203,10 @@ function Half({
   dropProps: (squad: string) => Record<string, unknown>;
   hoverSquad: string | null;
   draggingIds: number[];
+  /** 给该组再加一队（队数不固定，按需加） */
+  onAddSquad?: (groupId: number) => void;
+  /** 删掉某一队（有历史记录的会被后端拒绝） */
+  onRemoveSquad?: (squadId: number, name: string) => void;
 }) {
   return (
     <div className="half">
@@ -204,13 +215,22 @@ function Half({
         const list = squads.filter((s) => s.groupId === g.id);
         return (
           <div className="half__group" key={g.id}>
-            <div className="half__groupname">{g.name}</div>
+            <div className="half__groupname">
+              {g.name}
+              <span className="half__groupcount">{list.length} 队</span>
+              {onAddSquad && (
+                <button className="btn sm ghost half__addbtn" onClick={() => onAddSquad(g.id)}
+                        title={`给「${g.name}」再加一队（第 ${list.length + 1} 队）`}>
+                  ＋ 加一队
+                </button>
+              )}
+            </div>
             {list.length === 0 && <div className="half__emptygroup">该战斗组下还没有小队</div>}
             <div className="half__row">
               {list.map((s) => (
                 <SquadRowView key={s.id} squad={s} members={bySquad.get(s.name) ?? []}
                               classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
-                              onSkillNote={onSkillNote}
+                              onSkillNote={onSkillNote} onRemoveSquad={onRemoveSquad}
                               dragProps={dragProps} dropProps={dropProps}
                               hovered={hoverSquad === s.name} draggingIds={draggingIds} />
               ))}
@@ -225,7 +245,7 @@ function Half({
 /** 一支小队 = 一整行：队名 + 6 张卡片横排铺开 */
 function SquadRowView({
   squad, members, classMap, onPickSlot, onRemoveRow, onSkillNote,
-  dragProps, dropProps, hovered, draggingIds,
+  dragProps, dropProps, hovered, draggingIds, onRemoveSquad,
 }: {
   squad: SquadRow;
   members: ParticipationRow[];
@@ -237,6 +257,7 @@ function SquadRowView({
   dropProps: (squad: string) => Record<string, unknown>;
   hovered: boolean;
   draggingIds: number[];
+  onRemoveSquad?: (squadId: number, name: string) => void;
 }) {
   const slots: (ParticipationRow | null)[] = [];
   for (let i = 0; i < squad.size; i++) slots.push(members[i] ?? null);
@@ -252,6 +273,12 @@ function SquadRowView({
         <span>{squad.name}</span>
         <span className="squadrow__count">{members.length}/{squad.size}</span>
         {squad.tactic && <span className="squadrow__tactic">{squad.tactic}</span>}
+        {onRemoveSquad && (
+          <button className="squadrow__del" title={`删掉「${squad.name}」这一队（有历史记录时会被拒绝）`}
+                  onClick={(e) => { e.stopPropagation(); onRemoveSquad(squad.id, squad.name); }}>
+            ×
+          </button>
+        )}
       </div>
       <div className="squadrow__cards">
         {slots.map((r, i) => (

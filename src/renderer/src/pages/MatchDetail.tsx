@@ -316,6 +316,28 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   setError(err instanceof ApiError ? err.message : String(err));
                 }
               }}
+              onAddSquad={async (groupId) => {
+                try {
+                  const s = await api.meta.appendSquad(groupId);
+                  setNotice(`已加一队「${s.name}」`);
+                  setError(null);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
+              onRemoveSquad={async (squadId, name) => {
+                try {
+                  await api.meta.removeSquad(squadId);
+                  setNotice(`已删掉「${name}」`);
+                  setError(null);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
             />
             <div className="hint" style={{ marginTop: 8 }}>
               拖动姓名可换小队、拖到下方「未分配」区可移出小队；点击职业色块也能选人入队，点击姓名移出本场。

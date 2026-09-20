@@ -112,25 +112,41 @@ export interface SquadDef {
 /**
  * 默认的「战斗组 → 小队」结构（迁移脚本用它初始化数据库）。
  *
- * 用户口径：共 10 个战斗队 × 6 人，划归到 4 个战斗组；
- * 组内第 N 队命名为「组名-N」（如防守二有 3 队 → 防守二-3）。
- * 战斗组可新增、每组队伍数量不定，因此运行时一律读数据库，
- * 这里的常量只用于首次初始化，不作为业务校验依据。
+ * 用户口径：**初始共 12 队**，4 个战斗组（防守一/二、进攻一/二），**每组 3 队**；
+ * 但"12"只是初始值 —— 每组队数**不固定**，排表页可以随时「＋ 加一队」/
+ * 「× 删队」（加到第 5 队就是「防守一-5」）。
+ * 进攻组战术按 塔后拆 / 塔前拆 / 保镖 轮转，防守组统一「防守」。
+ * 因此运行时一律读数据库，这里的常量只用于首次初始化，不作为业务校验依据。
  */
-export const DEFAULT_SQUADS: readonly SquadDef[] = [
-  { name: '防守一-1', group: '防守一', kind: 'defend', indexInGroup: 1, tactic: '防守', size: 6, sortOrder: 1 },
-  { name: '防守一-2', group: '防守一', kind: 'defend', indexInGroup: 2, tactic: '防守', size: 6, sortOrder: 2 },
-  { name: '防守一-3', group: '防守一', kind: 'defend', indexInGroup: 3, tactic: '防守', size: 6, sortOrder: 3 },
-  { name: '防守二-1', group: '防守二', kind: 'defend', indexInGroup: 1, tactic: '防守', size: 6, sortOrder: 4 },
-  { name: '防守二-2', group: '防守二', kind: 'defend', indexInGroup: 2, tactic: '防守', size: 6, sortOrder: 5 },
-  { name: '防守二-3', group: '防守二', kind: 'defend', indexInGroup: 3, tactic: '防守', size: 6, sortOrder: 6 },
-  { name: '进攻一-1', group: '进攻一', kind: 'attack', indexInGroup: 1, tactic: '塔后拆', size: 6, sortOrder: 7 },
-  { name: '进攻一-2', group: '进攻一', kind: 'attack', indexInGroup: 2, tactic: '塔前拆', size: 6, sortOrder: 8 },
-  { name: '进攻一-3', group: '进攻一', kind: 'attack', indexInGroup: 3, tactic: '保镖', size: 6, sortOrder: 9 },
-  { name: '进攻二-1', group: '进攻二', kind: 'attack', indexInGroup: 1, tactic: '塔后拆', size: 6, sortOrder: 10 },
-  { name: '进攻二-2', group: '进攻二', kind: 'attack', indexInGroup: 2, tactic: '塔前拆', size: 6, sortOrder: 11 },
-  { name: '进攻二-3', group: '进攻二', kind: 'attack', indexInGroup: 3, tactic: '保镖', size: 6, sortOrder: 12 },
-] as const;
+const DEFEND_GROUP_NAMES = ['防守一', '防守二'] as const;
+const ATTACK_GROUP_NAMES = ['进攻一', '进攻二'] as const;
+/** 初始每组队数（用户口径：初始 12 队 = 4 组 × 3 队）；之后按需增删，不设上限 */
+export const SQUADS_PER_GROUP = 3;
+/** 进攻组的战术轮转序列（第 N 队循环取用，所以加队不会取到空战术） */
+const ATTACK_TACTICS: readonly Tactic[] = ['塔后拆', '塔前拆', '保镖'];
+
+export const DEFAULT_SQUADS: readonly SquadDef[] = (() => {
+  const list: SquadDef[] = [];
+  let sort = 1;
+  const push = (group: SquadGroup, kind: GroupKind, i: number) => {
+    list.push({
+      name: `${group}-${i}`,
+      group,
+      kind,
+      indexInGroup: i,
+      tactic: kind === 'defend' ? '防守' : ATTACK_TACTICS[(i - 1) % ATTACK_TACTICS.length],
+      size: 6,
+      sortOrder: sort++,
+    });
+  };
+  for (const g of DEFEND_GROUP_NAMES) {
+    for (let i = 1; i <= SQUADS_PER_GROUP; i++) push(g, 'defend', i);
+  }
+  for (const g of ATTACK_GROUP_NAMES) {
+    for (let i = 1; i <= SQUADS_PER_GROUP; i++) push(g, 'attack', i);
+  }
+  return list;
+})();
 
 /** 非上场槽位（状态，不是战斗组） */
 export const BENCH_SQUADS = ['替补', '请假'] as const;

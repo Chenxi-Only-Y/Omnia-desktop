@@ -608,6 +608,8 @@ export interface OmniaApi {
     createGroup(input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
     removeGroup(id: number): Promise<IpcResult<true>>;
     createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
+    /** 给某组再加一队（序号自动取组内最大 +1，所以能加到「防守一-5」） */
+    appendSquad(groupId: number): Promise<IpcResult<SquadRow>>;
     removeSquad(id: number): Promise<IpcResult<true>>;
     /** 读取 xlsx：先列工作表，再取某个工作表的网格与表头探测 */
     xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
@@ -687,6 +689,7 @@ export const IPC = {
   metaGroupCreate: 'meta:group:create',
   metaGroupRemove: 'meta:group:remove',
   metaSquadCreate: 'meta:squad:create',
+  metaSquadAppend: 'meta:squad:append',
   metaSquadRemove: 'meta:squad:remove',
   metaXlsxSheets: 'meta:xlsx:sheets',
   metaXlsxGrid: 'meta:xlsx:grid',

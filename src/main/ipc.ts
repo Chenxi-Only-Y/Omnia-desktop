@@ -262,6 +262,7 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
   ipcMain.handle(IPC.metaSquadCreate, safe((input: SquadInput) => squads.createSquad(input)));
+  ipcMain.handle(IPC.metaSquadAppend, safe((groupId: number) => squads.appendSquad(groupId)));
   ipcMain.handle(IPC.metaSquadRemove, safe((id: number) => {
     if (!squads.removeSquad(id)) throw new Error(`小队不存在：id=${id}`);
     return true as const;

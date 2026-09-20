@@ -185,6 +185,13 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
             if (matchId === null) return;
             void run(() => api.match.setSkillNote(matchId, playerId, note));
           }}
+          onAddSquad={(groupId) => void run(async () => {
+            const s = await api.meta.appendSquad(groupId);
+            setNotice(`已加一队「${s.name}」`);
+          })}
+          onRemoveSquad={(squadId, name) => void run(
+            () => api.meta.removeSquad(squadId), `已删掉「${name}」`,
+          )}
         />
       </div>
 

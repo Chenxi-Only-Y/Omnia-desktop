@@ -448,6 +448,32 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('新增组「演练组」→ 自动命名小队「' + s1.data.name + '」序号=' + s1.data.indexInGroup);
         const s2 = await api.meta.createSquad({ groupId: g.data.id });
         steps.push('再增一队 → 自动命名「' + s2.data.name + '」');
+
+        // 「每组队数不固定」：给已有组再加一队（appendSquad），并验证
+        // 1) 序号接着末尾（演练组已有 2 队 → 演练组-3）
+        // 2) 有历史记录的队删不掉（防误删历史建制）
+        const s3 = await api.meta.appendSquad(g.data.id);
+        steps.push('appendSquad → 「' + (s3.ok ? s3.data.name : 'ERR ' + s3.error) + '」');
+        // 给 防守一-1 造一条参战记录，然后试着删它 —— 必须被拒绝
+        const guardP = await api.player.create({ gameId: 'smoke_sqguard', name: '建制守卫', mainClass: '神相' });
+        const guardM = await api.match.create({ date: '2026-02-03', ourSide: '我方', oppSide: '守卫队' });
+        if (guardP.ok && guardM.ok) {
+          await api.match.upsertParticipation({
+            matchId: guardM.data.match.id, playerId: guardP.data.id, squad: '防守一-1', state: 'PLAY',
+          });
+        }
+        const catNow = await api.meta.squads();
+        const def1 = catNow.data.squads.find((x) => x.name === '防守一-1');
+        // 注意：探针脚本是当纯 JS 在页面里跑的，**不能写 TS 语法**（as const 之类会直接语法报错）
+        const delUsed = def1
+          ? await api.meta.removeSquad(def1.id)
+          : { ok: false, error: '防守一-1 不在建制里' };
+        steps.push('删有历史的队被拦=' + (delUsed.ok ? '否（异常！）' : '是')
+          + (delUsed.ok ? '' : '（' + delUsed.error.slice(0, 30) + '…）'));
+        if (guardP.ok) await api.player.remove(guardP.data.id);
+        if (guardM.ok) await api.match.remove(guardM.data.match.id);
+
+        await api.meta.removeSquad(s3.ok ? s3.data.id : 0);
         await api.meta.removeSquad(s2.data.id);
         await api.meta.removeSquad(s1.data.id);
         await api.meta.removeGroup(g.data.id);
@@ -536,6 +562,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && cat.data.capacity === 72
           && squads.includes('防守一-1') && squads.includes('防守二-3') && squads.includes('进攻二-3')
           && s1.data.name === '演练组-1' && s2.data.name === '演练组-2'
+          && s3.ok === true && s3.data.name === '演练组-3' && !delUsed.ok
           && blocks === 12 && hasTarget
           && upsertAlias.ok === true && aliasRow?.squad === '防守一-2' && aliasRow?.tactic === '防守'
           && aliasInSameBlock

@@ -81,6 +81,17 @@ export class SquadRepo {
     return this.db.prepare('DELETE FROM combat_group WHERE id = ?').run(id).changes > 0;
   }
 
+  /**
+   * 给某个战斗组"再加一队"。
+   *
+   * 用户口径：**每组队数不固定**，按需增删，人数不够就加。加到第 5 队就叫
+   * 「组名-5」，第 6 队就叫「组名-6」，没有上限（序号取组内最大 +1）。
+   * 排表页的「＋ 加一队」直接调它，免得为了加一队还要跳到设置页。
+   */
+  appendSquad(groupId: number): SquadRow {
+    return this.createSquad({ groupId });
+  }
+
   /** 新增小队：序号默认接在该组末尾，命名自动为「组名-序号」 */
   createSquad(input: SquadInput): SquadRow {
     const g = this.db.prepare('SELECT * FROM combat_group WHERE id = ?')
@@ -115,7 +126,27 @@ export class SquadRepo {
     return toSquad(row);
   }
 
+  /**
+   * 删掉一队。
+   *
+   * 有历史记录就拒绝 —— participation.squad 与 squad_score.squad 都是按名字文本存的
+   * （没有外键约束），直接删会让历史战报里的队名变成"查不到的孤儿"，
+   * 看板与评分的小队维度都会对不上。要删先把该队的人移走/清掉历史。
+   */
   removeSquad(id: number): boolean {
+    const s = this.db.prepare('SELECT name FROM squad WHERE id = ?').get(id) as { name: string } | undefined;
+    if (!s) return false;
+    const used = this.db.prepare(
+      `SELECT
+         (SELECT COUNT(*) FROM participation p WHERE p.squad = ?) AS parts,
+         (SELECT COUNT(*) FROM squad_score q WHERE q.squad = ?) AS scores`,
+    ).get(s.name, s.name) as { parts: number; scores: number };
+    if (Number(used.parts) > 0 || Number(used.scores) > 0) {
+      throw new Error(
+        `「${s.name}」已有历史记录（参战 ${used.parts} 条 / 小队评分 ${used.scores} 条），不能删。`
+        + '先把该队的人移到别队，或保留该队。',
+      );
+    }
     return this.db.prepare('DELETE FROM squad WHERE id = ?').run(id).changes > 0;
   }
 

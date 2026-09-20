@@ -15,6 +15,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
+import { classIconSrc } from '../lib/assets';
 
 interface Props extends PageProps {
   rows: ParticipationRow[];
@@ -325,6 +326,7 @@ function PlayerCard({
 
   const cls = row.classUsed || row.mainClass || '';
   const def = classMap.get(cls);
+  const icon = cls ? classIconSrc(cls) : null;
   const commit = () => {
     if (onSkillNote && note !== row.skillNote) onSkillNote(row.playerId, note);
   };
@@ -345,6 +347,7 @@ function PlayerCard({
       </div>
       <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
            title="点击换人 / 放入队员">
+        {icon && <img className="pcard__icon" src={icon} alt="" />}
         {cls || '未登记职业'}
       </div>
       {/* 技能备注：单行、无框，看起来就是一行普通文字（用户口径） */}

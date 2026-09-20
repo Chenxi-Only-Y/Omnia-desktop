@@ -454,6 +454,12 @@ textarea.input { resize: vertical; line-height: 1.5; }
   font-size: 13px; line-height: 1.25; opacity: .92; cursor: pointer;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
+/* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清 */
+.pcard__icon {
+  width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain;
+  background: rgba(255, 255, 255, .82); border-radius: 3px; padding: 1px;
+  box-sizing: border-box;
+}
 
 .pcard__id:hover { text-decoration: underline; }
 .pcard__cls:hover { text-decoration: underline; }

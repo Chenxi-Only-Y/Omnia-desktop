@@ -130,7 +130,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   /** 把整个排表功能区截成 PNG（主进程 capturePage + 保存对话框） */
   async function captureBoard() {
     try {
-      const res = await api.meta.captureElement('.board');
+      const res = await api.meta.captureBoard();
       setError(null);
       setNotice(res.path ? `已保存截图：${res.path}` : '已取消截图');
     } catch (err) {

@@ -3,7 +3,7 @@
  * 所有处理函数都返回 IpcResult<T>，异常被捕获并转成 { ok:false, error }，
  * 避免 IPC 序列化丢失堆栈。
  */
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron';
 import fs from 'node:fs';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type {
@@ -245,9 +245,13 @@ export function registerIpc(ctx: IpcContext): void {
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   }));
 
+  // 渲染层拼好截图后写进设置；顺手清掉请求标记，避免误触发
   ipcMain.handle(IPC.metaSettingSet, safe((key: string, value: string) => {
     const k = (key ?? '').trim();
     if (!k) throw new Error('设置项 key 不能为空');
+    if (k === 'captureRequest') {
+      ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run('capturePng');
+    }
     ctx.handle.db.prepare(
       `INSERT INTO app_setting (key, value) VALUES (?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
@@ -275,59 +279,94 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
 
-  // ── 截取窗口区域（排表功能区导出图片） ──────────────────────────
-  // 目标区域固定为排表功能区（.board），**不从渲染层传参**：
-  // 这条通道上渲染层的实参始终到不了主进程（排查记录：同一次运行里
-  // setSquadTactic 的两参传递正常；两参形式只到第二个、单对象参数、
-  // JSON 字符串、换通道名、清空 dist 重建 —— 全部无效），
-  // 所以只用一个「触发」语义，区域由主进程自己在页面里量。
-  ipcMain.handle(IPC.captureRegion, safe(async () => {
-    const boardSel = '.board';
+  // ── 截取排表功能区（导出 PNG） ──────────────────────────────────
+  // 分工：渲染层做「滚动分块 + canvas 拼合」（它才有 DOM 与画布），
+  // 主进程只提供两件事：把窗口撑到屏幕允许的最大尺寸（拿到最大可见区域），
+  // 以及按渲染层给的矩形逐块截图。
+  //
+  // 走过的弯路（都实测失败，记下来免得重走）：
+  //  - 直接截 .board：capturePage 只截**可见**区域 → 右半区/下方各队丢失；
+  //  - 只撑窗口不拼接：功能区的完整高度超过屏幕可用高度，仍然截不全；
+  //  - 隐藏侧栏改 grid-template-columns：网格塌掉（内容被挤成 355px 宽）；
+  //  - 分块时用 scroll 后的 getBoundingClientRect() 现算每块尺寸：
+  //    看板自身在横向滚动，滚动后 rect 会跑，裁剪尺寸算错 → 错位/重复。
+  //    改为**几何只量一次**，分块尺寸固定，位置只用 scrollLeft 推算。
+  let maxWinSaved: Electron.Rectangle | null = null;
+  const CAPTURE_RECT_KEY = 'captureRect';
+  const CAPTURE_PNG_KEY = 'capturePng';
+
+  /** 把窗口临时撑到屏幕允许的最大尺寸，让可见区域尽可能大；返回是否成功 */
+  ipcMain.handle(IPC.captureMaxWin, safe(async () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-    if (!win) throw new Error('找不到窗口，无法截图');
+    if (!win) throw new Error('找不到窗口');
+    if (maxWinSaved) return { w: win.getContentSize()[0], h: win.getContentSize()[1] };
+    const prev = win.getBounds();
+    const prevContent = win.getContentSize();
+    const work = require('electron').screen.getDisplayMatching(prev).workAreaSize;
+    win.setBounds({
+      x: prev.x, y: prev.y,
+      width: Math.round(work.width + (prev.width - prevContent[0])),
+      height: Math.round(work.height + (prev.height - prevContent[1])),
+    });
+    maxWinSaved = prev;
+    await new Promise((r) => setTimeout(r, 700));
+    const now = win.getContentSize();
+    console.log('[capture] 撑到最大窗口 内容区=' + now[0] + 'x' + now[1]);
+    return { w: now[0], h: now[1] };
+  }));
 
-    let rect: { x: number; y: number; width: number; height: number } | null = null;
-    let diag = '';
-    try {
-      const raw = await win.webContents.executeJavaScript(`(function () {
-        var el = document.querySelector(${JSON.stringify(boardSel)});
-        if (!el) return JSON.stringify({ err: 'no-element' });
-        var r = el.getBoundingClientRect();
-        return JSON.stringify({ x: r.left, y: r.top, w: r.width, h: r.height });
-      })()`);
-      diag = String(raw);
-      const o = JSON.parse(diag) as { err?: string; x?: number; y?: number; w?: number; h?: number };
-      if (o.err) throw new Error(`页面里找不到 ${boardSel}`);
-      rect = {
-        x: Math.round(o.x ?? 0), y: Math.round(o.y ?? 0),
-        width: Math.round(o.w ?? 0), height: Math.round(o.h ?? 0),
-      };
-    } catch (err) {
-      throw new Error(`量取区域失败：${err instanceof Error ? err.message : String(err)}｜diag=${diag}`);
-    }
-    if (!rect || rect.width <= 0 || rect.height <= 0) {
-      throw new Error(`区域无效：${JSON.stringify(rect)}｜diag=${diag}`);
-    }
+  /** 还原窗口尺寸 */
+  ipcMain.handle(IPC.captureRestoreWin, safe(() => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win && maxWinSaved) win.setBounds(maxWinSaved);
+    maxWinSaved = null;
+    return true as const;
+  }));
 
-    const img = await win.webContents.capturePage(rect);
-    // 直接用 capturePage 的返回：它就是 rect 那块区域（部分 DPI 下是等比的
-    // 物理像素，内容完整）。**不要**再按 CSS 像素裁 —— 那样会裁掉一部分内容（踩过）。
-    const cropped = img;
-    const size = cropped.getSize();
+  /** 分块截图：矩形先由渲染层写进设置（这条 IPC 传不了实参） */
+  ipcMain.handle(IPC.captureRect, safe(async () => {
+    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+      .get(CAPTURE_RECT_KEY) as { value: string } | undefined;
+    if (!row?.value) throw new Error('没有待截区域');
+    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run(CAPTURE_RECT_KEY);
+    const rect = JSON.parse(row.value) as { x: number; y: number; width: number; height: number };
+    if (!(rect.width > 0) || !(rect.height > 0)) throw new Error('待截区域无效');
+    const win = BrowserWindow.getAllWindows()[0];
+    if (!win) throw new Error('找不到窗口');
+    const img = await win.webContents.capturePage({
+      x: Math.round(rect.x), y: Math.round(rect.y),
+      width: Math.round(rect.width), height: Math.round(rect.height),
+    });
+    return img.toDataURL();
+  }));
+
+  /** 收下渲染层拼好的 PNG 并存盘 */
+  ipcMain.handle(IPC.captureRegion, safe(async () => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    if (!win) throw new Error('找不到窗口');
+    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+      .get(CAPTURE_PNG_KEY) as { value: string } | undefined;
+    if (!row?.value) throw new Error('没有截图数据（渲染层未写入 capturePng）');
+    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run(CAPTURE_PNG_KEY);
+    const buf = Buffer.from(row.value.replace(/^data:image\/png;base64,/, ''), 'base64');
+    const size = nativeImage.createFromBuffer(buf).getSize();
     const defaultName = `排表_${new Date().toISOString().slice(0, 10)}.png`;
     const outDir = process.env.OMNIA_CAPTURE_DIR;
     if (outDir) {
       fs.mkdirSync(outDir, { recursive: true });
-      const p = require('node:path').join(outDir, defaultName);
-      fs.writeFileSync(p, cropped.toPNG());
-      return { path: p, width: size.width, height: size.height };
+      const out = require('node:path').join(outDir, defaultName);
+      fs.writeFileSync(out, buf);
+      console.log('[capture] 已写出', out, size.width + 'x' + size.height);
+      return { path: out, width: size.width, height: size.height };
     }
     const picked = await dialog.showSaveDialog(win, {
       title: '保存截图', defaultPath: defaultName,
       filters: [{ name: 'PNG 图片', extensions: ['png'] }],
     });
-    if (picked.canceled || !picked.filePath) return { path: null, width: size.width, height: size.height };
-    fs.writeFileSync(picked.filePath, cropped.toPNG());
+    if (picked.canceled || !picked.filePath) {
+      return { path: null, width: size.width, height: size.height };
+    }
+    fs.writeFileSync(picked.filePath, buf);
     return { path: picked.filePath, width: size.width, height: size.height };
   }));
 

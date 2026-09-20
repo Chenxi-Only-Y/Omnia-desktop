@@ -1646,14 +1646,27 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           .find(b => b.textContent.trim() === '截取图片');
         if (!btn) throw new Error('工具栏里没有「截取图片」按钮');
         steps.push('按钮存在=true');
-        // 只传选择器字符串（矩形由主进程自量）
-        const res = await window.omnia.meta.captureRegion('.board');
-        if (!res.ok) throw new Error('截图失败: ' + res.error);
-        const b = document.querySelector('.board').getBoundingClientRect();
-        steps.push('截图返回 path=' + JSON.stringify(res.data.path)
-          + ' 尺寸=' + res.data.width + 'x' + res.data.height
-          + ' 看板实测=' + Math.round(b.width) + 'x' + Math.round(b.height));
-        return { ok: res.ok === true && !!res.data.path && res.data.width > 300, steps };
+        // 走界面同一条路：分块截图 + canvas 拼合 → 主进程落盘
+        const board = document.querySelector('.board').getBoundingClientRect();
+        const sc = document.querySelector('.content');
+        steps.push('看板实测=' + Math.round(board.width) + 'x' + Math.round(board.height)
+          + ' 内容区=' + sc.scrollWidth + 'x' + sc.scrollHeight
+          + ' 可视=' + sc.clientWidth + 'x' + sc.clientHeight);
+        btn.click();   // 与用户点按钮完全一致
+        // 等拼图 + 落盘（分块截图需要若干轮滚动）
+        await new Promise(r => setTimeout(r, 6000));
+        const msgs = [...document.querySelectorAll('.msg')].map(x => x.textContent.trim());
+        // 找出**真正**在滚动的是哪个元素（不要再猜容器）
+        const scrollers = [...document.querySelectorAll('*')]
+          .filter(el => el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 2)
+          .slice(0, 8)
+          .map(el => (el.className || el.tagName) + '[' + el.scrollWidth + 'x' + el.scrollHeight
+            + ' / ' + el.clientWidth + 'x' + el.clientHeight + ']');
+        steps.push('可滚动元素=' + JSON.stringify(scrollers));
+        const diag = (window).__captureDiag || '（无几何诊断）';
+        steps.push('界面提示=' + JSON.stringify(msgs));
+        steps.push('几何诊断=' + diag);
+        return { ok: msgs.some(m => m.includes('已保存截图')), steps, value: { msgs } };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针11f');
     for (const s of cap.steps) log('[smoke] 截取图片:', s);

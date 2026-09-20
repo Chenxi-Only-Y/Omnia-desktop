@@ -624,11 +624,16 @@ export interface OmniaApi {
     /** 只改某小队的战术（塔后拆/塔前拆/保镖/防守），不碰名称与人数 */
     setSquadTactic(id: number, tactic: string): Promise<IpcResult<SquadRow>>;
     /**
-     * 把窗口内某个元素当前的可见区域截成 PNG 并保存（弹保存对话框）。
-     * 只传选择器字符串：矩形由主进程在页面里自行量取 —— 这条通道上传
-     * 对象实参会丢失（见 ipc.ts 注释）。返回保存路径，取消则 path 为 null。
+     * 触发「截取排表功能区」并保存为 PNG。区域由渲染层分块截图后拼合
+     * （capturePage 只截可见区域，必须分块），主进程只负责落盘。
      */
-    captureRegion(selector: string): Promise<IpcResult<{ path: string | null; width: number; height: number }>>;
+    captureRegion(): Promise<IpcResult<{ path: string | null; width: number; height: number }>>;
+    /** 把窗口临时撑到屏幕最大，返回内容区尺寸（截图用，拿最大可见区域） */
+    captureMaxWin(): Promise<IpcResult<{ w: number; h: number }>>;
+    /** 还原窗口尺寸 */
+    captureRestoreWin(): Promise<IpcResult<true>>;
+    /** 分块截图，返回 PNG dataURL；矩形先写进 app_setting.captureRect */
+    captureRect(): Promise<IpcResult<string>>;
     /** 读取 xlsx：先列工作表，再取某个工作表的网格与表头探测 */
     xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
     xlsxGrid(data: Uint8Array, sheet: string | number, headerRow?: number): Promise<IpcResult<SheetGrid>>;
@@ -712,6 +717,12 @@ export const IPC = {
   metaSquadTactic: 'meta:squad:tactic',
   /** 截取窗口内某个区域的图片（排表功能区导出用） */
   captureRegion: 'app:capture-region',
+  /** 截图前把窗口临时撑到屏幕最大（拿最大可见区域） */
+  captureMaxWin: 'app:capture-maxwin',
+  /** 截图后还原窗口尺寸 */
+  captureRestoreWin: 'app:capture-restorewin',
+  /** 分块截图；矩形走 app_setting.captureRect（这条 IPC 传不了实参） */
+  captureRect: 'app:capture-rect',
   metaXlsxSheets: 'meta:xlsx:sheets',
   metaXlsxGrid: 'meta:xlsx:grid',
 

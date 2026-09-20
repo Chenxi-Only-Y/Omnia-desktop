@@ -39,8 +39,16 @@ const api = {
     appendSquad: (groupId: number) => invoke('meta:squad:append', groupId),
     removeSquad: (id: number) => invoke('meta:squad:remove', id),
     setSquadTactic: (id: number, tactic: string) => invoke('meta:squad:tactic', id, tactic),
-    // 只传选择器字符串：矩形由主进程自量（这条通道上传对象实参会丢失，见 ipc.ts）
-    captureRegion: (selector: string) => invoke('app:capture-region', selector),
+    /**
+     * 截取排表功能区（完整）。
+     * 参数一律**不走 IPC**：要截的矩形先写进 app_setting.captureRect，
+     * 这里只做无参触发，主进程读库取矩形 —— 这条 IPC 通道的实参传不过去
+     * （多参只到第一个、单参也丢，实测多次），所以只能用「触发」语义。
+     */
+    captureRegion: () => invoke('app:capture-region'),
+    captureMaxWin: () => invoke('app:capture-maxwin'),
+    captureRestoreWin: () => invoke('app:capture-restorewin'),
+    captureRect: () => invoke('app:capture-rect'),
     xlsxSheets: (data: Uint8Array) => invoke('meta:xlsx:sheets', data),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number) =>
       invoke('meta:xlsx:grid', data, sheet, headerRow),

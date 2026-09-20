@@ -48,17 +48,145 @@ export const api = {
     setSquadTactic: (id: number, tactic: string): Promise<SquadRow> =>
       unwrap(bridge().meta.setSquadTactic(id, tactic)),
     /**
-     * 把页面上某个元素的可见区域截成 PNG（弹保存对话框）。
-     * 只传选择器；矩形由主进程在页面里自量 —— 这条通道上传实参会丢失。
+     * 截取排表功能区，**完整**（含右半区与下半部分），存成 PNG。
+     *
+     * 为什么必须分块拼：capturePage 只截**可见**区域，而功能区的完整尺寸
+     * （约 2614×1704）比屏幕还大，右半区在横向滚动区、下方各队在竖向滚动区。
+     *
+     * 关键（前两次拼错就错在这）：几何量**只量一次** —— 先把窗口撑到屏幕最大，
+     * 此时记下看板在窗口里的位置、以及内容区的可视尺寸；之后每块的裁剪矩形
+     * 固定不变，位置只用 scrollLeft / 行索引推算，**不再**用滚动后的
+     * getBoundingClientRect() 现算（看板自身在横向滚动，rect 会跑）。
      */
-    captureElement: async (
-      selector: string,
-    ): Promise<{ path: string | null; width: number; height: number }> => {
-      const el = document.querySelector(selector);
-      if (!el) throw new Error(`页面上找不到要截取的区域：${selector}`);
-      el.scrollIntoView({ block: 'start' });
-      await new Promise((r) => setTimeout(r, 150));   // 等滚动落定
-      return unwrap(bridge().meta.captureRegion(selector));
+    captureBoard: async (): Promise<{ path: string | null; width: number; height: number }> => {
+      const vsc = document.querySelector('.content') as HTMLElement | null;        // 竖向滚它
+      const hsc = document.querySelector('.board__scroll') as HTMLElement | null;  // 横向滚它
+      const grid = document.querySelector('.board__halves') as HTMLElement | null;
+      if (!vsc || !hsc || !grid) throw new Error('排表功能区还没渲染，无法截图');
+
+      const prev = { x: hsc.scrollLeft, y: vsc.scrollTop };
+      const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      // 截图期间隐藏滚动条：否则会被截进图里（图里出现混入的滚动条）
+      const hideBar = document.createElement('style');
+      hideBar.textContent = '.board__scroll::-webkit-scrollbar,.content::-webkit-scrollbar'
+        + '{display:none!important}';
+      document.head.appendChild(hideBar);
+      let maxed = false;
+      try {
+        // 1) 窗口撑到屏幕最大，拿尽可能大的可视区域
+        const mw = await bridge().meta.captureMaxWin();
+        maxed = mw.ok;
+        // 等布局彻底落定再量几何：之前只等 400ms，窗口重排没完成就开始量，
+        // 量到的尺寸与之后截图时刻的布局不一致 → 拼出来列宽不同（踩过）
+        await settle(1200);
+        hsc.scrollLeft = 0;
+        vsc.scrollTop = 0;
+        await settle(500);
+
+        // 2) 几何量一次（之后固定不变）
+        //    横向滚动属于 .board__scroll，竖向属于 .content —— 早前一直量错容器，
+        //    导致 scrollTo 被钳制在 0、拼出重复图（踩过）
+        const gp = grid.getBoundingClientRect();
+        const originX = Math.max(0, Math.round(gp.left));   // 看板在窗口内的固定位置
+        const originY = Math.max(0, Math.round(gp.top));
+        // 完整尺寸以**网格自身**为准：.board__scroll 的 scrollWidth 含
+        // min-width:min-content 撑出的额外空间，会比内容宽（实测 3197 vs 2636）
+        const fullW = Math.round(grid.scrollWidth);
+        const fullH = Math.round(grid.scrollHeight);
+        const tileVW = hsc.clientWidth;
+        const tileVH = vsc.clientHeight;
+        if (tileVW <= 10 || tileVH <= 10) {
+          throw new Error(`可见区域太小（${tileVW}x${tileVH}），无法分块截图`);
+        }
+        const diag: string[] = [`origin=${originX},${originY} 完整=${fullW}x${fullH}`
+          + ` 可视=${tileVW}x${tileVH}`];
+
+        // 先收集每块的截图与实际滚动位置，再按「只取独有区域」的方式合并，
+        // 让最后一块吸收重叠部分（滚动会被钳制，块之间必然有重叠）
+        type Shot = { url: string; realX: number; realY: number };
+        const shots: Shot[] = [];
+        const ys: number[] = [];
+        for (let ay = 0; ay < fullH; ay += tileVH) ys.push(ay);
+        const xs: number[] = [];
+        for (let ax = 0; ax < fullW; ax += tileVW) xs.push(ax);
+
+        for (const ay of ys) {
+          for (const ax of xs) {
+            // 滚动位置取整：带小数的 scrollLeft 会让每块有几像素漂移，拼出来逐行错位（踩过）
+            hsc.scrollLeft = Math.round(ax);
+            vsc.scrollTop = Math.round(ay);
+            await settle(280);
+            const realX = hsc.scrollLeft;
+            const realY = vsc.scrollTop;
+            diag.push(`req ${ax},${ay} → 实 ${Math.round(realX)},${Math.round(realY)}`
+              + ` (max ${Math.round(hsc.scrollWidth - hsc.clientWidth)})`);
+            await api.meta.setSetting('captureRect', JSON.stringify({
+              x: originX, y: originY, width: tileVW, height: tileVH,
+            }));
+            const res = await bridge().meta.captureRect();
+            if (!res.ok) throw new Error(res.error || '分块截图失败');
+            shots.push({ url: res.data, realX, realY });
+          }
+        }
+        // 诊断色块与落点日志挪到 tiles/dpr 声明之后（见下方）
+
+        // 按实际滚动位置合并：每块占据 [real, 下一次的 real) 这段
+        type Tile = { url: string; ax: number; ay: number; w: number; h: number; sx: number; sy: number };
+        const tiles: Tile[] = [];
+        for (const s of shots) {
+          const nextX = xs.find((v) => v > s.realX + 0.5);
+          const nextY = ys.find((v) => v > s.realY + 0.5);
+          const ax = Math.round(s.realX);
+          const ay = Math.round(s.realY);
+          let w = (nextX === undefined ? fullW : Math.round(nextX)) - ax;
+          let h = (nextY === undefined ? fullH : Math.round(nextY)) - ay;
+          if (s.realX + 0.5 >= fullW || s.realY + 0.5 >= fullH) continue;
+          // 源偏移：重叠宽度取右侧/下侧，即从本块右/下边缘反推
+          const sx = Math.max(0, tileVW - w);
+          const sy = Math.max(0, tileVH - h);
+          if (w <= 0 || h <= 0) continue;
+          tiles.push({ url: s.url, ax, ay, w, h, sx, sy });
+        }
+
+        // 3) 按绝对坐标拼回原尺寸
+        const dpr = window.devicePixelRatio || 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(fullW * dpr);
+        canvas.height = Math.round(fullH * dpr);
+        const g = canvas.getContext('2d');
+        if (!g) throw new Error('无法创建画布');
+        g.fillStyle = '#E6E1E6';
+        g.fillRect(0, 0, canvas.width, canvas.height);
+        for (const t of tiles) {
+          const im = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error('分块图片解码失败'));
+            el.src = t.url;
+          });
+          // 分块图是 dpr 倍的物理像素：源区域按 (sx,sy,w,h) 取，落到画布 (ax,ay)
+          const d = dpr;
+          g.drawImage(im,
+            Math.round(t.sx * d), Math.round(t.sy * d),
+            Math.round(t.w * d), Math.round(t.h * d),
+            Math.round(t.ax * d), Math.round(t.ay * d),
+            Math.round(t.w * d), Math.round(t.h * d));
+        }
+        // 落点诊断：把每块的目标位置写进日志（拼错时一眼能看出落点偏移）
+        diag.push('落点=' + JSON.stringify(
+          tiles.map((t) => `${t.ax},${t.ay} ${t.w}x${t.h} src${t.sx},${t.sy}`),
+        ));
+        console.log('[capture] ' + diag.join(' ｜ '));
+        (window as unknown as { __captureDiag?: string }).__captureDiag = diag.join(' ｜ ');
+
+        await api.meta.setSetting('capturePng', canvas.toDataURL('image/png'));
+        return await unwrap(bridge().meta.captureRegion());
+      } finally {
+        hideBar.remove();
+        if (maxed) await bridge().meta.captureRestoreWin();
+        hsc.scrollLeft = prev.x;   // 横向在 board__scroll、竖向在 content
+        vsc.scrollTop = prev.y;
+      }
     },
     xlsxSheets: (data: Uint8Array): Promise<SheetList> => unwrap(bridge().meta.xlsxSheets(data)),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number): Promise<SheetGrid> =>

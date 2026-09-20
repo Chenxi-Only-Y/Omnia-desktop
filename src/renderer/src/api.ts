@@ -37,6 +37,7 @@ export const api = {
   meta: {
     classes: (): Promise<ClassInfo[]> => unwrap(bridge().meta.classes()),
     settings: (): Promise<Record<string, string>> => unwrap(bridge().meta.settings()),
+    setSetting: (key: string, value: string): Promise<true> => unwrap(bridge().meta.setSetting(key, value)),
     /** 战斗组 / 小队建制（数据驱动，可新增） */
     squads: (): Promise<SquadCatalog> => unwrap(bridge().meta.squads()),
     createGroup: (input: GroupInput): Promise<CombatGroupRow> => unwrap(bridge().meta.createGroup(input)),

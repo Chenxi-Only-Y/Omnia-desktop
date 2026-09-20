@@ -31,6 +31,7 @@ const api = {
   meta: {
     classes: () => invoke('meta:classes'),
     settings: () => invoke('meta:settings'),
+    setSetting: (key: string, value: string) => invoke('meta:setting:set', key, value),
     squads: () => invoke('meta:squads'),
     createGroup: (input: GroupInput) => invoke('meta:group:create', input),
     removeGroup: (id: number) => invoke('meta:group:remove', id),

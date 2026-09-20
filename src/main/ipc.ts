@@ -237,6 +237,16 @@ export function registerIpc(ctx: IpcContext): void {
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   }));
 
+  ipcMain.handle(IPC.metaSettingSet, safe((key: string, value: string) => {
+    const k = (key ?? '').trim();
+    if (!k) throw new Error('设置项 key 不能为空');
+    ctx.handle.db.prepare(
+      `INSERT INTO app_setting (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ).run(k, String(value ?? ''));
+    return true as const;
+  }));
+
   // ── 战斗组 / 小队建制（可新增） ─────────────────────────────────
   ipcMain.handle(IPC.metaSquads, safe(() => squads.catalog()));
   ipcMain.handle(IPC.metaGroupCreate, safe((input: GroupInput) => squads.createGroup(input)));

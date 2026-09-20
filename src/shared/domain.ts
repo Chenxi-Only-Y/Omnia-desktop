@@ -40,14 +40,21 @@ export const CLASS_NAMES: readonly string[] = CLASSES.map((c) => c.name);
 /**
  * 职业图标映射。
  *
- * 来源：原表「下滑预选」D6:D17 的 DISPIMG 内嵌图，已从 xlsx 解包导出。
- * 顺序依据 cellimages.xml 里的 DISPIMG ID ↔ media 文件对应关系（逐条核对），
- * 而非工作簿里的编号顺序 —— 二者并不一致，这里以 ID 映射为准。
- * ⚠️ 惊鸿（原表 A8 / D8）没有图标素材，是个待补缺口。
+ * 来源：原表「下滑预选」A6:C17 + D 列 DISPIMG 内嵌图，已从 xlsx 解包导出。
+ * 对应关系是逐行核对的（下滑预选 行6..行17 → DISPIMG ID → cellimages rels → media 文件名），
+ * 实测与原表一字不差。
+ *
+ * ⚠️ 惊鸿：原表里惊鸿（行8）的 DISPIMG ID 与妙音（行7）**完全相同**，
+ *    两个职业共用同一张 image3.png —— 这是原表的缺陷。
+ *    原表没有多余图标可用（26 张图各被引用一次），因此 `jinghong.png` 是
+ *    取 image3 的形状、按惊鸿自己的色板 F0BC06 重着色生成的替代图，
+ *    形状沿用原素材（不发明新图形），颜色用惊鸿的色板值，同风格且可区分。
+ *    若日后拿到官方惊鸿图标，直接替换 jinghong.png 即可。
  */
 export const CLASS_ICON_FILE: Record<string, string> = {
   素问: 'image4.png',
   妙音: 'image3.png',
+  惊鸿: 'jinghong.png',
   九灵: 'image1.png',
   神相: 'image11.png',
   玄机: 'image9.png',

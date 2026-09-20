@@ -58,11 +58,29 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 
 /* ── 布局 ─────────────────────────────────────────────────── */
 .app { display: grid; grid-template-columns: 216px 1fr; height: 100%; }
+/* 侧栏折叠：只留图标（图标是几何符号，本身就是稳定的视觉锚点） */
+.app.nav-collapsed { grid-template-columns: 56px 1fr; }
+.app.nav-collapsed .brand { padding: 14px 0 12px; text-align: center; }
+.app.nav-collapsed .brand h1 { font-size: 0; }
+.app.nav-collapsed .brand h1 .dot-sep { font-size: 20px; }
+.app.nav-collapsed .brand .sub { display: none; }
+.app.nav-collapsed .nav { padding: 10px 6px; }
+.app.nav-collapsed .nav-group-title { font-size: 0; padding: 6px 0; }
+.app.nav-collapsed .nav-group-title::after {
+  content: '·'; font-size: 12px; color: var(--text-faint);
+  display: block; text-align: center;
+}
+.app.nav-collapsed .nav-item { justify-content: center; padding: 9px 0; gap: 0; }
+.app.nav-collapsed .nav-item .ico { width: auto; font-size: 15px; opacity: .9; }
+/* 折叠时标签与角标隐藏 —— 标签文字改用 title 提示 */
+.app.nav-collapsed .nav-label,
+.app.nav-collapsed .nav-item .badge { display: none; }
 
 .sidebar {
   background: var(--bg-panel);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column; min-height: 0;
+  transition: none;
 }
 .brand {
   padding: 18px 18px 14px;
@@ -102,6 +120,14 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .topbar h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .topbar .spacer { flex: 1; }
 .topbar .meta { color: var(--text-faint); font-size: 11px; }
+
+/* 导航栏折叠按钮：常驻顶栏左侧，折叠后变成汉堡图标 */
+.icon-btn {
+  padding: 3px 8px; font-size: 15px; line-height: 1.1;
+  color: var(--text-dim); min-width: 30px;
+}
+.icon-btn:hover { color: var(--text); }
+.nav-toggle { margin-right: 2px; }
 
 .content { flex: 1; overflow: auto; padding: 16px 18px 28px; min-height: 0; }
 

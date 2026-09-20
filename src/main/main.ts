@@ -11,6 +11,7 @@ import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import { openDatabase, type DbHandle } from './db';
 import { registerIpc } from './ipc';
 import { parseTableText } from '../shared/tableText';
+import { CLASSES, classIconFile } from '../shared/domain';
 
 /** 编译后本文件位于 dist/main/main.js，应用根目录是上一级的上一级 */
 const APP_ROOT = path.resolve(__dirname, '..', '..');
@@ -187,7 +188,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       fs.mkdirSync(dir, { recursive: true });
       // 后台窗口的合成帧会滞后：先要一帧、再等一下，否则截到的是上一个页面的画面
       win.webContents.invalidate();
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 800));
       const img = await win.webContents.capturePage();
       const file = path.join(dir, `${name}.png`);
       fs.writeFileSync(file, img.toPNG());
@@ -1162,14 +1163,63 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           .some(x => x.textContent.indexOf('攻略') >= 0);
         steps.push('导航里仍有「攻略」=' + stillThere);
 
-        const ok = banners.length === 2
-          && banners.every(b => b.naturalWidth > 500)
-          && stillThere === false;
-        return { ok, steps };
+        // 导航栏折叠/展开：宽度真的变、标签真的藏、偏好真的落库
+        const app = document.querySelector('.app');
+        const toggle = document.querySelector('.nav-toggle');
+        if (!toggle) throw new Error('顶栏没有 .nav-toggle 折叠按钮');
+        const sideW = () => Math.round(document.querySelector('.sidebar').getBoundingClientRect().width);
+        const labelVisible = () => {
+          const el = document.querySelector('.nav-item .nav-label');
+          return !!(el && el.getBoundingClientRect().width > 0);
+        };
+        const wOpen = sideW();
+        const labelOpen = labelVisible();
+        const bgOpen = getComputedStyle(app).gridTemplateColumns;
+
+        toggle.click();
+        await new Promise(r => setTimeout(r, 300));
+        const wShut = sideW();
+        const labelShut = labelVisible();
+        const collapsedClass = app.classList.contains('nav-collapsed');
+
+        const savedShut = await window.omnia.meta.settings();
+        // 先不展开：留给主进程截图，截完由主进程点一下恢复
+        steps.push('折叠前 侧栏=' + wOpen + 'px 标签可见=' + labelOpen + ' grid=' + bgOpen);
+        steps.push('折叠后 侧栏=' + wShut + 'px 标签可见=' + labelShut
+          + ' nav-collapsed=' + collapsedClass + ' 落库 navCollapsed=' + JSON.stringify(savedShut.data.navCollapsed));
+
+        return {
+          ok: banners.length === 2
+            && banners.every(b => b.naturalWidth > 500)
+            && stillThere === false
+            && wOpen > 180 && wShut < 70 && labelOpen && !labelShut && collapsedClass
+            && savedShut.data.navCollapsed === '1',
+          steps,
+        };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针11');
     for (const s of guide.steps) log('[smoke] 首页:', s);
+    // 注意：这里不再截图。capturePage 对「纯布局变化」（CSS class 切换）不刷新合成帧，
+    // 只会拍到上一帧，反而误导。折叠后的宽度/标签可见性是直接在 DOM 上量的，更可信。
+    const navResume = await guarded(`(async () => {
+      const steps = smokeSteps();
+      const toggle = document.querySelector('.nav-toggle');
+      toggle.click();
+      await new Promise(r => setTimeout(r, 300));
+      const el = document.querySelector('.nav-item .nav-label');
+      const s = await window.omnia.meta.settings();
+      const w = Math.round(document.querySelector('.sidebar').getBoundingClientRect().width);
+      steps.push('再展开 侧栏=' + w + 'px 标签可见=' + !!(el && el.getBoundingClientRect().width > 0)
+        + ' 落库 navCollapsed=' + JSON.stringify(s.data.navCollapsed));
+      return {
+        ok: w > 180 && !!(el && el.getBoundingClientRect().width > 0) && s.data.navCollapsed === '0',
+        steps,
+      };
+    })()`, '探针11b');
+    for (const s of navResume.steps) log('[smoke] 首页:', s);
+    guide.ok = guide.ok && navResume.ok;
     log('[smoke] 首页立绘与导航    :', guide.ok ? 'PASS' : 'FAIL');
+    await shot('nav-collapsed');
 
     // 评分引擎（M1）：口径来自规则中心；验证分解合计、封顶、幂等、改规则会改分
     const scoring = await guarded(`(async () => {
@@ -1460,6 +1510,9 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     }
 
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
+    // 另加一条回归断言：12 个职业必须各有一张**互不相同**的图标 —— 原表里惊鸿和妙音
+    // 共用同一张图，界面上看起来就是"两个职业图标一样"，这种缺陷不该再溜回来。
+    const iconMap = CLASSES.map((c) => ({ name: c.name, file: classIconFile(c.name) }));
     const iconProbe = await guarded(`(async () => {
       const base = (document.baseURI || '').replace(/index\\.html.*$/, '');
       const probe = (file) => new Promise((resolve) => {
@@ -1468,9 +1521,9 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         img.onerror = () => resolve({ file, ok: false, w: 0 });
         img.src = base + 'class-icons/' + file;
       });
-      const results = await Promise.all([
-        probe('image4.png'), probe('image11.png'), probe('image2.png'),
-      ]);
+      const all = ${JSON.stringify(iconMap.map((x) => x.file).filter(Boolean))};
+      const results = [];
+      for (const f of all) results.push(await probe(f));
 
       // 种一个带主职业的成员，切到成员主档页，确认职业图标真的渲染成 DOM
       const made = await window.omnia.player.create({ gameId: '__icon_probe__', name: '图标探针', mainClass: '素问' });
@@ -1485,11 +1538,16 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     })()`, '探针12');
     type IconProbe = { base: string; results: { file: string; ok: boolean; w: number }[]; dom: number; firstSrc: string };
     const icons = ((iconProbe.value as IconProbe | undefined) ?? { base: '', results: [], dom: 0, firstSrc: '' });
-    const iconOk = icons.results.length > 0
-      && icons.results.every((x) => x.ok) && icons.dom > 0;
+    const missing = iconMap.filter((x) => !x.file).map((x) => x.name);
+    const fileCount = new Set(iconMap.map((x) => x.file)).size;
+    const allDistinct = missing.length === 0 && fileCount === CLASSES.length;
+    const iconOk = icons.results.length === CLASSES.length
+      && icons.results.every((x) => x.ok) && icons.dom > 0 && allDistinct;
     log('[smoke] M8 图标 base       :', icons.base);
-    log('[smoke] M8 图标加载        :', iconOk ? 'PASS' : 'FAIL',
+    log('[smoke] M8 图标加载        :', icons.results.every((x) => x.ok) && icons.results.length === CLASSES.length ? 'PASS' : 'FAIL',
       icons.results.map((x) => `${x.file}:${x.ok ? x.w + 'px' : '失败'}`).join(' '));
+    log('[smoke] M8 图标一一对应    :', allDistinct ? 'PASS' : 'FAIL',
+      `缺失=[${missing.join(',')}] 不同图标=${fileCount}/${CLASSES.length}`);
     log('[smoke] M8 页面渲染图标    :', icons.dom, '个，首个 src =', icons.firstSrc);
 
     const pass =

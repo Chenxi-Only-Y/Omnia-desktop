@@ -24,6 +24,7 @@ declare global {
       meta: {
         classes(): Promise<IpcResult<ClassInfo[]>>;
         settings(): Promise<IpcResult<Record<string, string>>>;
+        setSetting(key: string, value: string): Promise<IpcResult<true>>;
         squads(): Promise<IpcResult<SquadCatalog>>;
         createGroup(input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
         removeGroup(id: number): Promise<IpcResult<true>>;

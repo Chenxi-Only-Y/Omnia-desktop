@@ -597,6 +597,8 @@ export interface OmniaApi {
   meta: {
     classes(): Promise<IpcResult<ClassInfo[]>>;
     settings(): Promise<IpcResult<AppSettings>>;
+    /** 写单个设置项（导航栏折叠状态之类的界面偏好） */
+    setSetting(key: string, value: string): Promise<IpcResult<true>>;
     /** 战斗组 / 小队建制（可新增） */
     squads(): Promise<IpcResult<SquadCatalog>>;
     createGroup(input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
@@ -674,6 +676,7 @@ export const IPC = {
   playerDetail: 'player:detail',
   metaClasses: 'meta:classes',
   metaSettings: 'meta:settings',
+  metaSettingSet: 'meta:setting:set',
   metaSquads: 'meta:squads',
   metaGroupCreate: 'meta:group:create',
   metaGroupRemove: 'meta:group:remove',

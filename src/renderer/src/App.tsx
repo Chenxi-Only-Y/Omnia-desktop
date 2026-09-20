@@ -36,6 +36,8 @@ export default function App() {
   const [playerCount, setPlayerCount] = useState<number | null>(null);
   /** 在成员主档里点开的成员详情 */
   const [detailId, setDetailId] = useState<number | null>(null);
+  /** 侧栏折叠：偏好存进库（app_setting），下次打开保持原样 */
+  const [navOpen, setNavOpen] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -47,13 +49,26 @@ export default function App() {
       } catch (err) {
         setBootError(err instanceof ApiError ? err.message : String(err));
       }
+      // 界面偏好读不到不算致命，静默用默认值（展开）
+      try {
+        const s = await api.meta.settings();
+        if (s.navCollapsed === '1') setNavOpen(false);
+      } catch { /* 忽略 */ }
     })();
   }, []);
+
+  const toggleNav = () => {
+    setNavOpen((open) => {
+      const next = !open;
+      void api.meta.setSetting('navCollapsed', next ? '0' : '1').catch(() => {});
+      return next;
+    });
+  };
 
   const props: PageProps = { classes, classMap };
 
   return (
-    <div className="app">
+    <div className={`app${navOpen ? ' nav-open' : ' nav-collapsed'}`}>
       <aside className="sidebar">
         <div className="brand">
           <h1>万象<span className="dot-sep">·</span>Omnia</h1>
@@ -67,9 +82,11 @@ export default function App() {
               key={n.key}
               className={`nav-item${page === n.key ? ' active' : ''}`}
               onClick={() => setPage(n.key)}
+              title={navOpen ? undefined : n.label}
+              aria-label={n.label}
             >
               <span className="ico">{n.icon}</span>
-              <span>{n.label}</span>
+              <span className="nav-label">{n.label}</span>
               {!n.ready && <span className="badge">待接入</span>}
             </button>
           ))}
@@ -78,6 +95,15 @@ export default function App() {
 
       <main className="main">
         <header className="topbar">
+          <button
+            className="btn ghost icon-btn nav-toggle"
+            onClick={toggleNav}
+            title={navOpen ? '收起导航栏' : '展开导航栏'}
+            aria-label={navOpen ? '收起导航栏' : '展开导航栏'}
+            aria-expanded={navOpen}
+          >
+            {navOpen ? '«' : '☰'}
+          </button>
           <h2>{NAV.find((n) => n.key === page)?.label}</h2>
           <div className="spacer" />
           {playerCount !== null && <span className="meta">成员 {playerCount} 人</span>}

@@ -1393,7 +1393,13 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const noteEl = document.querySelector('.pcard__note');
       const fs = (el) => (el ? getComputedStyle(el).fontSize : '（无）');
       steps.push('字号实测 ID=' + fs(idEl) + ' 职业=' + fs(clsEl) + ' 备注=' + fs(noteEl)
-        + '（应为 22px / 13px / 15px）');
+        + '（应为 28px / 17px / 15px）');
+      // 内容有没有被卡片裁掉：三个子元素的高度之和 vs 卡片可用高度
+      const inner = (el) => (el ? Math.round(el.getBoundingClientRect().height) : 0);
+      const need = inner(idEl) + inner(clsEl) + inner(noteEl);
+      const avail = cardBox.h - 12;   // 卡片上下 padding 各 6
+      steps.push('内容高度=' + need + ' 卡片可用高=' + avail
+        + ' 会不会被裁=' + (need > avail));
       steps.push('一队=' + rowBox.w + 'x' + rowBox.h + ' 每行卡片数=' + cardsPerRow
         + ' 队名列=' + headBox.w);
       steps.push('看板=' + boardBox.w + 'x' + boardBox.h
@@ -1435,10 +1441,11 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     // 三行字号必须正好是用户指定的 22 / 13 / 15 ——
     // 之前两条 .pcard__note 规则同名覆盖，把 15px 悄悄改成 10px，靠这条断言才抓住
     {
-      const f = (geom.value as { fonts?: { id: string; cls: string; note: string } } | undefined)?.fonts;
-      const fontsOk = f?.id === '22px' && f?.cls === '13px' && f?.note === '15px';
+      const g = geom.value as { fonts?: { id: string; cls: string; note: string } } | undefined;
+      const f = g?.fonts;
+      const fontsOk = f?.id === '28px' && f?.cls === '17px' && f?.note === '15px';
       if (!fontsOk) log('[smoke] 排表字号            : FAIL', JSON.stringify(f));
-      else log('[smoke] 排表字号            : PASS ID=22px 职业=13px 备注=15px');
+      else log('[smoke] 排表字号            : PASS ID=28px 职业=17px 备注=15px');
       geom.ok = geom.ok && fontsOk;
     }
     await shot('lineup', 900);

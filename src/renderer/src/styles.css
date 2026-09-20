@@ -382,14 +382,34 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .half__row { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
 .half__group { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
 
+/* 两个半区之间的中缝：固定 344px 宽（用户口径）。
+   放图片时**横向铺满优先**：object-fit:cover 会等比放大铺满，
+   超出的部分裁掉；不设 background 之外的重复，少的地方由容器底色补。
+   flex:0 0 344px 防止被 flex 收缩（之前 44px 被压成 31px）。 */
 .board__divider {
-  align-self: stretch; width: 44px; display: flex; align-items: center; justify-content: center;
-  background: var(--surface-2); border-radius: 6px;
+  align-self: stretch; flex: 0 0 344px; width: 344px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border-radius: 6px; overflow: hidden;
 }
-.board__divider--thin { width: 12px; }
+.board__divider--thin { flex: 0 0 12px; width: 12px; }
+
+/* 中缝图片：横向铺满，超出裁剪（用户口径） */
+.board__divider-img {
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  display: block;
+}
+
 .board__calligraphy {
   writing-mode: vertical-rl; font-size: 20px; letter-spacing: 10px;
   color: var(--fg); opacity: .38; font-family: "KaiTi", "STKaiti", serif;
+}
+
+/* 设置页里的中缝图片预览：按实际显示比例（344 宽）给个示意 */
+.divider-preview { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
+.divider-preview img {
+  width: 120px; max-height: 271px; object-fit: cover;
+  border: 1px solid var(--line-strong); border-radius: 6px; display: block;
 }
 
 /* 一支小队 = 一整行：队名 + 6 张卡片横排铺开，卡片撑满整行宽度 */

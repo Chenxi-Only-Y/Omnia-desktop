@@ -1493,6 +1493,75 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const clsEl = document.querySelector('.pcard__cls');
       const noteEl = document.querySelector('.pcard__note');
       const fs = (el) => (el ? getComputedStyle(el).fontSize : '（无）');
+      const fw = (el) => (el ? getComputedStyle(el).fontWeight : '');
+      // 排表功能区各处的字号全量实测（用户问"各个卡片字号多少"，不凭记忆答）
+      const probe = (sel) => {
+        const el = document.querySelector(sel);
+        return el ? (getComputedStyle(el).fontSize + '/' + getComputedStyle(el).fontWeight) : '（无）';
+      };
+      steps.push('字号全览（字号/字重）:'        + ' 队名=' + probe('.squadrow__name')
+        + ' 人数=' + probe('.squadrow__count')
+        + ' 战术=' + probe('.squadrow__tactic--edit')
+        + ' 组名=' + probe('.half__groupname')
+        + ' 加一队=' + probe('.half__addbtn')
+        + ' ID=' + probe('.pcard__id')
+        + ' 职业=' + probe('.pcard__cls')
+        + ' 备注=' + probe('.pcard__note')
+        + ' 空位=' + probe('.pcard__empty')
+        + ' 未分配标题=' + probe('.board__unassigned-title')
+        + ' 未分配chip=' + probe('.board__chip'));
+      // 尺寸全览：卡片（已填/空位）、队名列、小队行、组间距
+      const box = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return '（无）';
+        const b = el.getBoundingClientRect();
+        return Math.round(b.width) + 'x' + Math.round(b.height);
+      };
+      steps.push('尺寸全览:'
+        + ' 卡片(已填)=' + box('.pcard:not(.pcard--empty)')
+        + ' 卡片(空位)=' + box('.pcard--empty')
+        + ' 队名列=' + box('.squadrow__head')
+        + ' 小队行=' + box('.squadrow')
+        + ' 卡片区=' + box('.squadrow__cards')
+        + ' 卡片间距=' + (() => {
+          const c = document.querySelectorAll('.squadrow__cards > *');
+          if (c.length < 2) return '?';
+          const a = c[0].getBoundingClientRect(); const b2 = c[1].getBoundingClientRect();
+          return Math.round(b2.left - a.right) + 'px';
+        })());
+      // 两个半区中间的分隔（默认竖排「万象」；设了 dividerImage 就显示图片）
+      const dv = document.querySelector('.board__divider');
+      if (dv) {
+        const db = dv.getBoundingClientRect();
+        const dc = getComputedStyle(dv);
+        const cal = dv.querySelector('.board__calligraphy');
+        const cc = cal ? getComputedStyle(cal) : null;
+        steps.push('中缝分隔: ' + Math.round(db.width) + 'x' + Math.round(db.height)
+          + ' 背景=' + dc.backgroundColor + ' 圆角=' + dc.borderRadius
+          + '（宽度应为 344）'
+          + ' ｜ 书法字=' + (cc ? (cc.fontSize + ' ' + cc.fontFamily.split(',')[0] + ' 颜色=' + cc.color
+            + ' 透明度=' + cc.opacity + ' 书写方向=' + cc.writingMode + ' 字距=' + cc.letterSpacing) : '（未显示）'));
+        // 中缝图片：设了 dividerImage 后应渲染 <img> 且 object-fit:cover（横向铺满裁剪）
+        // 注意：探针里没有组件内的 api 变量，必须用 window.omnia
+        const savedOld = await window.omnia.meta.settings();
+        const prev = savedOld.data.dividerImage ?? '';
+        const px = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        await window.omnia.meta.setSetting('dividerImage', px);
+        // 用同一事件通知看板（与设置页选图后的路径一致），不必切页重挂载
+        window.dispatchEvent(new CustomEvent('omnia:divider-image', { detail: px }));
+        await new Promise(r => setTimeout(r, 400));
+        const imgEl = document.querySelector('.board__divider-img');
+        const ic = imgEl ? getComputedStyle(imgEl) : null;
+        const ib = imgEl ? imgEl.getBoundingClientRect() : null;
+        steps.push('中缝图片: 渲染=' + !!imgEl
+          + ' object-fit=' + (ic ? ic.objectFit : '（无）')
+          + ' 显示尺寸=' + (ib ? Math.round(ib.width) + 'x' + Math.round(ib.height) : '（无）')
+          + '（fit 应为 cover；宽应为 344）');
+        await window.omnia.meta.setSetting('dividerImage', prev);   // 还原
+        await new Promise(r => setTimeout(r, 300));
+      } else {
+        steps.push('中缝分隔: 未渲染');
+      }
       steps.push('字号实测 ID=' + fs(idEl) + ' 职业=' + fs(clsEl) + ' 备注=' + fs(noteEl)
         + '（应为 25px / 15px / 17px）');
       // 内容有没有被卡片裁掉：三个子元素的高度之和 vs 卡片可用高度

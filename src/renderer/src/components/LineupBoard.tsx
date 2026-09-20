@@ -12,11 +12,12 @@
  *
  * 建制仍完全数据驱动：战斗组与小队的名称、归属、战术、人数都来自数据库。
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
 import { classIconSrc } from '../lib/assets';
 import { TACTICS } from '@shared/domain';
+import { api } from '../api';
 
 interface Props extends PageProps {
   rows: ParticipationRow[];
@@ -71,6 +72,19 @@ export default function LineupBoard({
   /** 当前悬停的小队名 / 是否悬停在未分配区 */
   const [hoverSquad, setHoverSquad] = useState<string | null>(null);
   const [hoverUnassign, setHoverUnassign] = useState(false);
+  /** 半区中缝的图片（存 app_setting.dividerImage，dataURL）。为空则显示竖排「万象」 */
+  const [dividerImage, setDividerImage] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    void api.meta.settings()
+      .then((s) => { if (alive) setDividerImage(s.dividerImage ?? ''); })
+      .catch(() => { /* 读不到就用默认书法字 */ });
+    // 在设置页选完图后立刻生效（否则要切页重新挂载才看得到）
+    const onSet = (e: Event) => setDividerImage(String((e as CustomEvent).detail ?? ''));
+    window.addEventListener('omnia:divider-image', onSet);
+    return () => { alive = false; window.removeEventListener('omnia:divider-image', onSet); };
+  }, []);
 
   /** 小队名 → 已排入的队员（按加入顺序） */
   const bySquad = useMemo(() => {
@@ -145,7 +159,9 @@ export default function LineupBoard({
                   draggingIds={dragIds.current} />
           )}
           <div className="board__divider" aria-hidden="true">
-            <span className="board__calligraphy">万象</span>
+            {dividerImage
+              ? <img className="board__divider-img" src={dividerImage} alt="" />
+              : <span className="board__calligraphy">万象</span>}
           </div>
           {attackGroups.length > 0 && (
             <Half title="进攻半区" groups={attackGroups} squads={squads} bySquad={bySquad}

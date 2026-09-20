@@ -4,6 +4,9 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { TACTICS } from '@shared/domain';
 
+/** 中缝图片上限：会存成 dataURL 进 app_setting，太大既慢又占库，这里挡一下 */
+const DIVIDER_IMAGE_MAX_MB = 3;
+
 interface Props extends PageProps {
   info: AppInfo | null;
 }
@@ -13,6 +16,36 @@ export default function SettingsPage({ info }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newGroup, setNewGroup] = useState({ name: '', kind: 'attack' as 'attack' | 'defend' });
+  /** 半区中缝图片（dataURL）；空 = 显示默认的竖排「万象」 */
+  const [dividerImage, setDividerImage] = useState('');
+
+  useEffect(() => {
+    void api.meta.settings()
+      .then((s) => setDividerImage(s.dividerImage ?? ''))
+      .catch(() => { /* 读不到就保持默认 */ });
+  }, []);
+
+  /** 选图片 → 读成 dataURL → 存进 app_setting（渲染时 object-fit:cover 横向铺满裁剪） */
+  function pickDividerImage(file: File | undefined) {
+    if (!file) return;
+    if (file.size > DIVIDER_IMAGE_MAX_MB * 1024 * 1024) {
+      setNotice(null);
+      setError(`图片太大（${(file.size / 1024 / 1024).toFixed(1)}MB），请控制在 ${DIVIDER_IMAGE_MAX_MB}MB 以内`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result ?? '');
+      void run(() => api.meta.setSetting('dividerImage', url), '中缝图片已更新（回「排表」查看）')
+        .then(() => {
+          setDividerImage(url);
+          // 通知正在挂载的看板立刻换图（否则要切页重新挂载才生效）
+          window.dispatchEvent(new CustomEvent('omnia:divider-image', { detail: url }));
+        });
+    };
+    reader.onerror = () => setError('读取图片失败');
+    reader.readAsDataURL(file);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -175,6 +208,40 @@ export default function SettingsPage({ info }: Props) {
           与旧表互通：成员主档在「成员主档 → 导入 CSV / JSON」，战报在「对局与战报 → 批量导入战报」里粘贴 Excel 区域或选文件。
           旧表 xlsx 可直接读取（表头不在第一行时用 headerRow 指定，命令行见 README）。
         </div>
+      </div>
+
+      <div className="card">
+        <h3>排表 · 半区中缝</h3>
+        <div className="toolbar">
+          <label className="btn" style={{ cursor: 'pointer' }}>
+            选择图片
+            <input type="file" accept="image/*" style={{ display: 'none' }}
+                   onChange={(e) => { pickDividerImage(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          {dividerImage && (
+            <button className="btn danger" onClick={() => {
+              void run(
+                () => api.meta.setSetting('dividerImage', ''), '已恢复默认（竖排「万象」）',
+              ).then(() => {
+                setDividerImage('');
+                window.dispatchEvent(new CustomEvent('omnia:divider-image', { detail: '' }));
+              });
+            }}>
+              清除图片
+            </button>
+          )}
+          <span className="hint" style={{ margin: 0 }}>
+            固定 344px 宽；**横向铺满优先** —— 比例不符时等比放大铺满、超出部分裁掉，
+            不够的地方由底色补。建议竖图（宽高比 ≈ 344:778）。
+            上限 {DIVIDER_IMAGE_MAX_MB}MB。
+          </span>
+        </div>
+        {dividerImage && (
+          <div className="divider-preview">
+            <img src={dividerImage} alt="中缝预览" />
+            <span className="hint">预览（实际按 344px 宽横向铺满裁剪）</span>
+          </div>
+        )}
       </div>
     </>
   );

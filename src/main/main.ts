@@ -624,12 +624,49 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           cleared: a4?.slotNo === -1,
         };
         steps.push('判定=' + JSON.stringify(cond));
+
+        // 关键补充：**渲染位置**也要对 —— 光落库对不算，卡片必须出现在第 5 格。
+        // 之前就是只断言了 slotNo，没断言 DOM 位置，所以"点了没变"没被发现。
+        // 注意此队里还留着第 2 格的「落位乙」，所以已填格数应为 2。
+        await api.match.upsertParticipation({ matchId: mid, playerId: pid1, squad: '防守一-1', state: 'PLAY' });
+        await api.match.assignBulk({ matchId: mid, playerIds: [pid1], squad: '防守一-1', slotIndex: 4 });
+        const nav = [...document.querySelectorAll('button.nav-item')]
+          .find(x => x.textContent.indexOf('排表') >= 0);
+        if (nav) nav.click();
+        await new Promise(r => setTimeout(r, 900));
+        // 先看落库，再看渲染 —— 分清是"数据被改了"还是"渲染位置不对"
+        const parts2 = await api.match.participations(mid);
+        steps.push('落库复查：' + JSON.stringify(parts2.data.map(r => ({
+          name: r.name, slotNo: r.slotNo, squad: r.squad,
+        }))));
+        const row = [...document.querySelectorAll('.squadrow')].find(x => x.dataset.squad === '防守一-1');
+        if (!row) throw new Error('看板上找不到 防守一-1');
+        const cards = [...row.querySelectorAll('.squadrow__cards > *')];
+        const idxOf = (gid) => cards.findIndex(c => c.textContent.indexOf(gid) >= 0);
+        const filledCount = cards.filter(c => !c.classList.contains('pcard--empty')).length;
+        const dbA = parts2.data.find(r => r.name === '落位甲');
+        const dbB = parts2.data.find(r => r.name === '落位乙');
+        steps.push('渲染：共 ' + cards.length + ' 格；甲 落库 slot=' + dbA?.slotNo
+          + ' → 渲染第 ' + (idxOf('smoke_slot_1') + 1) + ' 格；乙 落库 slot=' + dbB?.slotNo
+          + ' → 渲染第 ' + (idxOf('smoke_slot_2') + 1) + ' 格；已填 ' + filledCount + ' 格');
+        // 不变量：渲染位置必须等于落库槽号（比写死 5/2 更可靠，不会被前置步骤影响）
+        cond.renderMatchesSlot = idxOf('smoke_slot_1') === dbA?.slotNo
+          && idxOf('smoke_slot_2') === dbB?.slotNo;
+        cond.gapsKept = filledCount === 2;          // 中间空格没被"挤过来"填满
+        cond.slot5Honoured = idxOf('smoke_slot_1') === 4;   // 点第 5 格就真的在第 5 格
+        steps.push('判定2=' + JSON.stringify({
+          renderMatchesSlot: cond.renderMatchesSlot,
+          gapsKept: cond.gapsKept,
+          slot5Honoured: cond.slot5Honoured,
+        }));
+        cond.ok = Object.values(cond).every(Boolean);
+
         // 自己造的数据自己清：不然会污染后面的 M6/拖拽/报名/评分等探针
         await api.match.remove(mid);
         await api.player.remove(pid1);
         await api.player.remove(pid2);
         steps.push('清理完成');
-        return { ok: Object.values(cond).every(Boolean), steps };
+        return { ok: cond.ok === true, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针4b');
     for (const s of slot.steps) log('[smoke] 落位:', s);

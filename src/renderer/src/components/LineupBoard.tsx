@@ -260,18 +260,21 @@ function SquadRowView({
   draggingIds: number[];
   onRemoveSquad?: (squadId: number, name: string) => void;
 }) {
-  const slots: (ParticipationRow | null)[] = [];
-  // 按落位槽号排（-1 = 未指定的排后面，保持原顺序），这样"点哪个空位就填哪个"
-  // 才对得上：比如点第 4 格加人，他就在第 4 格，而不是挤到最左边。
-  const ordered = [...members].sort((a, b) => {
-    const sa = a.slotNo ?? -1;
-    const sb = b.slotNo ?? -1;
-    if (sa < 0 && sb < 0) return 0;
-    if (sa < 0) return 1;
-    if (sb < 0) return -1;
-    return sa - sb;
-  });
-  for (let i = 0; i < squad.size; i++) slots.push(ordered[i] ?? null);
+  // 真正按格子落座：谁在第几格就渲染在第几格，**中间的空格留空**。
+  // 只按槽号排序是不够的 —— 那样人还是会从 0 号位连续铺开，
+  // 点第 5 格的人显示上仍被挤到前面（踩过一次）。
+  const ordered: (ParticipationRow | null)[] = new Array(squad.size).fill(null);
+  const noSlot: ParticipationRow[] = [];
+  for (const m of members) {
+    const s = m.slotNo ?? -1;
+    if (s >= 0 && s < squad.size && ordered[s] === null) ordered[s] = m;
+    else noSlot.push(m);      // 未指定格号 / 越界 / 同格冲突 → 顺次补进空格
+  }
+  let cursor = 0;
+  for (const m of noSlot) {
+    while (cursor < squad.size && ordered[cursor] !== null) cursor += 1;
+    if (cursor < squad.size) ordered[cursor] = m;
+  }
   const tone = squad.kind === 'defend' ? 'defend' : 'attack';
 
   return (
@@ -292,7 +295,7 @@ function SquadRowView({
         )}
       </div>
       <div className="squadrow__cards">
-        {slots.map((r, i) => (
+        {ordered.map((r, i) => (
           <PlayerCard key={i} row={r} slotIndex={i} squad={squad} classMap={classMap}
                       onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} onSkillNote={onSkillNote}
                       dragProps={dragProps} dragging={!!r && draggingIds.includes(r.playerId)} />

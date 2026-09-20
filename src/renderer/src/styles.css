@@ -440,7 +440,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* 没有职业（或未登记）时退回浅底深字 */
 .pcard--noclass { background: var(--surface-2); color: var(--text); }
 
-/* 三行字号（用户口径，绝对值）：ID 名 28px 加粗 / 技能备注 15px / 职业 17px。
+/* 三行字号（用户口径，绝对值）：ID 名 28px 加粗 / 技能备注 17px / 职业 15px。
    写死不用容器查询缩放 —— 用户给的是确定值，缩放会把它盖掉。 */
 .pcard__id {
   font-size: 28px; font-weight: 800; line-height: 1.1; letter-spacing: 0;
@@ -450,7 +450,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
 }
 .pcard__cls {
   display: flex; align-items: center; gap: 5px;
-  font-size: 17px; line-height: 1.2; opacity: .92; cursor: pointer;
+  font-size: 15px; line-height: 1.2; opacity: .92; cursor: pointer;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
@@ -475,7 +475,7 @@ textarea.input { resize: vertical; line-height: 1.5; }
   margin-top: auto; width: 100%; box-sizing: border-box;
   background: transparent; border: 0; border-bottom: 1px solid transparent;
   border-radius: 0; padding: 1px 0 2px;
-  font-size: 15px; line-height: 1.25; color: inherit;
+  font-size: 17px; line-height: 1.25; color: inherit;
   cursor: text; font-family: inherit;
 }
 .pcard__note::placeholder { color: currentColor; opacity: .42; }

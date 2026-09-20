@@ -1360,6 +1360,13 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const head = document.querySelector('.squadrow__head');
       const headBox = head ? r(head) : { w: 0, h: 0 };
       steps.push('卡片=' + cardBox.w + 'x' + cardBox.h + ' 比例=' + ratio + '（16:9=1.778）');
+      // 实测三行字号（计算值），确认 CSS 真的生效、没被别处盖掉
+      const idEl = document.querySelector('.pcard__id');
+      const clsEl = document.querySelector('.pcard__cls');
+      const noteEl = document.querySelector('.pcard__note');
+      const fs = (el) => (el ? getComputedStyle(el).fontSize : '（无）');
+      steps.push('字号实测 ID=' + fs(idEl) + ' 职业=' + fs(clsEl) + ' 备注=' + fs(noteEl)
+        + '（应为 22px / 13px / 15px）');
       steps.push('一队=' + rowBox.w + 'x' + rowBox.h + ' 每行卡片数=' + cardsPerRow
         + ' 队名列=' + headBox.w);
       steps.push('看板=' + boardBox.w + 'x' + boardBox.h
@@ -1395,9 +1402,18 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const needH = rowsPerHalf * rowBox.h + rowsPerHalf * 8;
       steps.push('单半区需要高度≈' + needH + ' 可用高度≈' + contentBox.h
         + ' 装得下=' + (needH <= contentBox.h));
-      return { ok: true, steps, value: { cardBox, rowBox, boardBox, contentBox, scrollBox, halvesBox, rows } };
+      return { ok: true, steps, value: { cardBox, rowBox, boardBox, contentBox, scrollBox, halvesBox, rows, fonts: { id: fs(idEl), cls: fs(clsEl), note: fs(noteEl) } } };
     })()`, '探针11d');
     for (const s of geom.steps) log('[smoke] 排表尺寸:', s);
+    // 三行字号必须正好是用户指定的 22 / 13 / 15 ——
+    // 之前两条 .pcard__note 规则同名覆盖，把 15px 悄悄改成 10px，靠这条断言才抓住
+    {
+      const f = (geom.value as { fonts?: { id: string; cls: string; note: string } } | undefined)?.fonts;
+      const fontsOk = f?.id === '22px' && f?.cls === '13px' && f?.note === '15px';
+      if (!fontsOk) log('[smoke] 排表字号            : FAIL', JSON.stringify(f));
+      else log('[smoke] 排表字号            : PASS ID=22px 职业=13px 备注=15px');
+      geom.ok = geom.ok && fontsOk;
+    }
     await shot('lineup', 900);
     // 前面几个探针会切页，等排表页真正画出来再截第二张（截图只信合成帧，必须留足时间）
     await guarded(`(async () => {
@@ -1751,7 +1767,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
-      && scoring.ok === true && season.ok === true && iconOk && lineup.ok === true && r.schemaVersion >= 6;
+      && scoring.ok === true && season.ok === true && iconOk && lineup.ok === true
+      && geom.ok === true && r.schemaVersion >= 6;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

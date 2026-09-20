@@ -1,10 +1,9 @@
 [smoke] schema 版本        : 6 （迁移应已跑到最新）
-[smoke] 截图: D:\AI\ds.5\lis-desktop\dev-data\shots\overview.png 2139x1325
 [smoke] preload 注入        : true
 [smoke] app.info()         : true
 [smoke] meta.classes() 数量 : 12
 [smoke] player.list() 数量  : 0
-[smoke] React 已渲染字符数  : 5123
+[smoke] React 已渲染字符数  : 5490
 [smoke] 错误                : 无
 [smoke] CRUD: create ok id=1 class=神相
 [smoke] CRUD: update ok sub=潮光 remark=自检写入
@@ -107,6 +106,9 @@
 [smoke] 规则集管理        : PASS
 [smoke] 首页: 首页立绘卡=2 尺寸=810x276 867x264
 [smoke] 首页: 导航里仍有「攻略」=false
+[smoke] 首页: 折叠前 侧栏=216px 标签可见=true grid=216px 1210px
+[smoke] 首页: 折叠后 侧栏=56px 标签可见=false nav-collapsed=true 落库 navCollapsed="1"
+[smoke] 首页: 再展开 侧栏=216px 标签可见=true 落库 navCollapsed="0"
 [smoke] 首页立绘与导航    : PASS
 [smoke] 评分: 使用中的规则=自检规则B v3
 [smoke] 评分: 参评人数=6 均分=83.28 区间=[71.81,94.39] 触顶=0
@@ -148,9 +150,9 @@
 [smoke] 赛季: 当前导航="⟳赛季" 卡片标题=当前赛季|赛季列表|历史对局归档
 [smoke] 赛季: 判定明细={"created":true,"dupBlocked":true,"emptyBlocked":true,"singleActive":true,"delActiveBlocked":true,"autoTaggedActive":true,"assigned":true,"counted":true,"unassignKeepsMatch":true,"ui":true}
 [smoke] 赛季模块          : PASS
-[smoke] 截图: D:\AI\ds.5\lis-desktop\dev-data\shots\season.png 2139x1325
 [smoke] M8 图标 base       : file:///D:/AI/ds.5/lis-desktop/release/win-unpacked/resources/app.asar/dist/renderer/
-[smoke] M8 图标加载        : PASS image4.png:108px image11.png:96px image2.png:102px
+[smoke] M8 图标加载        : PASS image4.png:108px image3.png:105px jinghong.png:105px image1.png:93px image11.png:96px image9.png:93px image5.png:143px image6.png:90px image10.png:101px image7.png:125px image8.png:101px image2.png:102px
+[smoke] M8 图标一一对应    : PASS 缺失=[] 不同图标=12/12
 [smoke] M8 页面渲染图标    : 2 个，首个 src = ./class-icons/image9.png
 [smoke] 写操作往返          : PASS
 [smoke] 结果                : PASS

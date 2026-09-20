@@ -454,10 +454,11 @@ textarea.input { resize: vertical; line-height: 1.5; }
   font-size: 13px; line-height: 1.25; opacity: .92; cursor: pointer;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
-/* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清 */
+/* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
+   尺寸要压得住 22px 的 ID 名，所以给到 22px；放大后仍靠托底与底色区分。 */
 .pcard__icon {
-  width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain;
-  background: rgba(255, 255, 255, .82); border-radius: 3px; padding: 1px;
+  width: 22px; height: 22px; flex: 0 0 auto; object-fit: contain;
+  background: rgba(255, 255, 255, .82); border-radius: 4px; padding: 1px;
   box-sizing: border-box;
 }
 

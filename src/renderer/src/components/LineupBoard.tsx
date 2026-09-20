@@ -16,6 +16,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
 import { classIconSrc } from '../lib/assets';
+import { TACTICS } from '@shared/domain';
 
 interface Props extends PageProps {
   rows: ParticipationRow[];
@@ -32,6 +33,8 @@ interface Props extends PageProps {
   onAddSquad?: (groupId: number) => void;
   /** 删掉某一队（有历史记录时后端会拒绝） */
   onRemoveSquad?: (squadId: number, name: string) => void;
+  /** 就地改战术（队名列里直接改） */
+  onChangeTactic?: (squadId: number, tactic: string) => void;
 }
 
 /** 拖拽携带的数据格式（自定义 MIME，避免和外部拖入的文件混淆） */
@@ -54,7 +57,7 @@ function readDrag(ev: React.DragEvent): DragPayload | null {
 
 export default function LineupBoard({
   rows, catalog, classMap, onPickSlot, onRemoveRow, onAssign, onUnassign, onSkillNote,
-  onAddSquad, onRemoveSquad,
+  onAddSquad, onRemoveSquad, onChangeTactic,
 }: Props) {
   // 上场的都看得到：只排除明确"替补/请假"的。
   // 注意不能写成 state === 'PLAY' —— 参战记录的 state 可能是空串（历史数据/未设置），
@@ -137,7 +140,7 @@ export default function LineupBoard({
             <Half title="防守半区" groups={defendGroups} squads={squads} bySquad={bySquad}
                   classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                   onSkillNote={onSkillNote}
-                  onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad}
+                  onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
                   dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
                   draggingIds={dragIds.current} />
           )}
@@ -148,7 +151,7 @@ export default function LineupBoard({
             <Half title="进攻半区" groups={attackGroups} squads={squads} bySquad={bySquad}
                   classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                   onSkillNote={onSkillNote}
-                  onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad}
+                  onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
                   dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
                   draggingIds={dragIds.current} />
           )}
@@ -190,7 +193,7 @@ export default function LineupBoard({
 
 function Half({
   title, groups, squads, bySquad, classMap, onPickSlot, onRemoveRow, onSkillNote,
-  dragProps, dropProps, hoverSquad, draggingIds, onAddSquad, onRemoveSquad,
+  dragProps, dropProps, hoverSquad, draggingIds, onAddSquad, onRemoveSquad, onChangeTactic,
 }: {
   title: string;
   groups: SquadCatalog['groups'];
@@ -208,6 +211,8 @@ function Half({
   onAddSquad?: (groupId: number) => void;
   /** 删掉某一队（有历史记录的会被后端拒绝） */
   onRemoveSquad?: (squadId: number, name: string) => void;
+  /** 就地改战术（队名列里直接改） */
+  onChangeTactic?: (squadId: number, tactic: string) => void;
 }) {
   return (
     <div className="half">
@@ -231,7 +236,7 @@ function Half({
               {list.map((s) => (
                 <SquadRowView key={s.id} squad={s} members={bySquad.get(s.name) ?? []}
                               classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
-                              onSkillNote={onSkillNote} onRemoveSquad={onRemoveSquad}
+                              onSkillNote={onSkillNote} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
                               dragProps={dragProps} dropProps={dropProps}
                               hovered={hoverSquad === s.name} draggingIds={draggingIds} />
               ))}
@@ -246,7 +251,7 @@ function Half({
 /** 一支小队 = 一整行：队名 + 6 张卡片横排铺开 */
 function SquadRowView({
   squad, members, classMap, onPickSlot, onRemoveRow, onSkillNote,
-  dragProps, dropProps, hovered, draggingIds, onRemoveSquad,
+  dragProps, dropProps, hovered, draggingIds, onRemoveSquad, onChangeTactic,
 }: {
   squad: SquadRow;
   members: ParticipationRow[];
@@ -259,6 +264,8 @@ function SquadRowView({
   hovered: boolean;
   draggingIds: number[];
   onRemoveSquad?: (squadId: number, name: string) => void;
+  /** 就地改战术（队名列里直接改） */
+  onChangeTactic?: (squadId: number, tactic: string) => void;
 }) {
   // 真正按格子落座：谁在第几格就渲染在第几格，**中间的空格留空**。
   // 只按槽号排序是不够的 —— 那样人还是会从 0 号位连续铺开，
@@ -286,7 +293,21 @@ function SquadRowView({
       <div className="squadrow__head">
         <span>{squad.name}</span>
         <span className="squadrow__count">{members.length}/{squad.size}</span>
-        {squad.tactic && <span className="squadrow__tactic">{squad.tactic}</span>}
+        {/* 战术直接就地可改：看起来就是一行字，点开才出现选项，不加额外控件 */}
+        {onChangeTactic ? (
+          <select
+            className="squadrow__tactic squadrow__tactic--edit"
+            value={squad.tactic || ''}
+            title="点击可直接改战术"
+            onChange={(e) => onChangeTactic(squad.id, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <option value="">未定</option>
+            {TACTICS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        ) : (
+          squad.tactic && <span className="squadrow__tactic">{squad.tactic}</span>
+        )}
         {onRemoveSquad && (
           <button className="squadrow__del" title={`删掉「${squad.name}」这一队（有历史记录时会被拒绝）`}
                   onClick={(e) => { e.stopPropagation(); onRemoveSquad(squad.id, squad.name); }}>

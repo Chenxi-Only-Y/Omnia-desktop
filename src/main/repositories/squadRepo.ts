@@ -12,6 +12,7 @@ import type {
   CombatGroupRow, GroupInput, SquadCatalog, SquadInput, SquadRow,
 } from '../../shared/types';
 import type { GroupKind, Tactic } from '../../shared/domain';
+import { TACTICS } from '../../shared/domain';
 
 interface GroupDbRow {
   id: number; name: string; kind: string; sort_order: number; remark: string;
@@ -133,6 +134,20 @@ export class SquadRepo {
    * （没有外键约束），直接删会让历史战报里的队名变成"查不到的孤儿"，
    * 看板与评分的小队维度都会对不上。要删先把该队的人移走/清掉历史。
    */
+  /** 只改战术（排表页队名列里直接改），不碰名称/人数/归属 */
+  setTactic(id: number, tactic: string): SquadRow {
+    const t = (tactic ?? '').trim();
+    if (t && !(TACTICS as readonly string[]).includes(t)) {
+      throw new Error(`未知战术：${t}（可选：${TACTICS.join(' / ')}）`);
+    }
+    const info = this.db.prepare('UPDATE squad SET tactic = ? WHERE id = ?').run(t, id);
+    if (!info.changes) throw new Error(`小队不存在：id=${id}`);
+    const row = this.db.prepare(
+      `SELECT s.*, g.name AS group_name, g.kind FROM squad s
+       JOIN combat_group g ON g.id = s.group_id WHERE s.id = ?`,
+    ).get(id) as unknown as SquadDbRow;
+    return toSquad(row);
+  }
   removeSquad(id: number): boolean {
     const s = this.db.prepare('SELECT name FROM squad WHERE id = ?').get(id) as { name: string } | undefined;
     if (!s) return false;

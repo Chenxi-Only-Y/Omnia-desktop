@@ -31,6 +31,7 @@ declare global {
         createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
         appendSquad(groupId: number): Promise<IpcResult<SquadRow>>;
         removeSquad(id: number): Promise<IpcResult<true>>;
+        setSquadTactic(id: number, tactic: string): Promise<IpcResult<SquadRow>>;
         xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
         xlsxGrid(data: Uint8Array, sheet: string | number, headerRow?: number): Promise<IpcResult<SheetGrid>>;
       };

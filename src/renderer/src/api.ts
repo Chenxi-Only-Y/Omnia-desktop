@@ -45,6 +45,8 @@ export const api = {
     createSquad: (input: SquadInput): Promise<SquadRow> => unwrap(bridge().meta.createSquad(input)),
     appendSquad: (groupId: number): Promise<SquadRow> => unwrap(bridge().meta.appendSquad(groupId)),
     removeSquad: (id: number): Promise<true> => unwrap(bridge().meta.removeSquad(id)),
+    setSquadTactic: (id: number, tactic: string): Promise<SquadRow> =>
+      unwrap(bridge().meta.setSquadTactic(id, tactic)),
     xlsxSheets: (data: Uint8Array): Promise<SheetList> => unwrap(bridge().meta.xlsxSheets(data)),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number): Promise<SheetGrid> =>
       unwrap(bridge().meta.xlsxGrid(data, sheet, headerRow)),

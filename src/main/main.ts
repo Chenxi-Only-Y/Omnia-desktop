@@ -542,8 +542,11 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const icons = document.querySelectorAll('.pcard__icon').length;
         const named = document.querySelectorAll('.pcard__id').length;
         const notes = document.querySelectorAll('.pcard__note').length;
+        // 战术就地可改：队名列里应渲染出 select（外观与普通文字一致，不加额外控件）
+        const tacticSelects = document.querySelectorAll('.squadrow__tactic--edit').length;
+        const tacticOpts = document.querySelectorAll('.squadrow__tactic--edit option').length;
         steps.push('看板渲染小队行=' + blocks + ' 含职业图标=' + icons + ' 有 ID 名=' + named
-          + ' 技能备注输入框=' + notes);
+          + ' 技能备注输入框=' + notes + ' 战术可改下拉=' + tacticSelects + ' 选项数=' + tacticOpts);
         steps.push('小队名（前5）=' + teamNames.slice(0, 5).join(','));
         const hasTarget = teamNames.includes('防守一-1');
         // 别名写进去的那个人也必须落在「防守一-2」同一行里，而不是另起一行

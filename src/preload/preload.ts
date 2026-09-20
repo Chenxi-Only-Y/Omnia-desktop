@@ -38,6 +38,7 @@ const api = {
     createSquad: (input: SquadInput) => invoke('meta:squad:create', input),
     appendSquad: (groupId: number) => invoke('meta:squad:append', groupId),
     removeSquad: (id: number) => invoke('meta:squad:remove', id),
+    setSquadTactic: (id: number, tactic: string) => invoke('meta:squad:tactic', id, tactic),
     xlsxSheets: (data: Uint8Array) => invoke('meta:xlsx:sheets', data),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number) =>
       invoke('meta:xlsx:grid', data, sheet, headerRow),

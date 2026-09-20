@@ -621,6 +621,8 @@ export interface OmniaApi {
     /** 给某组再加一队（序号自动取组内最大 +1，所以能加到「防守一-5」） */
     appendSquad(groupId: number): Promise<IpcResult<SquadRow>>;
     removeSquad(id: number): Promise<IpcResult<true>>;
+    /** 只改某小队的战术（塔后拆/塔前拆/保镖/防守），不碰名称与人数 */
+    setSquadTactic(id: number, tactic: string): Promise<IpcResult<SquadRow>>;
     /** 读取 xlsx：先列工作表，再取某个工作表的网格与表头探测 */
     xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
     xlsxGrid(data: Uint8Array, sheet: string | number, headerRow?: number): Promise<IpcResult<SheetGrid>>;
@@ -701,6 +703,7 @@ export const IPC = {
   metaSquadCreate: 'meta:squad:create',
   metaSquadAppend: 'meta:squad:append',
   metaSquadRemove: 'meta:squad:remove',
+  metaSquadTactic: 'meta:squad:tactic',
   metaXlsxSheets: 'meta:xlsx:sheets',
   metaXlsxGrid: 'meta:xlsx:grid',
 

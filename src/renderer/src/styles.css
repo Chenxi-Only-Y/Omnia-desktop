@@ -414,6 +414,22 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .squadrow__count { font-size: 9px; font-weight: 400; color: var(--text-faint); }
 .squadrow__tactic { font-size: 9px; font-weight: 400; color: var(--text-faint); }
 
+/* 可直接改的战术：外观与普通文字一致（无边框无背景），点开才出现下拉。
+   不加任何额外按钮/图标 —— 用户口径"不要额外添加什么"。 */
+.squadrow__tactic--edit {
+  appearance: none; -webkit-appearance: none;
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  color: var(--text-faint); font-family: inherit; font-size: 9px; font-weight: 400;
+  text-align: center; text-align-last: center; padding: 0 2px; max-width: 100%;
+  cursor: pointer;
+}
+.squadrow__tactic--edit:hover {
+  border-color: var(--line-strong); background: var(--surface-2); color: var(--text);
+}
+.squadrow__tactic--edit:focus {
+  outline: none; border-color: var(--fg); background: var(--surface); color: var(--text);
+}
+
 .squadrow__cards { display: flex; gap: 3px; flex: 1 1 auto; }
 
 /* 队员卡片：16:9 横版圆角矩形，底色 = 职业色（内联）。

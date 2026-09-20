@@ -166,8 +166,19 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
             {missingSlots > 0 ? ` · 还空 ${missingSlots}` : ' · 已排满'}
           </div>
           <div style={{ flex: 1 }} />
+          <button className="btn" onClick={() => setShowAdd((v) => !v)}>
+            {showAdd ? '收起' : '添加队员'}
+          </button>
           <button className="btn" onClick={() => void loadMatches()}>刷新场次</button>
         </div>
+        {showAdd && (
+          <AddPlayerPicker
+            roster={roster}
+            existing={new Set(our.map((r) => r.playerId))}
+            classMap={classMap}
+            onPick={(id) => { void addPlayer(id); }}
+          />
+        )}
       </div>
 
       <div className="card card--fill" style={{ padding: '12px 14px' }}>
@@ -194,6 +205,9 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           onRemoveSquad={(squadId, name) => void run(
             () => api.meta.removeSquad(squadId), `已删掉「${name}」`,
           )}
+          onChangeTactic={(squadId, tactic) => void run(
+            () => api.meta.setSquadTactic(squadId, tactic), `战术已改为「${tactic || '未定'}」`,
+          )}
         />
       </div>
 
@@ -211,22 +225,6 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           }}
         />
       )}
-
-      <div className="card">
-        <div className="toolbar" style={{ marginBottom: 0 }}>
-          <button className="btn primary" onClick={() => setShowAdd(!showAdd)}>
-            {showAdd ? '收起' : '添加队员'}
-          </button>
-        </div>
-        {showAdd && (
-          <AddPlayerPicker
-            roster={roster}
-            existing={new Set(our.map((r) => r.playerId))}
-            classMap={classMap}
-            onPick={(id) => { void addPlayer(id); }}
-          />
-        )}
-      </div>
     </div>
   );
 }

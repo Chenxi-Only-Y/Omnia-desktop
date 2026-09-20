@@ -329,6 +329,17 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   setError(err instanceof ApiError ? err.message : String(err));
                 }
               }}
+              onChangeTactic={async (squadId, tactic) => {
+                try {
+                  await api.meta.setSquadTactic(squadId, tactic);
+                  setNotice(`战术已改为「${tactic || '未定'}」`);
+                  setError(null);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
               onRemoveSquad={async (squadId, name) => {
                 try {
                   await api.meta.removeSquad(squadId);

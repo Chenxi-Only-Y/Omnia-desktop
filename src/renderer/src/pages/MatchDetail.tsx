@@ -439,7 +439,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   const isDirty = dirty.has(r.id);
                   const eff = deriveEffective(st);
                   return (
-                    <tr key={r.id} style={isDirty ? { background: '#232c3a' } : undefined}>
+                    <tr key={r.id} style={isDirty ? { background: 'var(--accent-soft)' } : undefined}>
                       <td>
                         {r.name}
                         {isDirty && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>•</span>}

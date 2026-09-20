@@ -63,7 +63,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
   if (!detail) return <div className="card"><div className="hint">加载中…</div></div>;
 
   const { player, totals, radar, teamAverage } = detail;
-  const clsColor = classMap.get(player.mainClass)?.color ?? '#2BCBFF';
+  const clsColor = classMap.get(player.mainClass)?.color ?? 'var(--fg)';
   const listRows = onlyFilled
     ? detail.matches.filter((m) => m.statFilled)
     : detail.matches;
@@ -159,7 +159,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
                 <RadarChart axes={radar} color={clsColor} size={300} />
                 <div className="radar-legend">
                   <div className="radar-legend__row">
-                    <span className="lg" style={{ background: clsColor }} />
+                    <span className="lg" style={{ background: clsColor || 'var(--line-strong)' }} />
                     <b>{player.name}</b> 场均
                   </div>
                   <div className="radar-legend__row">

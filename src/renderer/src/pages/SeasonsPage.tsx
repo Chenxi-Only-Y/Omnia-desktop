@@ -119,7 +119,7 @@ export default function SeasonsPage({ onSeasonChanged }: Props) {
               {list.map((s) => (
                 <tr key={s.id}>
                   <td>{s.active
-                    ? <span style={{ color: '#7ee0a0' }}>● 当前</span>
+                    ? <span style={{ color: 'var(--ok)', fontWeight: 600 }}>● 当前</span>
                     : <span style={{ color: 'var(--text-dim)' }}>○</span>}</td>
                   <td>{s.name}</td>
                   <td style={{ color: 'var(--text-dim)' }}>

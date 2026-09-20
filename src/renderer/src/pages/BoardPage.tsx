@@ -112,8 +112,12 @@ export default function BoardPage({ classMap }: PageProps) {
                       )}
                     </td>
                     <td>
-                      <span className={`chip class`} style={{ color: classMap.get(r.mainClass)?.color ?? '#6b7383' }}>
-                        <span className="dot" style={{ background: classMap.get(r.mainClass)?.color ?? '#6b7383' }} />
+                      <span className="chip class"
+                            style={{
+                              borderColor: classMap.get(r.mainClass)?.color ?? 'var(--line-strong)',
+                              color: 'var(--text)',
+                            }}>
+                        <span className="dot" style={{ background: classMap.get(r.mainClass)?.color ?? 'var(--text-faint)' }} />
                         {r.mainClass || '—'}
                       </span>
                     </td>
@@ -194,7 +198,7 @@ export default function BoardPage({ classMap }: PageProps) {
                     <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{m.label}</span>
                     <div className="ratebar ratebar--wide"><i style={{
                       width: `${Math.round(rate * 100)}%`,
-                      background: rate > 0 ? 'var(--accent)' : '#3a4152',
+                      background: rate > 0 ? 'var(--fg)' : 'var(--line-strong)',
                     }} /></div>
                     <span className="num" style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
                       {m.nonZero} / {m.total}（{Math.round(rate * 100)}%）
@@ -243,7 +247,7 @@ export default function BoardPage({ classMap }: PageProps) {
                     <tr key={s.squad}>
                       <td>{s.squad}</td>
                       <td style={{ color: 'var(--text-dim)' }}>{s.group || '—'}</td>
-                      <td style={{ color: s.kind === 'defend' ? '#7aa7e0' : s.kind === 'attack' ? '#e0a97a' : 'var(--text-faint)' }}>
+                      <td style={{ color: s.kind === 'defend' ? 'var(--kind-defend)' : s.kind === 'attack' ? 'var(--kind-attack)' : 'var(--text-faint)' }}>
                         {s.kind === 'defend' ? '防守' : s.kind === 'attack' ? '进攻' : '—'}
                       </td>
                       <td className="num">{s.plays}</td>

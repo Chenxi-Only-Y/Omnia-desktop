@@ -88,7 +88,7 @@ export default function SettingsPage({ info }: Props) {
                 return (
                   <tr key={g.id}>
                     <td>{g.name}</td>
-                    <td style={{ color: g.kind === 'defend' ? '#7aa7e0' : '#e0a97a' }}>
+                    <td style={{ color: g.kind === 'defend' ? 'var(--kind-defend)' : 'var(--kind-attack)' }}>
                       {g.kind === 'defend' ? '防守' : '进攻'}
                     </td>
                     <td className="num">{list.length}</td>

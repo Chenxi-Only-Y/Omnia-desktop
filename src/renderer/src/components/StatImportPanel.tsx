@@ -172,7 +172,7 @@ export default function StatImportPanel({
                 </thead>
                 <tbody>
                   {preview.rows.slice(0, 60).map((r) => (
-                    <tr key={r.row} style={r.issues.some((i) => i.level === 'error') ? { background: '#331d23' } : undefined}>
+                    <tr key={r.row} style={r.issues.some((i) => i.level === 'error') ? { background: 'var(--danger-soft)' } : undefined}>
                       <td className="num">{r.row}</td>
                       <td>{r.name}</td>
                       <td><ClassChip name={r.classUsed} classMap={classMap} showIcon={false} /></td>

@@ -45,7 +45,8 @@ function createWindow(): void {
     minWidth: 1180,
     minHeight: 720,
     show: false,
-    backgroundColor: '#14161c',
+    // 与主题 --bg 一致（背景主色 第 3 个 #E6E1E6），避免启动瞬间闪深色
+    backgroundColor: '#E6E1E6',
     title: '万象·Omnia',
     autoHideMenuBar: true,
     webPreferences: {
@@ -181,10 +182,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
    * 可选截图：设置 OMNIA_SMOKE_SHOTS=<目录> 时，把界面真实样子写成 PNG。
    * 用途是"别只看断言通过，要看一眼长什么样"——尤其是排表/赛季这类布局密集的页面。
    */
-  const shot = async (name: string): Promise<void> => {
+  const shot = async (name: string, settleMs = 0): Promise<void> => {
     const dir = env('OMNIA_SMOKE_SHOTS');
     if (!dir) return;
     try {
+      // 探针返回后 React 可能还没把新页面提交到合成器，先等一拍再要帧
+      if (settleMs > 0) await new Promise((r) => setTimeout(r, settleMs));
       fs.mkdirSync(dir, { recursive: true });
       // 后台窗口的合成帧会滞后：先要一帧、再等一下，否则截到的是上一个页面的画面
       win.webContents.invalidate();
@@ -1163,6 +1166,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           .some(x => x.textContent.indexOf('攻略') >= 0);
         steps.push('导航里仍有「攻略」=' + stillThere);
 
+        // 主题令牌必须已切到单色稿：背景主色 = 第 3 个色 #E6E1E6
+        const bgComputed = getComputedStyle(document.body).backgroundColor;
+        const heroCard = document.querySelector('.card') ? getComputedStyle(document.querySelector('.card')).backgroundColor : '';
+        steps.push('主题 页面背景=' + bgComputed + '（应 rgb(230,225,230)） 卡片=' + heroCard + '（应 rgb(252,248,253)）');
+        const themeOk = bgComputed === 'rgb(230, 225, 230)' && heroCard === 'rgb(252, 248, 253)';
+
         // 导航栏折叠/展开：宽度真的变、标签真的藏、偏好真的落库
         const app = document.querySelector('.app');
         const toggle = document.querySelector('.nav-toggle');
@@ -1192,6 +1201,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           ok: banners.length === 2
             && banners.every(b => b.naturalWidth > 500)
             && stillThere === false
+            && themeOk
             && wOpen > 180 && wShut < 70 && labelOpen && !labelShut && collapsedClass
             && savedShut.data.navCollapsed === '1',
           steps,
@@ -1219,7 +1229,66 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of navResume.steps) log('[smoke] 首页:', s);
     guide.ok = guide.ok && navResume.ok;
     log('[smoke] 首页立绘与导航    :', guide.ok ? 'PASS' : 'FAIL');
-    await shot('nav-collapsed');
+
+    // 排表页：独立成页后必须能从侧栏直达，且带上场次选择与完整看板。
+    // 注意：跑到这里时前面探针的对局都已清理，所以本探针自己造一场
+    // （否则页面会正确地显示"还没有对局"，断言就没意义了）。
+    const lineup = await guarded(`(async () => {
+      const steps = smokeSteps();
+      let madePlayer = null;
+      let madeMatch = null;
+      try {
+        const api = window.omnia;
+        const p = await api.player.create({ gameId: 'smoke_lineup_1', name: '排表测试员', mainClass: '神相' });
+        if (!p.ok) throw new Error('建档失败: ' + p.error);
+        madePlayer = p.data.id;
+        smokeMade('player', p.data.id);
+        const m = await api.match.create({ date: '2026-08-01', ourSide: '我方', oppSide: '排表队' });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        madeMatch = m.data.match.id;
+        smokeMade('match', m.data.match.id);
+        await api.match.upsertParticipation({
+          matchId: madeMatch, playerId: madePlayer, squad: '防守一-1', state: 'PLAY',
+        });
+
+        const nav = [...document.querySelectorAll('button.nav-item')]
+          .find(x => x.textContent.indexOf('排表') >= 0);
+        if (!nav) throw new Error('侧栏没有「排表」');
+        nav.click();
+        const t0 = Date.now();
+        while (Date.now() - t0 < 8000) {
+          if (document.querySelector('.blk')) break;
+          await new Promise(r => setTimeout(r, 150));
+        }
+        const blocks = document.querySelectorAll('.blk').length;
+        const picker = document.querySelector('.field select');
+        const opts = picker ? picker.querySelectorAll('option').length : 0;
+        const names = [...document.querySelectorAll('.blk__teamname')].map(e => e.textContent.trim());
+        const hasBench = document.body.textContent.indexOf('未分配') >= 0;
+        const active = document.querySelector('button.nav-item.active')?.textContent?.trim() ?? '';
+        // 造的那个人应该出现在看板上
+        const showsPlayer = document.body.textContent.indexOf('排表测试员') >= 0;
+        steps.push('排表页 方块=' + blocks + ' 场次选择器=' + !!picker + ' 场次选项=' + opts);
+        steps.push('看板小队（前4）=' + names.slice(0, 4).join(',') + ' 有未分配区=' + hasBench
+          + ' 显示本场队员=' + showsPlayer);
+        steps.push('当前导航=' + JSON.stringify(active));
+        return {
+          ok: blocks === 12 && !!picker && opts >= 1 && hasBench && showsPlayer
+            && active.indexOf('排表') >= 0,
+          steps,
+          // 清理句柄必须放在 value 里：guarded 只透传 ok/steps/value，直接挂顶层会被丢掉
+          value: { cleanup: { playerId: madePlayer, matchId: madeMatch } },
+        };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
+    })()`, '探针11c');
+    for (const s of lineup.steps) log('[smoke] 排表:', s);
+    log('[smoke] 排表页            :', lineup.ok ? 'PASS' : 'FAIL');
+    await shot('lineup', 900);
+    {
+      const c = (lineup.value as { cleanup?: { playerId: number; matchId: number } } | undefined)?.cleanup;
+      if (c?.matchId) await guarded(`window.omnia.match.remove(${c.matchId}).catch(() => {})`, '清理排表对局');
+      if (c?.playerId) await guarded(`window.omnia.player.remove(${c.playerId}).catch(() => {})`, '清理排表成员');
+    }
 
     // 评分引擎（M1）：口径来自规则中心；验证分解合计、封顶、幂等、改规则会改分
     const scoring = await guarded(`(async () => {
@@ -1487,11 +1556,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           ui: rows >= 1 && activeMark && hasCreate,
         };
         steps.push('判定明细=' + JSON.stringify(cond));
-        // 清理交给外层：截图要在数据还在的时候拍
+        // 清理交给外层：截图要在数据还在的时候拍。
+        // 句柄必须放 value 里 —— guarded 只透传 ok/steps/value，挂顶层会被丢掉。
         return {
           ok: Object.values(cond).every(Boolean),
           steps,
-          cleanup: { playerId: p.data.id, seasonIds: [created.data.id, s2.data.id] },
+          value: { cleanup: { playerId: p.data.id, seasonIds: [created.data.id, s2.data.id] } },
         };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '赛季');
@@ -1555,7 +1625,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
-      && scoring.ok === true && season.ok === true && iconOk && r.schemaVersion >= 6;
+      && scoring.ok === true && season.ok === true && iconOk && lineup.ok === true && r.schemaVersion >= 6;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

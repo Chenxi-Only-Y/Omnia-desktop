@@ -16,7 +16,7 @@ interface Props {
  * 这样不同量级的维度（击杀 vs 伤害）能画在同一张图上而不用各自归一化，
  * 也让"1.0 圈"成为可读的参照线。
  */
-export default function RadarChart({ axes, size = 260, color = '#2BCBFF' }: Props) {
+export default function RadarChart({ axes, size = 260, color = 'var(--fg)' }: Props) {
   const cx = size / 2;
   const cy = size / 2;
   const rMax = size / 2 - 42;
@@ -56,18 +56,18 @@ export default function RadarChart({ axes, size = 260, color = '#2BCBFF' }: Prop
       {rings.map((k) => (
         <circle key={k} cx={cx} cy={cy} r={(k / CAP) * rMax}
                 fill="none"
-                stroke={k === 1 ? '#3d4657' : '#262b38'}
+                stroke={k === 1 ? 'var(--line-strong)' : 'var(--line)'}
                 strokeWidth={k === 1 ? 1.2 : 1}
                 strokeDasharray={k === 1 ? undefined : '3 4'} />
       ))}
       {/* 轴线 + 维度标签 */}
       {points.map((p) => (
         <g key={p.key}>
-          <line x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="#262b38" strokeWidth={1} />
+          <line x1={cx} y1={cy} x2={p.ax} y2={p.ay} stroke="var(--line)" strokeWidth={1} />
           <text
             x={cx + Math.cos(p.ang) * (rMax + 20)}
             y={cy + Math.sin(p.ang) * (rMax + 20)}
-            fill="#9aa3b2" fontSize={11}
+            fill="var(--text-dim)" fontSize={11}
             textAnchor={Math.abs(Math.cos(p.ang)) < 0.3 ? 'middle' : Math.cos(p.ang) > 0 ? 'start' : 'end'}
             dominantBaseline="middle"
           >
@@ -76,14 +76,14 @@ export default function RadarChart({ axes, size = 260, color = '#2BCBFF' }: Prop
         </g>
       ))}
       {/* 球队人均基准圈（多边形） */}
-      <polygon points={basePoly} fill="none" stroke="#6b7383" strokeWidth={1} strokeDasharray="4 3" />
+      <polygon points={basePoly} fill="none" stroke="var(--text-faint)" strokeWidth={1} strokeDasharray="4 3" />
       {/* 个人 */}
       <polygon points={poly} fill={`${color}33`} stroke={color} strokeWidth={1.8} />
       {points.map((p) => (
         <circle key={p.key} cx={p.x} cy={p.y} r={2.6} fill={color} />
       ))}
       {/* 中心点 */}
-      <circle cx={cx} cy={cy} r={2} fill="#3d4657" />
+      <circle cx={cx} cy={cy} r={2} fill="var(--line-strong)" />
     </svg>
   );
 }

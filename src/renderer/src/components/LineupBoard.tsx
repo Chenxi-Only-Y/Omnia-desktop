@@ -279,7 +279,8 @@ function BlockView({
               const iconSrc = cls ? classIconSrc(cls) : null;
               return (
                 <td key={c.index}
-                    style={def ? { background: def.color, color: '#10121a' } : undefined}
+                    /* 职业色块铺底 + 固定深色字：浅底亮底都可读，不随主题变 */
+                    style={def ? { background: def.color, color: 'var(--on-class)' } : undefined}
                     title={cls ? `${cls} · 点击放入队员` : '空位 · 点击放入队员'}
                     onClick={() => onPickSlot(squad.name, c.index)}>
                   {iconSrc

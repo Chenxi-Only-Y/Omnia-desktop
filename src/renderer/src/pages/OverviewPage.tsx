@@ -148,7 +148,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
                       : <i style={{ width: 7, height: 7, borderRadius: '50%', background: c.color, display: 'inline-block' }} />}
                     {c.name}
                   </span>
-                  <div className="ratebar ratebar--wide" style={{ background: '#171a22' }}>
+                  <div className="ratebar ratebar--wide" style={{ background: 'var(--surface-2)' }}>
                     <i style={{ width: `${(n / max) * 100}%`, background: c.color }} />
                   </div>
                   <span className="num" style={{ textAlign: 'right', color: n ? 'var(--text)' : 'var(--text-faint)' }}>{n}</span>

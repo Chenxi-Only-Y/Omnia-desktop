@@ -177,7 +177,7 @@ export default function RulesPage({ classes }: PageProps) {
             <tbody>
               {list.length === 0 && <tr><td className="empty" colSpan={6}>还没有规则集</td></tr>}
               {list.map((rs) => (
-                <tr key={rs.id} style={rs.active ? { background: '#1d2b33' } : undefined}>
+                <tr key={rs.id} style={rs.active ? { background: 'var(--accent-soft)' } : undefined}>
                   <td className="num">v{rs.version}</td>
                   <td>
                     {rs.name}

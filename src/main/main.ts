@@ -1556,7 +1556,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('中缝图片: 渲染=' + !!imgEl
           + ' object-fit=' + (ic ? ic.objectFit : '（无）')
           + ' 显示尺寸=' + (ib ? Math.round(ib.width) + 'x' + Math.round(ib.height) : '（无）')
-          + '（fit 应为 cover；宽应为 344）');
+          + ' 中缝高=' + Math.round(db.height)
+          + '（宽应=344，高按图片比例；不足部分由底色补）');
         await window.omnia.meta.setSetting('dividerImage', prev);   // 还原
         await new Promise(r => setTimeout(r, 300));
       } else {

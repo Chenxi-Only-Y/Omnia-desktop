@@ -73,8 +73,6 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
     void loadDetail(matchId);
   }, [matchId, loadDetail]);
 
-  const current = useMemo(() => matches.find((m) => m.id === matchId) ?? null, [matches, matchId]);
-
   /** 我方参战（含替补/请假槽位），看板需要全量才知道谁是替补 */
   const our = useMemo(() => rows.filter((r) => r.side === 'our'), [rows]);
 
@@ -167,12 +165,6 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           <div style={{ flex: 1 }} />
           <button className="btn" onClick={() => void loadMatches()}>刷新场次</button>
         </div>
-        {current && (
-          <div className="hint" style={{ marginTop: 8 }}>
-            本场共 {our.length} 人在名单内（含替补 / 请假）。
-            {current.ruleSetId === null ? ' 未指定规则集。' : ''}
-          </div>
-        )}
       </div>
 
       <div className="card" style={{ padding: '12px 14px' }}>
@@ -188,11 +180,11 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
             const row = our.find((r) => r.id === id);
             if (row) void removeRow(row);
           }}
+          onSkillNote={(playerId, note) => {
+            if (matchId === null) return;
+            void run(() => api.match.setSkillNote(matchId, playerId, note));
+          }}
         />
-        <div className="hint" style={{ marginTop: 8 }}>
-          拖动姓名可换小队、拖到下方「未分配」区可移出小队；点击职业色块也能选人入队，点击姓名移出本场。
-          版式对齐原表「排表」页：每小队 6 人 × 5 行（职业 / 备注 / 姓名 / 战术 / 角色 ID）。
-        </div>
       </div>
 
       {cellPick && (
@@ -214,9 +206,6 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           <button className="btn primary" onClick={() => setShowAdd(!showAdd)}>
             {showAdd ? '收起' : '添加队员'}
           </button>
-          <span className="hint" style={{ margin: 0 }}>
-            在这里补人进本场；进队后默认「未分配」，再拖到对应小队
-          </span>
         </div>
         {showAdd && (
           <AddPlayerPicker

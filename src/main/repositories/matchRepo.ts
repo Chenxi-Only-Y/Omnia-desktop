@@ -27,7 +27,7 @@ interface MatchRow {
 interface PartRow {
   id: number; match_id: number; player_id: number; side: string;
   squad: string; tactic: string; team_role: string; class_used: string;
-  note_role: string; mic: string; state: string;
+  note_role: string; skill_note: string; mic: string; state: string;
   game_id: string; name: string; main_class: string;
   kills: number | null; fountain_kills: number | null; assists: number | null;
   resource: number | null; dmg_player: number | null; dmg_player_armor: number | null;
@@ -246,6 +246,7 @@ export class MatchRepo {
         classUsed: r.class_used || '',
         mainClass: r.main_class || '',
         noteRole: (r.note_role || '') as NoteRole,
+        skillNote: r.skill_note || '',
         mic: (r.mic || '') as ParticipationRow['mic'],
         state: (r.state || 'PLAY') as PartState,
         stat,
@@ -330,17 +331,22 @@ export class MatchRepo {
       throw new Error(`职业「${classUsed}」不在 12 职业表内（可用别名见职业字典）`);
     }
 
+    // skillNote 是"没传就别动"：排表页只改技能备注时不该把小队/状态一起覆盖，
+    // 所以用 COALESCE 只在显式传入时更新；新建时留空。
+    const skillNote = input.skillNote === undefined ? null : s(input.skillNote);
     this.db.prepare(
       `INSERT INTO participation
-         (match_id, player_id, side, squad, tactic, team_role, class_used, note_role, mic, state)
-       VALUES (?, ?, 'our', ?, ?, ?, ?, ?, ?, ?)
+         (match_id, player_id, side, squad, tactic, team_role, class_used, note_role, skill_note, mic, state)
+       VALUES (?, ?, 'our', ?, ?, ?, ?, ?, COALESCE(?, ''), ?, ?)
        ON CONFLICT(match_id, player_id, side) DO UPDATE SET
          squad = excluded.squad, tactic = excluded.tactic, team_role = excluded.team_role,
          class_used = excluded.class_used, note_role = excluded.note_role,
+         skill_note = COALESCE(?, participation.skill_note),
          mic = excluded.mic, state = excluded.state`,
     ).run(
       matchId, playerId, squad, tactic, teamRole, classUsed,
-      s(input.noteRole) || pl.note_role, pl.mic, s(input.state) || 'PLAY',
+      s(input.noteRole) || pl.note_role, skillNote, pl.mic, s(input.state) || 'PLAY',
+      skillNote,
     );
 
     const row = this.db.prepare(
@@ -407,6 +413,14 @@ export class MatchRepo {
       `UPDATE participation SET squad = '', tactic = '', team_role = ''
        WHERE match_id = ? AND player_id = ? AND side = 'our'`,
     ).run(matchId, playerId);
+  }
+
+  /** 只改本场技能备注（排表页卡片上直接填），不碰小队/战术/状态 */
+  setSkillNote(matchId: number, playerId: number, note: string): boolean {
+    return this.db.prepare(
+      `UPDATE participation SET skill_note = ?
+       WHERE match_id = ? AND player_id = ? AND side = 'our'`,
+    ).run(s(note), matchId, playerId).changes > 0;
   }
 
   /** 只改某一条参战记录的战报（保存 14 项指标） */

@@ -351,6 +351,16 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 7,
+    name: 'participation_skill_note',
+    up: (db) => {
+      // 本场技能备注：排表页每张队员卡片上直接填写的自由文本。
+      // 挂在 participation（人 × 场）而不是 player 上 —— 同一个人不同场次、
+      // 不同小队的技能安排本来就不一样，写进主档会把上一场的备注带到下一场。
+      db.exec(`ALTER TABLE participation ADD COLUMN skill_note TEXT NOT NULL DEFAULT ''`);
+    },
+  },
 ];
 
 export interface DbHandle {

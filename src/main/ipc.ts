@@ -124,6 +124,13 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
 
+  ipcMain.handle(IPC.matchSkillNote, safe((matchId: number, playerId: number, note: string) => {
+    if (!matches.setSkillNote(matchId, playerId, note)) {
+      throw new Error(`该队员不在本场名单里：playerId=${playerId}`);
+    }
+    return true as const;
+  }));
+
   // ── 评分（M1） ─────────────────────────────────────────────────
   ipcMain.handle(IPC.matchRunScore, safe((matchId: number, ruleSetId?: number) => {
     const rule = ruleSetId ? rules.get(ruleSetId) : rules.active();

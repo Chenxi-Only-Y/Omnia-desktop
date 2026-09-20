@@ -43,6 +43,7 @@ declare global {
         upsertParticipation(input: ParticipationInput): Promise<IpcResult<{ id: number }>>;
         assignBulk(input: AssignInput): Promise<IpcResult<{ moved: number }>>;
         unassign(matchId: number, playerId: number): Promise<IpcResult<true>>;
+        setSkillNote(matchId: number, playerId: number, note: string): Promise<IpcResult<true>>;
         removeParticipation(id: number): Promise<IpcResult<true>>;
         saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
         importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;

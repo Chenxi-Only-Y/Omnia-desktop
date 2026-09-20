@@ -306,6 +306,16 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                 const row = our.find((r) => r.id === id);
                 if (row) void removeRow(row);
               }}
+              onSkillNote={async (playerId, note) => {
+                try {
+                  await api.match.setSkillNote(matchId, playerId, note);
+                  setError(null);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
             />
             <div className="hint" style={{ marginTop: 8 }}>
               拖动姓名可换小队、拖到下方「未分配」区可移出小队；点击职业色块也能选人入队，点击姓名移出本场。

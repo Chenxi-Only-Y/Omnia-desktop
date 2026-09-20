@@ -74,6 +74,8 @@ export const api = {
     assignBulk: (input: AssignInput) => unwrap(bridge().match.assignBulk(input)),
     unassign: (matchId: number, playerId: number): Promise<true> =>
       unwrap(bridge().match.unassign(matchId, playerId)),
+    setSkillNote: (matchId: number, playerId: number, note: string): Promise<true> =>
+      unwrap(bridge().match.setSkillNote(matchId, playerId, note)),
     removeParticipation: (id: number): Promise<true> =>
       unwrap(bridge().match.removeParticipation(id)),
     saveStat: (participationId: number, stat: Partial<CombatStat>): Promise<true> =>

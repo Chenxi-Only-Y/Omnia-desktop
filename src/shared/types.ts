@@ -98,6 +98,8 @@ export interface ParticipationInput {
   classUsed?: string;
   squad?: string;
   noteRole?: NoteRole;
+  /** 本场技能备注：排表页卡片上直接填的自由文本（每人每场各自一份） */
+  skillNote?: string;
   state?: PartState;
   stat?: Partial<CombatStat>;
 }
@@ -153,6 +155,8 @@ export interface ParticipationRow {
   classUsed: string;
   mainClass: string;
   noteRole: NoteRole;
+  /** 本场技能备注（排表页可编辑） */
+  skillNote: string;
   mic: Player['mic'];
   state: PartState;
   stat: CombatStat;
@@ -621,6 +625,8 @@ export interface OmniaApi {
     assignBulk(input: AssignInput): Promise<IpcResult<{ moved: number }>>;
     /** 移出小队但保留在名单 */
     unassign(matchId: number, playerId: number): Promise<IpcResult<true>>;
+    /** 只改本场技能备注，不碰小队/状态（排表页卡片上直接填） */
+    setSkillNote(matchId: number, playerId: number, note: string): Promise<IpcResult<true>>;
     removeParticipation(id: number): Promise<IpcResult<true>>;
     saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
     importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;
@@ -695,6 +701,7 @@ export const IPC = {
   matchParticipationUpsert: 'match:participation:upsert',
   matchAssignBulk: 'match:assign:bulk',
   matchUnassign: 'match:unassign',
+  matchSkillNote: 'match:skill:note',
 
   // 报名 / 请假
   signupBoard: 'signup:board',

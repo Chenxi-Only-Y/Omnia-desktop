@@ -327,8 +327,9 @@ table.grid td .cell-num { background: var(--surface); }
 textarea.input { resize: vertical; line-height: 1.5; }
 
 /* ─────────────────────────────────────────────────────────────
-   排表看板（LineupBoard）—— 版式对齐原表「排表」页截图
-   色块铺底 + 组间空隙 + 半区中缝书法，不用网格线
+   排表看板（LineupBoard）—— 卡片版
+   一队一列卡片，多队横向排开（左右可拉）；队内 6 人上下滑。
+   卡片底色 = 职业色，文字固定深色。
    ───────────────────────────────────────────────────────────── */
 .board { display: flex; flex-direction: column; gap: 10px; }
 
@@ -366,56 +367,105 @@ textarea.input { resize: vertical; line-height: 1.5; }
   color: var(--fg); opacity: .38; font-family: "KaiTi", "STKaiti", serif;
 }
 
-/* 一个「组」= 6 人 × 5 行 */
-.blk { border-radius: 5px; overflow: hidden; background: var(--surface); }
-.blk--defend { box-shadow: inset 0 0 0 1px #9DB6D6; }
-.blk--attack { box-shadow: inset 0 0 0 1px #D6B49D; }
-.blk--bench { box-shadow: inset 0 0 0 1px var(--line-strong); }
+/* 半区：队与队上下排（下滑看下一队），整个半区横向可拉（右滑看右半区） */
+.half { display: flex; flex-direction: column; gap: 10px; flex: 0 0 auto; }
+.half__row { display: flex; flex-direction: column; gap: 8px; }
 
-.blk__table { border-collapse: separate; border-spacing: 1px; }
-.blk__table td {
-  width: 58px; max-width: 58px; text-align: center; vertical-align: middle;
-  font-size: 10px; line-height: 1.25; padding: 1px 2px;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  background: var(--surface-3);
+/* 一支小队 = 一整行：队名 + 6 张卡片横排铺开 */
+.squadrow {
+  display: flex; align-items: stretch; gap: 8px;
+  background: var(--surface); border-radius: 8px; padding: 6px 7px;
+  box-shadow: var(--shadow);
 }
-/* 职业色块：底色由 JS 内联成职业色，文字固定深色（浅底亮底都可读） */
-.blk__cls td { height: 26px; font-weight: 600; cursor: pointer; }
-.blk__icon { width: 22px; height: 22px; object-fit: contain; display: block; margin: 0 auto; }
-.blk__clsname { font-size: 11px; opacity: .9; }
+.squadrow--defend { box-shadow: inset 0 0 0 1px #9DB6D6, var(--shadow); }
+.squadrow--attack { box-shadow: inset 0 0 0 1px #D6B49D, var(--shadow); }
+.squadrow--drop { box-shadow: inset 0 0 0 2px var(--fg), 0 0 0 4px var(--accent-soft); }
 
-.blk__skill td { height: 15px; color: var(--text-dim); font-size: 9px; background: var(--surface-2); }
-.blk__skilltext { display: block; overflow: hidden; text-overflow: ellipsis; }
-
-.blk__name td { height: 20px; font-size: 11px; background: var(--surface); cursor: pointer; }
-.blk__pname { color: var(--text); }
-.blk__mic { margin-left: 3px; font-size: 8px; }
-.blk__mic--on { color: var(--ok); }
-.blk__mic--off { color: var(--text-faint); }
-.blk__empty { color: var(--text-faint); font-size: 10px; }
-
-.blk__score td { height: 16px; color: var(--text-dim); font-variant-numeric: tabular-nums; background: var(--surface); }
-.blk__id td { height: 13px; color: var(--text-faint); font-size: 9px; background: var(--surface-3); }
-
-/* 组右侧：总计 + 组名（与原表一致，组名竖排） */
-.blk__total {
-  width: 40px !important; background: var(--surface-2) !important;
-  color: var(--text); font-variant-numeric: tabular-nums; font-weight: 600;
+.squadrow__head {
+  flex: 0 0 auto; width: 54px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  border-right: 1px solid var(--line); padding-right: 6px;
+  font-size: 11px; font-weight: 600; color: var(--text); text-align: center;
+  letter-spacing: .3px;
 }
-.blk__teamname {
-  width: 20px !important; max-width: 20px !important;
-  writing-mode: vertical-rl; letter-spacing: 3px;
-  color: var(--text-dim); background: var(--surface-2) !important; font-size: 10px;
+.squadrow__count { font-size: 10px; font-weight: 400; color: var(--text-faint); }
+.squadrow__tactic { font-size: 10px; font-weight: 400; color: var(--text-faint); }
+
+.squadrow__cards { display: flex; gap: 6px; flex: 1 1 auto; }
+
+/* 队员卡片：16:9 横版圆角矩形，底色 = 职业色（内联），文字固定深色。
+   尺寸按屏幕实测定的：单卡 ≈ 96×54，一队一行 ≈ 130px，
+   一屏 3 队 ≈ 420px（两半区共 6 队，不用竖滑）；
+   横向两个半区 ≈ 1470px，略超视口宽度 → "右滑看右半区"正好成立。 */
+.pcard {
+  flex: 1 1 0; min-width: 0;
+  /* 16:9 —— 用 aspect-ratio 锁死比例，宽度由 flex 分配，高度随之推出来 */
+  aspect-ratio: 16 / 9;
+  border: 0; text-align: left; font: inherit;
+  background: var(--surface-3); color: var(--on-class);
+  border-radius: 10px; padding: 6px 8px;
+  display: flex; flex-direction: column; gap: 2px;
+  cursor: grab; overflow: hidden;
 }
+.pcard:active { cursor: grabbing; }
+.pcard--dragging { opacity: .35; }
+/* 没有职业（或未登记）时退回浅底深字，和职业底色卡能区分开 */
+.pcard--noclass { background: var(--surface-3); color: var(--text); }
+
+.pcard__id {
+  font-size: 11px; font-weight: 700; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer;
+}
+.pcard__id:hover { text-decoration: underline; }
+.pcard__mic { margin-left: 4px; font-size: 9px; opacity: .85; }
+.pcard__mic--off { opacity: .6; }
+
+.pcard__cls {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; line-height: 1.3; opacity: .95; cursor: pointer;
+  overflow: hidden; white-space: nowrap;
+}
+.pcard__cls:hover { text-decoration: underline; }
+.pcard__icon { width: 13px; height: 13px; object-fit: contain; flex: 0 0 auto; }
+.pcard__tactic {
+  margin-left: auto; font-style: normal; font-size: 9px;
+  opacity: .8; border-left: 1px solid currentColor; padding-left: 4px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* 技能备注：可直接改动填写。**即使为空也要看得出是个能填的框** ——
+   半透明白底 + 细边，在任意职业底色上都读得清。横版卡里它贴在底部 */
+.pcard__note {
+  margin-top: auto; width: 100%;
+  background: rgba(255, 255, 255, .72);
+  border: 1px solid rgba(16, 18, 26, .28);
+  border-radius: 5px; padding: 2px 5px;
+  font-size: 10px; line-height: 1.35; color: var(--on-class);
+  cursor: text; resize: none;
+  min-height: 24px; max-height: 46px;
+  font-family: inherit;
+}
+.pcard--noclass .pcard__note {
+  background: var(--surface); border-color: var(--line-strong); color: var(--text);
+}
+.pcard__note::placeholder { color: rgba(16, 18, 26, .5); }
+.pcard--noclass .pcard__note::placeholder { color: var(--text-faint); }
+.pcard__note:focus {
+  outline: none; background: #fff; border-color: var(--fg);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .55);
+}
+.pcard__note:disabled { opacity: .55; cursor: default; }
+
+.pcard--empty {
+  background: transparent; border: 1px dashed var(--line-strong);
+  color: var(--text-faint); cursor: pointer;
+  align-items: center; justify-content: center; min-height: 60px;
+}
+.pcard--empty:hover { border-color: var(--fg); color: var(--text); background: var(--surface-3); }
+.pcard__empty { font-size: 11px; }
 
 /* ── 拖拽反馈 ─────────────────────────────────────────────── */
-.blk--drop {
-  box-shadow: inset 0 0 0 2px var(--fg), 0 0 0 4px var(--accent-soft);
-}
-.blk--drop .blk__cls td { filter: brightness(1.06); }
-.blk__name td[draggable="true"] { cursor: grab; }
-.blk__name td[draggable="true"]:active { cursor: grabbing; }
-.blk__name--dragging { opacity: .35; }
 .board__unassigned--hover {
   border-top-color: var(--fg);
   background: var(--accent-soft);

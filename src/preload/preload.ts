@@ -51,6 +51,8 @@ const api = {
     upsertParticipation: (input: ParticipationInput) => invoke('match:participation:upsert', input),
     assignBulk: (input: AssignInput) => invoke('match:assign:bulk', input),
     unassign: (matchId: number, playerId: number) => invoke('match:unassign', matchId, playerId),
+    setSkillNote: (matchId: number, playerId: number, note: string) =>
+      invoke('match:skill:note', matchId, playerId, note),
     removeParticipation: (id: number) => invoke('match:participation:remove', id),
     saveStat: (participationId: number, stat: Partial<CombatStat>) =>
       invoke('match:stat:save', participationId, stat),

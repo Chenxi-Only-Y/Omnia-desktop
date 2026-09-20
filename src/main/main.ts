@@ -229,8 +229,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       } catch { /* 探针正在切换页面时可能取不到，下一轮再取 */ }
     };
     try {
-      await win.webContents.executeJavaScript('window.__smokeSteps = []; window.__smokeMade = []');
-      live = setInterval(() => { void drain(); }, 800);
+      await win.webContents.executeJavaScript('window.__smokeSteps = []; window.__smokeMade = []');      live = setInterval(() => { void drain(); }, 800);
       const raw = await Promise.race([
         win.webContents.executeJavaScript(wrapProbe(script)),
         new Promise((_, reject) => {
@@ -248,8 +247,16 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       await drain();   // 超时/异常时把最后一步捞出来，这是定位挂点的关键
+      // 渲染层抛错时 executeJavaScript 只给一句"Script failed to execute"，
+      // 顺手把 React 的错误边界信息/控制台最后一条错误捞出来，否则等于没说
+      let hint = '';
+      try {
+        hint = String(await win.webContents.executeJavaScript(
+          `(window.__smokeErr || '') + ' | root=' + ((document.getElementById('root')||{}).innerHTML||'').length`,
+        ));
+      } catch { /* 页面可能已经不可用 */ }
       await sweepProbeRows(label);
-      return { ok: false, steps: [`ERR 渲染层脚本失败：${msg}（最后一步见上方 ${label} · 行）`] };
+      return { ok: false, steps: [`ERR 渲染层脚本失败：${msg}｜线索：${hint}（最后一步见上方 ${label} · 行）`] };
     } finally {
       if (timer) clearTimeout(timer);
       if (live) clearInterval(live);
@@ -279,6 +286,17 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
   };
 
   win.webContents.once('did-finish-load', async () => {
+    // 全局错误捕获：渲染层抛错时 executeJavaScript 只回一句无信息量的
+    // "Script failed to execute"，先把真正的报错记下来给探针用。
+    void win.webContents.executeJavaScript(`
+      window.__smokeErr = '';
+      window.addEventListener('error', (e) => {
+        window.__smokeErr = String((e && (e.message || (e.error && e.error.message))) || e);
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        window.__smokeErr = 'unhandledrejection: ' + String((e && e.reason && (e.reason.stack || e.reason.message)) || e.reason);
+      });
+    `);
     let r: Awaited<ReturnType<typeof preloadProbe>>;
     try {
       r = await preloadProbe();
@@ -485,21 +503,29 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           .find(b => b.textContent.includes('阵容编排'));
         if (lineupTab) lineupTab.click();
 
-        // 等排表看板方块渲染出来
-        await waitFor(() => document.querySelectorAll('.blk').length > 0 ? true : null, '排表看板方块');
+        // 等排表看板渲染出来（卡片版：一队一整行 .squadrow，行内是 .pcard 卡片）
+        await waitFor(() => document.querySelectorAll('.squadrow').length > 0 ? true : null, '排表看板');
 
-        const blocks = document.querySelectorAll('.blk').length;
-        const teamNames = [...document.querySelectorAll('.blk__teamname')].map(e => e.textContent.trim());
-        const icons = document.querySelectorAll('.blk__icon').length;
-        const named = document.querySelectorAll('.blk__pname').length;
-        steps.push('看板渲染小队方块=' + blocks + ' 含职业图标=' + icons + ' 有姓名=' + named);
-        steps.push('方块小队名（前5）=' + teamNames.slice(0, 5).join(','));
+        const blocks = document.querySelectorAll('.squadrow').length;
+        // 队名栏文本形如「防守一-1 0/6 防守」，去掉计数与战术，只留队名。
+        // 这里刻意不用正则：探针脚本是塞在模板字符串里的，正则里的转义斜杠
+        // 会被外层模板吃掉一半，直接把探针变成语法错误（踩过一次）。
+        const teamNames = [...document.querySelectorAll('.squadrow__head')]
+          .map(e => (e.firstElementChild ? e.firstElementChild.textContent : '').trim())
+          .filter(Boolean);
+        const icons = document.querySelectorAll('.pcard__icon').length;
+        const named = document.querySelectorAll('.pcard__id').length;
+        const notes = document.querySelectorAll('.pcard__note').length;
+        steps.push('看板渲染小队行=' + blocks + ' 含职业图标=' + icons + ' 有 ID 名=' + named
+          + ' 技能备注输入框=' + notes);
+        steps.push('小队名（前5）=' + teamNames.slice(0, 5).join(','));
         const hasTarget = teamNames.includes('防守一-1');
-        // 别名写进去的那个人也必须落在「防守一-2」同一块里，而不是另起一格
-        const aliasBlock = [...document.querySelectorAll('.blk')]
+        // 别名写进去的那个人也必须落在「防守一-2」同一行里，而不是另起一行
+        const aliasBlock = [...document.querySelectorAll('.squadrow')]
           .find(b => b.dataset.squad === '防守一-2');
-        const aliasInSameBlock = !!aliasBlock && aliasBlock.textContent.includes('别名测试员');
-        steps.push('别名成员落在 防守一-2 同一格=' + aliasInSameBlock);
+        const aliasInSameBlock = !!aliasBlock
+          && aliasBlock.textContent.includes('smoke_board_alias');
+        steps.push('别名成员落在 防守一-2 同一行=' + aliasInSameBlock);
 
         await api.match.remove(m.data.match.id);
         await api.player.remove(p.data.id);
@@ -780,18 +806,28 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         await waitFor(() => document.querySelector('button.tab') ? true : null, '页签');
         const tab = [...document.querySelectorAll('button.tab')].find(b => b.textContent.includes('阵容编排'));
         if (tab) tab.click();
-        await waitFor(() => document.querySelectorAll('.blk').length > 0 ? true : null, '看板方块');
+        await waitFor(() => document.querySelectorAll('.squadrow').length > 0 ? true : null, '看板');
 
-        // 找「拖拽甲」所在的格子（在 防守一-1 方块里）与其姓名单元格
-        const blocks = [...document.querySelectorAll('.blk')];
+        // 诊断：看板到底拿到了什么
+        const dbgParts = await api.match.participations(mid);
+        steps.push('参战记录=' + JSON.stringify(dbgParts.data.map(r => ({
+          name: r.name, gameId: r.gameId, squad: r.squad, state: r.state, side: r.side,
+        }))));
+        steps.push('看板里的 ID 名=' + JSON.stringify(
+          [...document.querySelectorAll('.pcard__id')].map(e => e.textContent.trim())));
+
+        // 找「拖拽甲」所在的卡片（在 防守一-1 那一行里）—— 卡片本身是拖拽源。
+        // 注意：卡片标题是**角色 ID 名**（用户口径：标题=ID、第二行=职业、第三行=技能备注），
+        // 真实姓名不上卡片，所以这里按 gameId 找，不能按姓名找。
+        const blocks = [...document.querySelectorAll('.squadrow')];
         const fromBlock = blocks.find(b => b.dataset.squad === '防守一-1');
         if (!fromBlock) throw new Error('看板上找不到 防守一-1');
-        const nameCell = [...fromBlock.querySelectorAll('.blk__name td')]
-          .find(td => td.textContent.includes('拖拽甲'));
-        if (!nameCell) throw new Error('防守一-1 里找不到 拖拽甲');
-        steps.push('拖拽前 防守一-1 含 拖拽甲=' + !!nameCell);
+        const dragCard = [...fromBlock.querySelectorAll('.pcard')]
+          .find(c => c.textContent.includes('smoke_dnd_1'));
+        if (!dragCard) throw new Error('防守一-1 里找不到 smoke_dnd_1（拖拽甲的 ID）');
+        steps.push('拖拽前 防守一-1 含 拖拽甲(ID)=' + !!dragCard);
 
-        // 目标：进攻一-1
+        // 目标：进攻一-1（整行是落点）
         const toBlock = blocks.find(b => b.dataset.squad === '进攻一-1');
         if (!toBlock) throw new Error('看板上找不到 进攻一-1');
 
@@ -808,19 +844,19 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
         const store = dt;
         const fire = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: store }));
-        fire(nameCell, 'dragstart');
+        fire(dragCard, 'dragstart');
         fire(toBlock, 'dragover');
         fire(toBlock, 'drop');
-        fire(nameCell, 'dragend');
+        fire(dragCard, 'dragend');
 
         const KEY = 'application/x-omnia-player';
         steps.push('dragstart 写入的载荷=' + store.getData(KEY));
 
-        // 等界面重新加载后核对
+        // 等界面重新加载后核对（卡片上没有姓名，按 ID 名找）
         await waitFor(() => {
-          const b = [...document.querySelectorAll('.blk')].find(x => x.dataset.squad === '进攻一-1');
-          return b && b.textContent.includes('拖拽甲') ? true : null;
-        }, '拖拽后 进攻一-1 出现 拖拽甲');
+          const b = [...document.querySelectorAll('.squadrow')].find(x => x.dataset.squad === '进攻一-1');
+          return b && b.textContent.includes('smoke_dnd_1') ? true : null;
+        }, '拖拽后 进攻一-1 出现 拖拽甲(ID)');
 
         const parts = await api.match.participations(mid);
         const p1row = parts.data.find(r => r.name === '拖拽甲');
@@ -842,8 +878,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && p1row?.squad === '进攻一-1'
           && p1row?.state === 'PLAY'
           && p2row?.squad === ''
-          && !!chip;
-        return { ok, steps };
+          && !!chip;        return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针7');
     for (const s of dnd.steps) log('[smoke] 拖拽:', s);
@@ -1236,6 +1271,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     const lineup = await guarded(`(async () => {
       const steps = smokeSteps();
       let madePlayer = null;
+      let madePlayer2 = null;
       let madeMatch = null;
       try {
         const api = window.omnia;
@@ -1243,12 +1279,21 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         if (!p.ok) throw new Error('建档失败: ' + p.error);
         madePlayer = p.data.id;
         smokeMade('player', p.data.id);
+        // 再来一个「未分配」的人：未分配区只在有未分配队员时才渲染，
+        // 不造一个的话就测不到"拖回未分配"这条路径
+        const p2 = await api.player.create({ gameId: 'smoke_lineup_2', name: '排表测试员乙', mainClass: '素问' });
+        if (!p2.ok) throw new Error('建档失败2: ' + p2.error);
+        madePlayer2 = p2.data.id;
+        smokeMade('player', p2.data.id);
         const m = await api.match.create({ date: '2026-08-01', ourSide: '我方', oppSide: '排表队' });
         if (!m.ok) throw new Error('建对局失败: ' + m.error);
         madeMatch = m.data.match.id;
         smokeMade('match', m.data.match.id);
         await api.match.upsertParticipation({
           matchId: madeMatch, playerId: madePlayer, squad: '防守一-1', state: 'PLAY',
+        });
+        await api.match.upsertParticipation({
+          matchId: madeMatch, playerId: madePlayer2, state: 'PLAY',
         });
 
         const nav = [...document.querySelectorAll('button.nav-item')]
@@ -1257,19 +1302,25 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         nav.click();
         const t0 = Date.now();
         while (Date.now() - t0 < 8000) {
-          if (document.querySelector('.blk')) break;
+          if (document.querySelector('.squadrow')) break;
           await new Promise(r => setTimeout(r, 150));
         }
-        const blocks = document.querySelectorAll('.blk').length;
+        const blocks = document.querySelectorAll('.squadrow').length;
         const picker = document.querySelector('.field select');
         const opts = picker ? picker.querySelectorAll('option').length : 0;
-        const names = [...document.querySelectorAll('.blk__teamname')].map(e => e.textContent.trim());
+        // 队名取 head 里第一个子元素（避免用到正则 —— 见 M5 探针里的说明）
+        const names = [...document.querySelectorAll('.squadrow__head')]
+          .map(e => (e.firstElementChild ? e.firstElementChild.textContent : '').trim())
+          .filter(Boolean);
+        const cards = document.querySelectorAll('.pcard').length;
+        const noteInputs = document.querySelectorAll('.pcard__note').length;
         const hasBench = document.body.textContent.indexOf('未分配') >= 0;
         const active = document.querySelector('button.nav-item.active')?.textContent?.trim() ?? '';
-        // 造的那个人应该出现在看板上
-        const showsPlayer = document.body.textContent.indexOf('排表测试员') >= 0;
-        steps.push('排表页 方块=' + blocks + ' 场次选择器=' + !!picker + ' 场次选项=' + opts);
-        steps.push('看板小队（前4）=' + names.slice(0, 4).join(',') + ' 有未分配区=' + hasBench
+        // 造的那个人应该出现在看板上（卡片标题是 ID 名，不是姓名）
+        const showsPlayer = document.body.textContent.indexOf('smoke_lineup_1') >= 0;
+        steps.push('排表页 小队行=' + blocks + ' 场次选择器=' + !!picker + ' 场次选项=' + opts);
+        steps.push('卡片=' + cards + ' 技能备注框=' + noteInputs
+          + ' 小队（前4）=' + names.slice(0, 4).join(',') + ' 有未分配区=' + hasBench
           + ' 显示本场队员=' + showsPlayer);
         steps.push('当前导航=' + JSON.stringify(active));
         return {
@@ -1277,17 +1328,28 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
             && active.indexOf('排表') >= 0,
           steps,
           // 清理句柄必须放在 value 里：guarded 只透传 ok/steps/value，直接挂顶层会被丢掉
-          value: { cleanup: { playerId: madePlayer, matchId: madeMatch } },
+          value: { cleanup: { playerId: madePlayer, playerIds: [madePlayer, madePlayer2], matchId: madeMatch } },
         };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针11c');
     for (const s of lineup.steps) log('[smoke] 排表:', s);
     log('[smoke] 排表页            :', lineup.ok ? 'PASS' : 'FAIL');
     await shot('lineup', 900);
+    // 前面几个探针会切页，等排表页真正画出来再截第二张（截图只信合成帧，必须留足时间）
+    await guarded(`(async () => {
+      const nav = [...document.querySelectorAll('button.nav-item')]
+        .find(x => x.textContent.indexOf('排表') >= 0);
+      if (nav) nav.click();
+      await new Promise(r => setTimeout(r, 1200));
+      return { ok: true, steps: [] };
+    })()`, '回到排表页');
+    await shot('lineup-settled', 1200);
     {
-      const c = (lineup.value as { cleanup?: { playerId: number; matchId: number } } | undefined)?.cleanup;
+      const c = (lineup.value as { cleanup?: { playerIds?: number[]; matchId: number } } | undefined)?.cleanup;
       if (c?.matchId) await guarded(`window.omnia.match.remove(${c.matchId}).catch(() => {})`, '清理排表对局');
-      if (c?.playerId) await guarded(`window.omnia.player.remove(${c.playerId}).catch(() => {})`, '清理排表成员');
+      for (const pid of c?.playerIds ?? []) {
+        await guarded(`window.omnia.player.remove(${pid}).catch(() => {})`, `清理排表成员${pid}`);
+      }
     }
 
     // 评分引擎（M1）：口径来自规则中心；验证分解合计、封顶、幂等、改规则会改分

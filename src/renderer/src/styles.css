@@ -383,21 +383,20 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .half__group { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
 
 /* 两个半区之间的中缝：固定 344px 宽（用户口径）。
-   放图片时**横向铺满优先**：宽度强制拉到 344（等比/非等比都由宽度定），
-   高度按图片自身比例走；**高度不够的地方由容器底色补**（不裁剪、不放大到铺满竖向）。
-   之前用 object-fit:cover 是"竖向铺满优先"（会裁掉左右），与用户口径相反。
+   图片**居中占 172px 宽**（= 344 的一半），两侧各 86px 由底色补；
+   高度按图片自身比例，竖向不足的部分同样由底色补。
    flex:0 0 344px 防止被 flex 收缩（之前 44px 被压成 31px）。 */
 .board__divider {
   align-self: stretch; flex: 0 0 344px; width: 344px;
   display: flex; flex-direction: column;
-  align-items: stretch; justify-content: center;
+  align-items: center; justify-content: center;   /* 水平/垂直都居中 */
   background: var(--surface-2); border-radius: 6px; overflow: hidden;
 }
 .board__divider--thin { flex: 0 0 12px; width: 12px; }
 
-/* 中缝图片：横向铺满 344，高度按比例；剩下的竖向空间露出容器底色 */
+/* 中缝图片：居中 172px 宽，高度按比例；四周不足的部分露出容器底色 */
 .board__divider-img {
-  width: 100%; height: auto; max-height: 100%;
+  width: 172px; height: auto; max-height: 100%;
   object-fit: contain; object-position: center;
   display: block;
 }

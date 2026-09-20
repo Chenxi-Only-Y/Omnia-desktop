@@ -231,8 +231,9 @@ export default function SettingsPage({ info }: Props) {
             </button>
           )}
           <span className="hint" style={{ margin: 0 }}>
-            固定 344px 宽；**横向铺满**：宽度拉到 344（不裁剪），高度按图片自身比例，
-            高度不足的部分由中缝底色补。建议竖图（宽高比 ≈ 344:778）正好铺满。
+            中缝固定 344px 宽，图片**居中占 172px 宽**（两侧各 86px 由底色补），
+            高度按图片自身比例，竖向不足也由底色补。
+            建议图片宽高比 ≈ 172:778 或更窄，正好铺满中间。
             上限 {DIVIDER_IMAGE_MAX_MB}MB。
           </span>
         </div>

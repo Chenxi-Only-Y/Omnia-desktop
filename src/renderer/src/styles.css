@@ -440,10 +440,10 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* 没有职业（或未登记）时退回浅底深字 */
 .pcard--noclass { background: var(--surface-2); color: var(--text); }
 
-/* 三行字号（用户口径，绝对值）：ID 名 28px 加粗 / 技能备注 17px / 职业 15px。
+/* 三行字号（用户口径，绝对值）：ID 名 25px 加粗 / 技能备注 17px / 职业 15px。
    写死不用容器查询缩放 —— 用户给的是确定值，缩放会把它盖掉。 */
 .pcard__id {
-  font-size: 28px; font-weight: 800; line-height: 1.1; letter-spacing: 0;
+  font-size: 25px; font-weight: 800; line-height: 1.1; letter-spacing: 0;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; word-break: break-all;
   cursor: pointer;

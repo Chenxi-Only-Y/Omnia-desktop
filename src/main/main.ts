@@ -1393,7 +1393,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const noteEl = document.querySelector('.pcard__note');
       const fs = (el) => (el ? getComputedStyle(el).fontSize : '（无）');
       steps.push('字号实测 ID=' + fs(idEl) + ' 职业=' + fs(clsEl) + ' 备注=' + fs(noteEl)
-        + '（应为 28px / 15px / 17px）');
+        + '（应为 25px / 15px / 17px）');
       // 内容有没有被卡片裁掉：三个子元素的高度之和 vs 卡片可用高度
       const inner = (el) => (el ? Math.round(el.getBoundingClientRect().height) : 0);
       const need = inner(idEl) + inner(clsEl) + inner(noteEl);
@@ -1443,9 +1443,9 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     {
       const g = geom.value as { fonts?: { id: string; cls: string; note: string } } | undefined;
       const f = g?.fonts;
-      const fontsOk = f?.id === '28px' && f?.cls === '15px' && f?.note === '17px';
+      const fontsOk = f?.id === '25px' && f?.cls === '15px' && f?.note === '17px';
       if (!fontsOk) log('[smoke] 排表字号            : FAIL', JSON.stringify(f));
-      else log('[smoke] 排表字号            : PASS ID=28px 职业=15px 备注=17px');
+      else log('[smoke] 排表字号            : PASS ID=25px 职业=15px 备注=17px');
       geom.ok = geom.ok && fontsOk;
     }
     await shot('lineup', 900);

@@ -404,25 +404,25 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .squadrow--drop { box-shadow: inset 0 0 0 2px var(--fg), 0 0 0 4px var(--accent-soft); }
 
 /* 队名列固定宽度，不参与分配，卡片才能把剩余宽度吃干净。
-   字号按用户口径放大 30%：队名 10→13、人数 9→12、战术 9→12；
-   列宽 58→74px 容纳放大后的文字（否则「防守一-1」会折行）。 */
+   用户口径：队名 15px 加粗、战术 13px（人数跟着战术走 12→13）。
+   列宽 74px 容纳放大后的文字。 */
 .squadrow__head {
   flex: 0 0 auto; width: 74px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 2px;
   border-right: 1px solid var(--line); padding-right: 6px;
-  font-size: 13px; font-weight: 700; color: var(--text); text-align: center;
+  font-size: 15px; font-weight: 700; color: var(--text); text-align: center;
   letter-spacing: 0; white-space: nowrap;
 }
-.squadrow__name { font-size: 13px; }
-.squadrow__count { font-size: 12px; font-weight: 400; color: var(--text-faint); }
-.squadrow__tactic { font-size: 12px; font-weight: 400; color: var(--text-dim); }
+.squadrow__name { font-size: 15px; font-weight: 700; }
+.squadrow__count { font-size: 13px; font-weight: 400; color: var(--text-faint); }
+.squadrow__tactic { font-size: 13px; font-weight: 400; color: var(--text-dim); }
 
 /* 可直接改的战术：外观与普通文字一致（无边框无背景），点开才出现下拉。
    不加任何额外按钮/图标 —— 用户口径"不要额外添加什么"。 */
 .squadrow__tactic--edit {
   appearance: none; -webkit-appearance: none;
   background: transparent; border: 1px solid transparent; border-radius: 4px;
-  color: var(--text-dim); font-family: inherit; font-size: 12px; font-weight: 400;
+  color: var(--text-dim); font-family: inherit; font-size: 13px; font-weight: 400;
   text-align: center; text-align-last: center; padding: 0 2px; max-width: 100%;
   cursor: pointer;
 }

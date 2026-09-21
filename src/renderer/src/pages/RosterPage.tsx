@@ -27,6 +27,17 @@ const EMPTY_DRAFT: Draft = {
   id: '', joinedOrder: '', mic: '', noteRole: '', orangeWeapon: '', status: 'active', remark: '',
 };
 
+/** 可排序的列（表头点击） */
+type SortKey = 'order' | 'id' | 'signup' | 'status' | 'mic' | 'role' | 'orange' | 'remark';
+
+/** 报名状态排序权重：参加 → 替补 → 请假 → 未填表 */
+function signupRank(s: SignupStatus | null): number {
+  if (s === 'JOIN') return 0;
+  if (s === 'BENCH') return 1;
+  if (s === 'LEAVE') return 2;
+  return 3;
+}
+
 const STATUS_LABEL: Record<string, string> = { active: '在队', inactive: '暂离', left: '离队' };
 
 export default function RosterPage({ classes, classMap, onCount, onOpenDetail }: Props) {
@@ -57,6 +68,14 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   /** 「序」的内联草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
   const [orderDraft, setOrderDraftState] = useState<Record<number, string>>({});
+  /**
+   * 表头排序：默认按「序」。点表头只改**查看顺序**，不动库里的序；
+   * 换列排序后拖动换位仍按当前显示顺序写回序（见 moveTo 的说明）。
+   */
+  const [sortKey, setSortKey] = useState<SortKey>('order');
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
+  /** 列表容器：拖动到边缘时自动滚动 */
+  const listRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,13 +141,67 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     });
   }, [players, q, filterStatus]);
 
-  /** 列表顺序：按「序」排（没填序的排最后），同序按 id —— 改序 / 拖拽都立刻反映在这里 */
-  const sorted = useMemo(() => [...filtered].sort((a, b) => {
-    const oa = a.joinedOrder ?? Number.MAX_SAFE_INTEGER;
-    const ob = b.joinedOrder ?? Number.MAX_SAFE_INTEGER;
-    if (oa !== ob) return oa - ob;
-    return a.id - b.id;
-  }), [filtered]);
+  /** 列表顺序：默认按「序」（没填序的排最后，同序按 id）；点表头可临时换列 */
+  const sorted = useMemo(() => {
+    const val = (p: Player): string | number => {
+      switch (sortKey) {
+        case 'order': return p.joinedOrder ?? Number.MAX_SAFE_INTEGER;
+        case 'id': return p.gameId.toLowerCase();
+        case 'signup': return signupRank(signupOf.get(p.id) ?? null);
+        case 'status': return statusOf(p).label;
+        case 'mic': return p.mic || '';
+        case 'role': return p.noteRole || '';
+        case 'orange': return p.orangeWeapon === '有' ? 0 : 1;
+        case 'remark': return p.remark || '';
+        default: return p.id;
+      }
+    };
+    const cmp = (a: Player, b: Player): number => {
+      const va = val(a);
+      const vb = val(b);
+      let r: number;
+      if (typeof va === 'number' && typeof vb === 'number') r = va - vb;
+      else r = String(va).localeCompare(String(vb), 'zh-Hans-CN');
+      if (r === 0) r = a.id - b.id;      // 稳定：同值按 id
+      return r * sortDir;
+    };
+    return [...filtered].sort(cmp);
+  }, [filtered, sortKey, sortDir, signupOf]);
+
+  /** 点表头：同一列再点切换升/降；换列则回到升序 */
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir((d) => (d === 1 ? -1 : 1));
+    else { setSortKey(k); setSortDir(1); }
+  }
+
+  /**
+   * 一键填满序：按**当前显示顺序**把序写成 1、2、3…
+   * 导入进来的人序都是空的，先铺一遍再拖会顺手很多。
+   */
+  async function fillOrder() {
+    if (!sorted.length) return;
+    if (!window.confirm(`按当前显示顺序把 ${sorted.length} 人的「序」重写为 1…${sorted.length}？`)) return;
+    try {
+      await api.player.reorder(sorted.map((x) => x.id));
+      setSortKey('order');
+      setSortDir(1);
+      setError(null);
+      setNotice(`已把 ${sorted.length} 人的序填为 1…${sorted.length}`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
+
+  /** 拖动到列表上/下边缘时自动滚动，才能把第 60 人拖到第 2 位 */
+  function autoScroll(e: React.DragEvent) {
+    const el = listRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 44;
+    if (e.clientY < r.top + margin) el.scrollTop -= 14;
+    else if (e.clientY > r.bottom - margin) el.scrollTop += 14;
+  }
 
   function setOrderDraft(id: number, v: string) {
     setOrderDraftState((d) => ({ ...d, [id]: v }));
@@ -357,6 +430,10 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
             <option value="">全部状态</option>
             <option value="active">在队</option><option value="inactive">暂离</option><option value="left">离队</option>
           </select>
+          <button className="btn" onClick={() => void fillOrder()} disabled={!sorted.length}
+                  title="按当前显示顺序把「序」写成 1…N（导入进来的人序都是空的）">
+            一键填满序
+          </button>
           <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }}
                  onChange={(e) => void handleFile(e.target.files?.[0])} />
           <button className="btn primary" onClick={() => setWizard(true)}>从 xlsx 导入</button>
@@ -390,7 +467,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
           </span>
         </div>
 
-        <div className="roster-cards">
+        <div className="roster-cards" ref={listRef} onDragOver={autoScroll}>
           {loading && <div className="hint">加载中…</div>}
           {!loading && filtered.length === 0 && (
             <div className="hint">暂无成员。可以用上面的表单添加，或导入旧表的成员主档。</div>
@@ -400,14 +477,16 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
           {!loading && filtered.length > 0 && (
             <div className="roster-cards__head">
               <span />
-              <span>序</span>
-              <span>ID</span>
-              <span>本场报名</span>
-              <span>状态</span>
-              <span>麦克风</span>
-              <span>备注角色</span>
-              <span>橙武</span>
-              <span>备注</span>
+              {([
+                ['order', '序'], ['id', 'ID'], ['signup', '本场报名'], ['status', '状态'],
+                ['mic', '麦克风'], ['role', '备注角色'], ['orange', '橙武'], ['remark', '备注'],
+              ] as [SortKey, string][]).map(([k, label]) => (
+                <span key={k} className={`th${sortKey === k ? ' th--active' : ''}`}
+                      title="点击排序（再点一次反序）"
+                      onClick={() => toggleSort(k)}>
+                  {label}{sortKey === k ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
+                </span>
+              ))}
               <span style={{ textAlign: 'right' }}>操作</span>
             </div>
           )}
@@ -459,15 +538,16 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                 </span>
                 <span className={`badge-state ${st.kind}`}>{st.label}</span>
 
+                {/* 只留值 —— 列名在表头上，格子里再写一遍就是重复（用户指出的） */}
                 <span className="roster-card__meta">
-                  <span>麦克风 <b>{p.mic || '—'}</b></span>
-                  <span>备注角色 <b>{p.noteRole || '—'}</b></span>
+                  <span>{p.mic || '—'}</span>
+                  <span>{p.noteRole || '—'}</span>
                   {/* 橙武只有有/无（默认无）：有 → 这一项直接显示橙色「橙武」；
                       没有 → 显示「-」。设置入口在「编辑」里，卡片上不放输入框。 */}
                   {p.orangeWeapon === '有'
                     ? <b className="roster-orange--yes" title="有橙武">橙武</b>
                     : <b style={{ color: 'var(--text-faint)', fontWeight: 400 }} title="无橙武">-</b>}
-                  <span>备注 <b>{p.remark || '—'}</b></span>
+                  <span title={p.remark || undefined}>{p.remark || '—'}</span>
                 </span>
 
                 <span className="roster-card__actions">

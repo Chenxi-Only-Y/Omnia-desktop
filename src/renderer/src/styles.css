@@ -577,6 +577,10 @@ tr.row--leave > td { background: var(--surface-3); }
   position: sticky; top: 0; background: var(--bg-panel); z-index: 1;
 }
 .roster-cards__head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 可点排序的表头 */
+.roster-cards__head .th { cursor: pointer; user-select: none; }
+.roster-cards__head .th:hover { color: var(--text); }
+.roster-cards__head .th--active { color: var(--fg); font-weight: 700; }
 .roster-card {
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--radius-sm); padding: 3px 8px;

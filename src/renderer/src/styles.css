@@ -187,6 +187,10 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
   flex: 1 1 auto; overflow: auto; padding: 16px 18px 28px;
   min-height: 0; display: block;
 }
+/* 首页：首屏要渐变铺满，而 sticky 元素**不能超出包含块内容框的上边缘**，
+   那 16px 上内边距靠负边距是盖不掉的（实测 sticky 下 margin-top 完全无效）。
+   所以这一页直接去掉上内边距。 */
+.content--flush-top { padding-top: 0; }
 /* 参与撑满的页面根节点 */
 .page-fill { display: flex; flex-direction: column; gap: 12px; flex: 0 0 auto; }
 /* 看板卡不再撑满高度：由内容决定高度，纵向滚整页 */
@@ -800,7 +804,8 @@ tr.row--leave > td { background: var(--surface-3); }
 .hero {
   position: relative; overflow: hidden;
   border-radius: 12px; border: 1px solid var(--border);
-  min-height: 300px; padding: 30px 30px 22px;
+  /* 大幅视觉：上半屏主要给图（用户口径「大幅视觉，数据放下方」） */
+  min-height: clamp(380px, 52vh, 620px); padding: 34px 34px 26px;
   display: flex; flex-direction: column; justify-content: space-between;
   /* 浅色主视觉：卡片色打底 + 极轻的职业色晕，保持单色稿的干净感 */
   background:
@@ -856,6 +861,45 @@ tr.row--leave > td { background: var(--surface-3); }
 }
 .hero__class i { width: 26px; height: 26px; border-radius: 50%; display: block; opacity: .85; }
 .hero__class em { font-style: normal; font-size: 10px; color: var(--text-dim); }
+
+/* ── 首屏钉住 + 数据层上滑覆盖（用户口径）────────────────────────
+   渐变首屏铺满一屏且 sticky 不动；下面的 .hero-cover 不透明、层级更高，
+   滚动时像帘子一样从下往上升起，把首屏盖住。 */
+.hero--pinned {
+  position: sticky;
+  /* z-index:0 让它待在数据层下面；sticky 只能在本页内容框内活动，
+     上方的对齐靠 .content--flush-top 去掉了上内边距（见上面说明）。 */
+  top: 0; z-index: 0;
+  /* 左右负边距抵消 .content 的 18px 内边距（横向没有 sticky 那种限制） */
+  margin: 0 -18px;
+  height: calc(100vh - 46px);   /* 46px = 顶栏高度 */
+  min-height: 0;
+  border: 0; border-radius: 0;
+  justify-content: center;
+}
+.hero-cover {
+  position: relative; z-index: 1;
+  /* 不透明底 → 才能盖住首屏；负边距同样为了铺满 */
+  background: var(--bg);
+  margin: 0 -18px -28px;
+  padding: 18px 18px 28px;
+  min-height: 100vh;
+}
+.hero__scroll {
+  position: absolute; left: 0; right: 0; bottom: 22px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--text-dim); font-size: 12px; letter-spacing: 1px;
+  animation: hero-scroll-hint 1.8s ease-in-out infinite;
+}
+.hero__scroll-arrow { font-size: 15px; }
+@keyframes hero-scroll-hint {
+  0%, 100% { transform: translateY(0); opacity: .75; }
+  50% { transform: translateY(5px); opacity: 1; }
+}
+/* 尊重"减少动效"偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .hero__scroll { animation: none; }
+}
 
 /* ─────────────────────────────────────────────────────────────
    xlsx 导入向导

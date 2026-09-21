@@ -1313,7 +1313,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
     for (const s of rules.steps) log('[smoke] 规则:', s);
     log('[smoke] 规则集管理        :', rules.ok ? 'PASS' : 'FAIL');
 
-    // 首页立绘卡：攻略页已删除，但首页那两张流派立绘要确认真的加载出来
+    // 首页首屏：渐变铺满 + 钉住不动 + 下滑时数据层从下往上盖住
     const guide = await guarded(`(async () => {
       const steps = smokeSteps();
       try {
@@ -1325,11 +1325,35 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const home = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.indexOf('总览') >= 0);
         if (!home) throw new Error('侧栏没有「总览」');
         home.click();
-        await waitFor(() => document.querySelectorAll('.banner-cards img').length > 0 ? true : null, '首页立绘卡');
-        const banners = [...document.querySelectorAll('.banner-cards img')];
-        await waitFor(() => banners.every(i => i.complete) ? true : null, '立绘卡加载');
-        steps.push('首页立绘卡=' + banners.length + ' 尺寸='
-          + banners.map(b => b.naturalWidth + 'x' + b.naturalHeight).join(' '));
+        // 首屏与数据层都要在
+        await waitFor(() => document.querySelector('.hero--pinned') ? true : null, '首屏');
+        await waitFor(() => document.querySelector('.hero-cover') ? true : null, '数据层');
+        const content = document.querySelector('.content');
+        const heroEl = document.querySelector('.hero--pinned');
+        const coverEl = document.querySelector('.hero-cover');
+        content.scrollTop = 0;
+        await new Promise(res => setTimeout(res, 250));
+        const restTop = Math.round(heroEl.getBoundingClientRect().top);
+        const coverTopAtRest = Math.round(coverEl.getBoundingClientRect().top);
+        // 往下滚：首屏应钉住不动，数据层升上来把它盖住
+        content.scrollTop = Math.round(content.clientHeight * 0.6);
+        await new Promise(res => setTimeout(res, 350));
+        const pinnedTop = Math.round(heroEl.getBoundingClientRect().top);
+        const coverTop = Math.round(coverEl.getBoundingClientRect().top);
+        const heroBottom = Math.round(heroEl.getBoundingClientRect().bottom);
+        steps.push('首屏静止 top=' + restTop + '（应≈顶栏下方 46）高度='
+          + Math.round(heroEl.getBoundingClientRect().height));
+        steps.push('滚动后 首屏 top=' + pinnedTop + '（应与静止一致=钉住）'
+          + ' 数据层 top=' + coverTop + ' 首屏底=' + heroBottom
+          + ' 覆盖=' + (coverTop < heroBottom));
+        steps.push('静止时数据层在首屏下方=' + (coverTopAtRest >= heroBottom));
+        const heroOk = Math.abs(pinnedTop - restTop) <= 2
+          && restTop <= 52                      // 铺满：紧贴顶栏，没有 16px 灰条
+          && coverTop < heroBottom
+          && coverTopAtRest >= heroBottom;
+        content.scrollTop = 0;
+        await new Promise(res => setTimeout(res, 200));
+        steps.push('首屏结构判定=' + heroOk);
 
         // 攻略页必须已经从导航里消失
         const stillThere = [...document.querySelectorAll('button.nav-item')]
@@ -1368,8 +1392,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           + ' nav-collapsed=' + collapsedClass + ' 落库 navCollapsed=' + JSON.stringify(savedShut.data.navCollapsed));
 
         return {
-          ok: banners.length === 2
-            && banners.every(b => b.naturalWidth > 500)
+          ok: heroOk
             && stillThere === false
             && themeOk
             && wOpen > 180 && wShut < 70 && labelOpen && !labelShut && collapsedClass

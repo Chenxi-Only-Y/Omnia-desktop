@@ -14,7 +14,6 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import { classIconSrc } from '../lib/assets';
-import { BannerCards } from '../components/BannerCards';
 /** 换成真实立绘时填文件名，例如 'hero/cover.png'（相对 public/） */
 const HERO_IMAGE: string | null = null;
 
@@ -33,6 +32,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const [latestSignups, setLatestSignups] = useState<SignupRow[]>([]);
   const [latestMatchLabel, setLatestMatchLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
+
 
   const load = useCallback(async () => {
     try {
@@ -68,14 +68,16 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const active = players.filter((p) => p.status === 'active').length;
   const ready = latestSignups.filter((r) => r.signup === 'JOIN').length;
   const capacity = catalog?.capacity ?? TOTAL_MATCH_SLOTS;
+  // 用户口径：首页背景就用那套**渐变铺满**（不用上传的图），首屏钉住不动。
+  // 上传的中缝图仍然只用于排表中缝，两者互不影响。
   const heroSrc = HERO_IMAGE ? `${import.meta.env.BASE_URL}${HERO_IMAGE}` : null;
 
   return (
     <>
       {error && <div className="msg error">{error}</div>}
 
-      {/* ── 主视觉区 ── */}
-      <section className="hero">
+      {/* ── 首屏：渐变铺满、钉住不动（下滑时下面的数据层盖上来） ── */}
+      <section className="hero hero--pinned">
         {heroSrc && <img className="hero__img" src={heroSrc} alt="" />}
         <div className="hero__veil" aria-hidden="true" />
         <div className="hero__body">
@@ -93,9 +95,6 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
           </div>
         </div>
 
-        {/* 三职业立绘卡（原表攻略页的 image22 / image26）*/}
-        <BannerCards />
-
         {/* 职业图标阵 —— 既是装饰也是"这个系统认识哪些职业"的表达 */}
         <div className="hero__classes" aria-hidden="true">
           {CLASSES.map((c) => {
@@ -110,10 +109,17 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
             );
           })}
         </div>
+
+        {/* 下滑提示：告诉用户下面还有东西 */}
+        <div className="hero__scroll" aria-hidden="true">
+          <span>下滑查看数据</span>
+          <span className="hero__scroll-arrow">↓</span>
+        </div>
       </section>
 
-      {/* ── 数据区（压在主视觉下方） ── */}
-      <div className="stat-grid" style={{ marginTop: 14 }}>
+      {/* ── 数据层：不透明背景 + 更高层级 → 滚动时从下往上盖住首屏 ── */}
+      <div className="hero-cover">
+      <div className="stat-grid">
         <div className="stat">
           <div className="k">成员总数</div>
           <div className="v">{players.length}<small> 人</small></div>
@@ -198,9 +204,10 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
           <div className="hint">读取中…</div>
         )}
         <div className="hint">
-          首页主视觉目前是占位版式：原表「首页」的大图实测是空图（作者原画已丢失）。
-          拿到立绘后放到 <code>src/renderer/public/hero/</code> 并在 <code>OverviewPage.tsx</code> 里填 HERO_IMAGE 即可。
+          首屏用的是主题渐变（原表「首页」的大图实测是空图，作者原画已丢失）。
+          首屏钉住不动，向下滚动时数据层会从下往上盖住它。
         </div>
+      </div>
       </div>
     </>
   );

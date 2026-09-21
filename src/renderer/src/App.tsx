@@ -112,7 +112,7 @@ export default function App() {
           {info && <span className="meta">Electron {info.electron} · Node {info.node}</span>}
         </header>
 
-        <section className="content">
+        <section className={`content${page === 'overview' ? ' content--flush-top' : ''}`}>
           {bootError && (
             <div className="msg error">
               初始化失败：{bootError}

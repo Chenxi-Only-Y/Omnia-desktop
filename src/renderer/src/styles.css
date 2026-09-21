@@ -275,6 +275,8 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 .badge-state.active { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
 .badge-state.inactive { color: var(--text-faint); border-color: var(--border-strong); }
 .badge-state.left { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+/* 本场未排表：中性灰，不当作异常 */
+.badge-state.none { color: var(--text-faint); border-color: var(--line-strong); }
 .badge-mic { font-size: 11px; color: var(--text-dim); }
 .badge-note { font-size: 11px; color: var(--warn); }
 

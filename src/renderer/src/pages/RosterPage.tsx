@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Match, Player, PlayerInput, SignupStatus } from '@shared/types';
+import type { Match, PartState, Player, PlayerInput, SignupStatus } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ImportWizard from '../components/ImportWizard';
@@ -39,6 +39,12 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [matchId, setMatchId] = useState<number | null>(null);
   /** playerId → 本场报名状态（null 表示未填表） */
   const [signupOf, setSignupOf] = useState<Map<number, SignupStatus | null>>(new Map());
+  /**
+   * playerId → 本场排表状态。
+   * 用户口径：「排表里有就显示在队」—— 即状态列以**排表**为准，
+   * 而不是主档里那个基本没人维护的状态字段。
+   */
+  const [lineupOf, setLineupOf] = useState<Map<number, PartState>>(new Map());
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editId, setEditId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -69,13 +75,35 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     }).catch(() => { /* 没有场次时保持空 */ });
   }, []);
 
-  // 拉该场的报名状态，供「未填表 / 参加 / 请假」标记
+  // 拉该场的报名状态与排表状态：「未填表 / 参加 / 请假」以及「在队」都按本场判定
   useEffect(() => {
-    if (matchId === null) { setSignupOf(new Map()); return; }
+    if (matchId === null) { setSignupOf(new Map()); setLineupOf(new Map()); return; }
     void api.signup.board(matchId).then((b) => {
       setSignupOf(new Map(b.rows.map((r) => [r.playerId, r.signup])));
     }).catch(() => setSignupOf(new Map()));
+    void api.match.participations(matchId).then((parts) => {
+      setLineupOf(new Map(
+        parts.filter((r) => r.side === 'our').map((r) => [r.playerId, r.state]),
+      ));
+    }).catch(() => setLineupOf(new Map()));
   }, [matchId]);
+
+  /**
+   * 状态列的显示值。
+   * 用户口径「排表里有就显示在队」：已选场次时以**该场排表**为准 ——
+   *   排表里上场 → 在队；替补 → 替补；请假 → 请假；没进排表 → 未排表。
+   * 未选场次时退回主档里存的状态（在队/暂离/离队）。
+   */
+  function statusOf(p: Player): { label: string; kind: string } {
+    if (matchId === null) {
+      return { label: STATUS_LABEL[p.status] ?? p.status, kind: p.status };
+    }
+    const st = lineupOf.get(p.id);
+    if (st === 'PLAY') return { label: '在队', kind: 'active' };
+    if (st === 'BENCH') return { label: '替补', kind: 'inactive' };
+    if (st === 'LEAVE') return { label: '请假', kind: 'left' };
+    return { label: '未排表', kind: 'none' };
+  }
 
   const filtered = useMemo(() => {
     const key = q.trim().toLowerCase();
@@ -375,7 +403,10 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                         })()}</td>
                         <td><span className="badge-mic">{p.mic || '—'}</span></td>
                         <td>{p.noteRole ? <span className="badge-note">{p.noteRole}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
-                        <td><span className={`badge-state ${p.status}`}>{STATUS_LABEL[p.status] ?? p.status}</span></td>
+                        <td>{(() => {
+                          const s = statusOf(p);
+                          return <span className={`badge-state ${s.kind}`}>{s.label}</span>;
+                        })()}</td>
                         <td style={{ color: 'var(--text-dim)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.remark || '—'}</td>
                         <td className="actions">
                           <div className="row-edit" style={{ justifyContent: 'flex-end' }}>

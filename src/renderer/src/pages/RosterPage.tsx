@@ -55,9 +55,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   /** 拖拽换位：正在拖的、以及当前悬停的目标 */
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
-  /** 「序」与「橙武」的内联草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
+  /** 「序」的内联草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
   const [orderDraft, setOrderDraftState] = useState<Record<number, string>>({});
-  const [orangeDraft, setOrangeDraft] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -145,25 +144,6 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     try {
       await api.player.update(p.id, { joinedOrder: next });
       setOrderDraftState((d) => { const n = { ...d }; delete n[p.id]; return n; });
-      setError(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
-    }
-  }
-
-  /** 提交「橙武」 */
-  async function commitOrange(p: Player) {
-    const raw = orangeDraft[p.id];
-    if (raw === undefined) return;
-    const next = raw.trim();
-    if (next === (p.orangeWeapon ?? '')) {
-      setOrangeDraft((d) => { const n = { ...d }; delete n[p.id]; return n; });
-      return;
-    }
-    try {
-      await api.player.update(p.id, { orangeWeapon: next });
-      setOrangeDraft((d) => { const n = { ...d }; delete n[p.id]; return n; });
       setError(null);
       await load();
     } catch (err) {
@@ -415,7 +395,23 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
           {!loading && filtered.length === 0 && (
             <div className="hint">暂无成员。可以用上面的表单添加，或导入旧表的成员主档。</div>
           )}
-          {!loading && sorted.map((p) => {
+          {/* 表头：用与卡片完全相同的列宽，所以标题与内容逐列对齐
+              （改成卡片时曾把表头漏掉，每列是什么只能靠猜） */}
+          {!loading && filtered.length > 0 && (
+            <div className="roster-cards__head">
+              <span />
+              <span>序</span>
+              <span>ID</span>
+              <span>本场报名</span>
+              <span>状态</span>
+              <span>麦克风</span>
+              <span>备注角色</span>
+              <span>橙武</span>
+              <span>备注</span>
+              <span style={{ textAlign: 'right' }}>操作</span>
+            </div>
+          )}
+          {!loading && sorted.map((p, idx) => {
             const st = statusOf(p);
             const dragOver = dragOverId === p.id && dragId !== null && dragId !== p.id;
             return (
@@ -447,6 +443,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                   type="number"
                   title="序（改完按序排列）"
                   value={p.joinedOrder ?? ''}
+                  placeholder={String(idx + 1)}
                   onChange={(e) => setOrderDraft(p.id, e.target.value)}
                   onBlur={() => void commitOrder(p)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void commitOrder(p); }}
@@ -465,18 +462,11 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                 <span className="roster-card__meta">
                   <span>麦克风 <b>{p.mic || '—'}</b></span>
                   <span>备注角色 <b>{p.noteRole || '—'}</b></span>
-                  {/* 橙武：默认显示「-」，点进去可直接填 */}
-                  <span className="roster-card__orange">
-                    橙武
-                    <input
-                      className="input roster-card__orange-input"
-                      placeholder="-"
-                      value={orangeDraft[p.id] ?? p.orangeWeapon ?? ''}
-                      onChange={(e) => setOrangeDraft((d) => ({ ...d, [p.id]: e.target.value }))}
-                      onBlur={() => void commitOrange(p)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') void commitOrange(p); }}
-                    />
-                  </span>
+                  {/* 橙武只有有/无（默认无）：有 → 这一项直接显示橙色「橙武」；
+                      没有 → 显示「-」。设置入口在「编辑」里，卡片上不放输入框。 */}
+                  {p.orangeWeapon === '有'
+                    ? <b className="roster-orange--yes" title="有橙武">橙武</b>
+                    : <b style={{ color: 'var(--text-faint)', fontWeight: 400 }} title="无橙武">-</b>}
                   <span>备注 <b>{p.remark || '—'}</b></span>
                 </span>
 
@@ -503,9 +493,19 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                     </select>
                     <input className="input" style={{ width: 76 }} placeholder="序" value={editDraft.joinedOrder}
                            onChange={(e) => setEditDraft({ ...editDraft, joinedOrder: e.target.value })} />
-                    <input className="input" style={{ width: 120 }} placeholder="橙武"
-                           value={editDraft.orangeWeapon}
-                           onChange={(e) => setEditDraft({ ...editDraft, orangeWeapon: e.target.value })} />
+                    <select className="select" value={editDraft.orangeWeapon}
+                            title="橙武：有 / 无"
+                            onChange={(e) => setEditDraft({ ...editDraft, orangeWeapon: e.target.value })}>
+                      <option value="">无</option>
+                      <option value="有">有</option>
+                    </select>
+                    {/* 状态：之前改造时漏掉了这个下拉，导致编辑里改不了在队状态 */}
+                    <select className="select" value={editDraft.status}
+                            onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
+                      <option value="active">在队</option>
+                      <option value="inactive">暂离</option>
+                      <option value="left">离队</option>
+                    </select>
                     <input className="input" style={{ width: 160 }} placeholder="备注"
                            value={editDraft.remark}
                            onChange={(e) => setEditDraft({ ...editDraft, remark: e.target.value })} />

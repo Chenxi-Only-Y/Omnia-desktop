@@ -38,6 +38,9 @@
   --danger-soft: #F2DFE3;
   --warn: #8A6A22;
   --warn-soft: #F4EAD5;
+  /* 橙武标记专用橙：主题整体偏灰，这里要能一眼跳出来 */
+  --orange: #C4701C;
+  --orange-soft: #F7E7D2;
   --ok: #3F6F58;
   --ok-soft: #DCEBE2;
 
@@ -555,39 +558,68 @@ tr.row--leave > td { background: var(--surface-3); }
 }
 .picker-item__sub--empty { cursor: default; }
 /* ── 成员主档：卡片列表（可拖动换位） ─────────────────────────── */
-.roster-cards { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow: auto; }
-.roster-card {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius-sm); padding: 6px 10px;
-  box-shadow: var(--shadow);
+.roster-cards { display: flex; flex-direction: column; gap: 4px; max-height: 62vh; overflow: auto; }
+/* 单行紧凑卡片。**固定列宽**（用户口径：每项固定位置，不能从左往右依次排）——
+   这样 67 行的「麦克风 / 备注角色 / 橙武 / 备注」都纵向对齐，一眼能扫。
+   [拖动] 序 ID 报名 状态 麦克风 备注角色 橙武 备注 ……… 操作 */
+.roster-card,
+.roster-cards__head {
+  display: grid;
+  grid-template-columns:
+    16px 46px minmax(120px, 200px) 62px 62px 86px 86px 58px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
 }
-.roster-card:hover { border-color: var(--line-strong); }
+/* 表头：与卡片共用列定义，所以逐列对齐 */
+.roster-cards__head {
+  padding: 2px 8px 4px;
+  font-size: 11px; color: var(--text-faint);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--bg-panel); z-index: 1;
+}
+.roster-cards__head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roster-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 3px 8px;
+}
+.roster-card:hover { border-color: var(--line-strong); background: var(--bg-hover); }
 .roster-card--dragging { opacity: .4; }
-.roster-card--over { border-color: var(--fg); box-shadow: 0 0 0 3px var(--accent-soft); }
+.roster-card--over { border-color: var(--fg); box-shadow: 0 0 0 2px var(--accent-soft); }
 .roster-card__handle {
-  cursor: grab; color: var(--text-faint); font-size: 14px; user-select: none;
-  padding: 0 2px;
+  cursor: grab; color: var(--text-faint); font-size: 13px; user-select: none;
+  padding: 0 1px; line-height: 1;
 }
 .roster-card__handle:active { cursor: grabbing; }
-.roster-card__order { width: 54px; text-align: center; }
+.roster-card__order {
+  width: 100%; text-align: center; padding: 1px 4px; font-size: 12px;
+}
 .roster-card__id {
   border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: var(--fg); font-weight: 700; padding: 0;
-  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--fg); font-weight: 700; padding: 0; text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .roster-card__id:hover { text-decoration: underline; }
-.roster-card__meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-  font-size: 12px; color: var(--text-dim); flex: 1 1 auto; min-width: 0;
+/* display:contents → 里面的每一项直接成为卡片网格的单元格，才能固定列宽 */
+.roster-card__meta { display: contents; }
+.roster-card__meta > span {
+  font-size: 12px; color: var(--text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .roster-card__meta b { color: var(--text); font-weight: 400; }
-.roster-card__orange { display: inline-flex; align-items: center; gap: 5px; }
-.roster-card__orange-input { width: 96px; padding: 1px 6px; font-size: 12px; }
-.roster-card__actions { display: flex; gap: 4px; flex: 0 0 auto; }
+/* 有橙武：这一项整块显示橙色，一眼能看出来 */
+.roster-orange--yes {
+  color: var(--orange) !important;
+  background: var(--orange-soft);
+  border-radius: 4px; padding: 0 5px;
+}
+.roster-card .badge-state {
+  justify-self: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.roster-card__actions { display: flex; gap: 3px; justify-self: end; }
+.roster-card__actions .btn.sm { padding: 1px 7px; font-size: 11px; }
+/* 编辑栏横跨整行 */
 .roster-card__edit {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  flex-basis: 100%; margin-top: 6px; padding-top: 6px;
+  grid-column: 1 / -1; margin-top: 4px; padding-top: 6px;
   border-top: 1px dashed var(--line);
 }
 

@@ -99,6 +99,11 @@ function bootDatabase(): boolean {
  */
 function makeLogger(): (...args: unknown[]) => void {
   const explicit = env('OMNIA_SMOKE_LOG');
+  // 自检时「截取图片」若走保存对话框会**模态阻塞**，无人点击就永远卡住整个自检。
+  // 所以自检模式下一律改成直接写文件（不给对话框机会）。
+  if (env('OMNIA_SMOKE', 'LIS_SMOKE') === '1' && !process.env.OMNIA_CAPTURE_DIR) {
+    process.env.OMNIA_CAPTURE_DIR = path.join(path.dirname(dbFile()), 'captures');
+  }
   const lines: string[] = [];
   const flush = () => {
     try {
@@ -362,9 +367,9 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
         const TSV = [
           '玩家名字\\t职业\\t击败/清泉\\t助攻\\t资源\\t对玩家伤害\\t人伤卸甲\\t对建筑伤害\\t破塔卸甲\\t治疗值\\t承受伤害\\t重伤\\t复活/清泉\\t焚骨',
-          '战报测试员\\t神相\\t 32/0\\t151\\t0\\t8930953\\t0\\t1965057\\t0\\t0\\t6489941\\t3\\t0\\t0',
+          'smoke_p1\\t神相\\t 32/0\\t151\\t0\\t8930953\\t0\\t1965057\\t0\\t0\\t6489941\\t3\\t0\\t0',
           '不在档的人\\t玄机\\t5/1\\t20\\t0\\t100\\t0\\t200\\t0\\t0\\t300\\t1\\t0\\t0',
-          '战报测试员\\t神相\\t1/0\\t1\\t0\\t1\\t0\\t1\\t0\\t0\\t1\\t0\\t0\\t0',
+          'smoke_p1\\t神相\\t1/0\\t1\\t0\\t1\\t0\\t1\\t0\\t0\\t1\\t0\\t0\\t0',
         ].join('\\n');
 
         // 严格模式：应出现 1 个「不在主档」错误 + 1 个重复错误
@@ -396,7 +401,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
 
         const parts = await api.match.participations(m.data.match.id);
         if (!parts.ok) throw new Error('读回失败: ' + parts.error);
-        const mine = parts.data.find(p => p.name === '战报测试员');
+        const mine = parts.data.find(p => p.gameId === 'smoke_p1');
         if (!mine) throw new Error('读回里找不到刚写入的队员');
         steps.push('读回 ok 参战=' + parts.data.length
           + ' 有效击杀=' + (mine.stat.kills + mine.stat.fountainKills)
@@ -494,7 +499,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           matchId: m.data.match.id, playerId: pAlias.data.id, squad: '防守一2', state: 'PLAY',
         });
         const partsAlias = await api.match.participations(m.data.match.id);
-        const aliasRow = partsAlias.data.find(r => r.name === '别名测试员');
+        const aliasRow = partsAlias.data.find(r => r.gameId === 'smoke_board_alias');
         steps.push('旧写法「防守一2」写入=' + (upsertAlias.ok ? '成功' : '被拒:' + upsertAlias.error)
           + ' 落库小队=' + JSON.stringify(aliasRow?.squad)
           + ' 战术=' + JSON.stringify(aliasRow?.tactic));
@@ -595,29 +600,29 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         // 甲放进「防守一-1」第 4 格（index 3）
         await api.match.assignBulk({ matchId: mid, playerIds: [pid1], squad: '防守一-1', slotIndex: 3 });
         let parts = await api.match.participations(mid);
-        const a = parts.data.find(r => r.name === '落位甲');
+        const a = parts.data.find(r => r.gameId === 'smoke_slot_1');
         steps.push('甲 放到第 4 格 → 落库 slotNo=' + a?.slotNo + '（应=3）');
 
         // 乙放进同一队第 2 格（index 1）
         await api.match.assignBulk({ matchId: mid, playerIds: [pid2], squad: '防守一-1', slotIndex: 1 });
         parts = await api.match.participations(mid);
-        const a2 = parts.data.find(r => r.name === '落位甲');
-        const b2 = parts.data.find(r => r.name === '落位乙');
+        const a2 = parts.data.find(r => r.gameId === 'smoke_slot_1');
+        const b2 = parts.data.find(r => r.gameId === 'smoke_slot_2');
         steps.push('乙 放到第 2 格 → 甲 slotNo=' + a2?.slotNo + ' 乙 slotNo=' + b2?.slotNo + '（应 3 / 1）');
 
         // 再点回甲占着的第 4 格（用第三人占位验证互换不丢人）：
         // 让乙改放到第 4 格 → 乙占 4，甲被顶到乙原来的 1
         await api.match.assignBulk({ matchId: mid, playerIds: [pid2], squad: '防守一-1', slotIndex: 3 });
         parts = await api.match.participations(mid);
-        const a3 = parts.data.find(r => r.name === '落位甲');
-        const b3 = parts.data.find(r => r.name === '落位乙');
+        const a3 = parts.data.find(r => r.gameId === 'smoke_slot_1');
+        const b3 = parts.data.find(r => r.gameId === 'smoke_slot_2');
         steps.push('乙 改放第 4 格 → 乙=' + b3?.slotNo + ' 甲=' + a3?.slotNo
           + '（互换：乙应 3，甲应 1，两人都不能丢）');
 
         // 移出小队要清掉格号
         await api.match.unassign(mid, pid1);
         parts = await api.match.participations(mid);
-        const a4 = parts.data.find(r => r.name === '落位甲');
+        const a4 = parts.data.find(r => r.gameId === 'smoke_slot_1');
         steps.push('移出小队后 slotNo=' + a4?.slotNo + '（应=-1）');
 
         const cond = {
@@ -647,8 +652,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const cards = [...row.querySelectorAll('.squadrow__cards > *')];
         const idxOf = (gid) => cards.findIndex(c => c.textContent.indexOf(gid) >= 0);
         const filledCount = cards.filter(c => !c.classList.contains('pcard--empty')).length;
-        const dbA = parts2.data.find(r => r.name === '落位甲');
-        const dbB = parts2.data.find(r => r.name === '落位乙');
+        const dbA = parts2.data.find(r => r.gameId === 'smoke_slot_1');
+        const dbB = parts2.data.find(r => r.gameId === 'smoke_slot_2');
         steps.push('渲染：共 ' + cards.length + ' 格；甲 落库 slot=' + dbA?.slotNo
           + ' → 渲染第 ' + (idxOf('smoke_slot_1') + 1) + ' 格；乙 落库 slot=' + dbB?.slotNo
           + ' → 渲染第 ' + (idxOf('smoke_slot_2') + 1) + ' 格；已填 ' + filledCount + ' 格');
@@ -691,12 +696,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         for (const m of [m1, m2]) if (m.ok) created.matches.push(m.data.match.id);
 
         // 第一场：3 人上场，全部填战报
-        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY', stat: { kills: 20, assists: 30, dmgPlayer: 1000, deaths: 1 } });
-        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p2.data.id, squad: '防守一-1', state: 'PLAY', stat: { assists: 50, healing: 5000, deaths: 0 } });
-        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p3.data.id, squad: '防守一-1', state: 'PLAY', stat: { assists: 10, damageTaken: 9000, deaths: 4 } });
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY', classUsed: '神相', stat: { kills: 20, assists: 30, dmgPlayer: 1000, deaths: 1 } });
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p2.data.id, squad: '防守一-1', state: 'PLAY', classUsed: '素问', stat: { assists: 50, healing: 5000, deaths: 0 } });
+        await api.match.upsertParticipation({ matchId: m1.data.match.id, playerId: p3.data.id, squad: '防守一-1', state: 'PLAY', classUsed: '铁衣', stat: { assists: 10, damageTaken: 9000, deaths: 4 } });
         // 第二场：3 人上场，只填 1 人（完整度应为 1/3）
-        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p1.data.id, squad: '进攻一-1', state: 'PLAY', stat: { kills: 5, deaths: 2 } });
-        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p2.data.id, squad: '进攻一-1', state: 'PLAY' });
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p1.data.id, squad: '进攻一-1', state: 'PLAY', classUsed: '神相', stat: { kills: 5, deaths: 2 } });
+        await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p2.data.id, squad: '进攻一-1', state: 'PLAY', classUsed: '素问' });
         await api.match.upsertParticipation({ matchId: m2.data.match.id, playerId: p3.data.id, state: 'LEAVE' });
 
         const d = await api.dashboard.data();
@@ -987,22 +992,22 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         }, '拖拽后 进攻一-1 出现 拖拽甲(ID)');
 
         const parts = await api.match.participations(mid);
-        const p1row = parts.data.find(r => r.name === '拖拽甲');
+        const p1row = parts.data.find(r => r.gameId === 'smoke_dnd_1');
         steps.push('落库后 拖拽甲.squad=' + p1row?.squad + ' state=' + p1row?.state
           + ' tactic=' + (p1row?.tactic || '（空）'));
-        const p2row = parts.data.find(r => r.name === '拖拽乙');
+        const p2row = parts.data.find(r => r.gameId === 'smoke_dnd_2');
         steps.push('未分配的 拖拽乙.squad=' + JSON.stringify(p2row?.squad ?? ''));
 
         // 再把 拖拽乙 拖到「未分配」区应该没有效果（它本来就未分配）；
         // 改为验证 拖拽甲 拖回未分配区会被移除小队
-        const chip = [...document.querySelectorAll('.board__chip')].find(c => c.textContent.includes('拖拽乙'));
+        const chip = [...document.querySelectorAll('.board__chip')].find(c => c.textContent.includes('smoke_dnd_2'));
         steps.push('未分配区出现 拖拽乙=' + !!chip);
 
         await api.match.remove(mid);
         await api.player.remove(p1.data.id);
         await api.player.remove(p2.data.id);
 
-        const ok = store.getData(KEY).includes('拖拽甲')
+        const ok = store.getData(KEY).includes('smoke_dnd_1')
           && p1row?.squad === '进攻一-1'
           && p1row?.state === 'PLAY'
           && p2row?.squad === ''
@@ -1131,7 +1136,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         b = await api.signup.board(mid);
         steps.push('标记后 参加=' + b.data.stats.joined + ' 替补=' + b.data.stats.bench
           + ' 请假=' + b.data.stats.leave + ' 未报名=' + b.data.stats.none);
-        const dRow = b.data.rows.find(r => r.name === '报名丁');
+        const dRow = b.data.rows.find(r => r.gameId === 'smoke_sg_4');
         steps.push('丁 报名=' + dRow.signup + ' 上场名单=' + dRow.lineupState);
 
         // 撤回请假改回参加后，取最新一次面板作为断言依据（避免用过期快照）
@@ -1149,15 +1154,15 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('应用条数=' + applied.data.applied);
 
         const parts = await api.match.participations(mid);
-        const byName = Object.fromEntries(parts.data.map(p => [p.name, p.state + '/' + (p.squad || '未分配')]));
-        steps.push('应用后 甲=' + byName['报名甲'] + ' 乙=' + byName['报名乙']
-          + ' 丙=' + byName['报名丙'] + ' 丁=' + byName['报名丁']);
+        const byName = Object.fromEntries(parts.data.map(p => [p.gameId, p.state + '/' + (p.squad || '未分配')]));
+        steps.push('应用后 甲=' + byName['smoke_sg_1'] + ' 乙=' + byName['smoke_sg_2']
+          + ' 丙=' + byName['smoke_sg_3'] + ' 丁=' + byName['smoke_sg_4']);
 
         // 甲先排进小队，再"应用一次"应该保留小队（只有状态被拉回上场）
         await api.match.upsertParticipation({ matchId: mid, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY' });
         await api.signup.apply(mid, [p1.data.id]);
         const parts2 = await api.match.participations(mid);
-        const jia = parts2.data.find(p => p.name === '报名甲');
+        const jia = parts2.data.find(p => p.gameId === 'smoke_sg_1');
         steps.push('再次应用后 甲 squad=' + jia.squad + '（应保留 防守一-1）');
 
         // 界面渲染
@@ -1193,10 +1198,10 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const ok = boardNow.data.stats.joined === 2 && boardNow.data.stats.bench === 1
           && boardNow.data.stats.leave === 0 && boardNow.data.stats.none === 2
           && dRow.signup === null && dRow.lineupState === null
-          && byName['报名甲'] === 'PLAY/未分配'
-          && byName['报名乙'] === 'BENCH/未分配'
-          && byName['报名丙'] === 'PLAY/未分配'
-          && byName['报名丁'] === undefined
+          && byName['smoke_sg_1'] === 'PLAY/未分配'
+          && byName['smoke_sg_2'] === 'BENCH/未分配'
+          && byName['smoke_sg_3'] === 'PLAY/未分配'
+          && byName['smoke_sg_4'] === undefined
           && jia.squad === '防守一-1'
           && rows >= 4 && marks >= 4;
         return { ok, steps };
@@ -1654,7 +1659,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           + ' 可视=' + sc.clientWidth + 'x' + sc.clientHeight);
         btn.click();   // 与用户点按钮完全一致
         // 等拼图 + 落盘（分块截图需要若干轮滚动）
-        await new Promise(r => setTimeout(r, 6000));
+        await new Promise(r => setTimeout(r, 14000));   // 三块截图 + 拼合 + 落盘需要更久
         const msgs = [...document.querySelectorAll('.msg')].map(x => x.textContent.trim());
         // 找出**真正**在滚动的是哪个元素（不要再猜容器）
         const scrollers = [...document.querySelectorAll('*')]
@@ -1766,8 +1771,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         await api.rules.setActive(nr.data.id);
         const run2 = await api.match.runScore(mid, nr.data.id);
         if (!run2.ok) throw new Error('按新规则算分失败: ' + run2.error);
-        const before = s1.lines.find(l => l.playerName === '评分己').total;
-        const after = run2.data.lines.find(l => l.playerName === '评分己').total;
+        const before = s1.lines.find((l) => l.playerName === 'sc_6').total;
+        const after = run2.data.lines.find((l) => l.playerName === 'sc_6').total;
         steps.push('评己(6 死) 旧规则=' + before.toFixed(2) + ' 高死亡扣分规则=' + after.toFixed(2)
           + ' 差=' + (after - before).toFixed(2));
         const savedBoth = await api.match.scores(mid);
@@ -1960,6 +1965,88 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       }
     }
 
+    // 报名导入与交叉核对：重复报名拒绝、未匹配 ID 记录、补建、未填表识别
+    const sgImp = await guarded(`(async () => {
+      const steps = smokeSteps();
+      const made = { players: [], matches: [] };
+      try {
+        const api = window.omnia;
+        const m = await api.match.create({ date: '2026-06-06', ourSide: '我方', oppSide: '报名导入队' });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        const mid = m.data.match.id;
+        made.matches.push(mid);
+
+        const p1 = await api.player.create({ gameId: 'smoke_sgi_1', name: '报名导入甲' });
+        const p2 = await api.player.create({ gameId: 'smoke_sgi_2', name: '报名导入乙' });
+        if (!p1.ok || !p2.ok) throw new Error('建档失败');
+        made.players.push(p1.data.id, p2.data.id);
+
+        const row = (line, gameId, status, mainClass, subClass) => ({
+          line, gameId, status, mic: status === 'JOIN' ? '有' : '',
+          mainClass: status === 'JOIN' ? mainClass : '',
+          subClass: status === 'JOIN' ? subClass : '', submittedAt: '2026-06-01 20:00',
+        });
+
+        // ① 重复报名必须被拒绝（用户口径：不自动取舍，让用户回 Excel 处理）
+        const dup = await api.signup.importSignups(mid, [
+          row(2, 'smoke_sgi_1', 'JOIN', '神相', ''),
+          row(3, 'smoke_sgi_1', 'JOIN', '素问', ''),
+        ]);
+        steps.push('重复报名被拒=' + (dup.ok ? '否（异常！）' : '是') + (dup.ok ? '' : '（' + dup.error.slice(0, 26) + '…）'));
+
+        // ② 正常导入：1 人已建档、1 人不在主档
+        const imp = await api.signup.importSignups(mid, [
+          row(2, 'smoke_sgi_1', 'JOIN', '神相', '铁衣'),
+          row(3, 'smoke_sgi_missing', 'LEAVE', '', ''),
+        ]);
+        if (!imp.ok) throw new Error('导入失败: ' + imp.error);
+        steps.push('导入=' + imp.data.imported + ' 条 未匹配=' + JSON.stringify(imp.data.unmatched));
+
+        // ③ 交叉核对
+        const rev = await api.signup.reviewSignups(mid);
+        if (!rev.ok) throw new Error('核对失败: ' + rev.error);
+        steps.push('报名有主档没有=' + JSON.stringify(rev.data.signedNotInRoster.map(r => r.gameId)));
+        steps.push('主档有未填表=' + JSON.stringify(rev.data.inRosterNotSigned.map(r => r.gameId)));
+
+        // ④ 补建缺失成员
+        const cm = await api.signup.createMissingPlayers(mid, ['smoke_sgi_missing']);
+        if (!cm.ok) throw new Error('补建失败: ' + cm.error);
+        steps.push('补建 新建=' + cm.data.created + ' 报名=' + cm.data.signups);
+        const after = await api.signup.reviewSignups(mid);
+        steps.push('补建后 报名有主档没有=' + JSON.stringify(
+          after.data.signedNotInRoster.map(r => r.gameId)));
+
+        // ⑤ 报名表带来的职业与二职
+        const board = await api.signup.board(mid);
+        const r1 = board.data.rows.find(r => r.gameId === 'smoke_sgi_1');
+        steps.push('甲 报名状态=' + r1.signup + ' 主职=' + r1.mainClass + ' 二职=' + r1.subClass + ' 麦=' + r1.mic);
+
+        // ⑥ 排表候选只应有报名记录的人：甲在、乙（未报名）不在
+        const inCand = board.data.rows.filter(r => r.signup !== null).map(r => r.gameId);
+        steps.push('本场候选=' + JSON.stringify(inCand));
+
+        const cond = {
+          dupBlocked: dup.ok === false,
+          imported: imp.data.imported === 1 && imp.data.unmatched.includes('smoke_sgi_missing'),
+          orphanListed: rev.data.signedNotInRoster.some(r => r.gameId === 'smoke_sgi_missing'),
+          notFilled: rev.data.inRosterNotSigned.some(r => r.gameId === 'smoke_sgi_2'),
+          created: cm.data.created === 1 && cm.data.signups === 1,
+          orphanCleared: !after.data.signedNotInRoster.some(r => r.gameId === 'smoke_sgi_missing'),
+          classes: r1.mainClass === '神相' && r1.subClass === '铁衣' && r1.signup === 'JOIN',
+          candidateOnlySigned: inCand.includes('smoke_sgi_1') && !inCand.includes('smoke_sgi_2'),
+        };
+        steps.push('判定=' + JSON.stringify(cond));
+        return { ok: Object.values(cond).every(Boolean), steps, value: { cleanup: made } };
+      } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)), value: { cleanup: made } }; }
+    })()`, '探针13');
+    for (const s of sgImp.steps) log('[smoke] 报名导入:', s);
+    log('[smoke] 报名导入与核对    :', sgImp.ok ? 'PASS' : 'FAIL');
+    {
+      const c = (sgImp.value as { cleanup?: { players: number[]; matches: number[] } } | undefined)?.cleanup;
+      for (const id of c?.matches ?? []) await guarded(`window.omnia.match.remove(${id}).catch(() => {})`, `清理报名对局${id}`);
+      for (const id of c?.players ?? []) await guarded(`window.omnia.player.remove(${id}).catch(() => {})`, `清理报名成员${id}`);
+    }
+
     // M8：职业图标能否被页面真正加载并渲染（打包后是 file:// 相对路径，最容易踩坑）
     // 另加一条回归断言：12 个职业必须各有一张**互不相同**的图标 —— 原表里惊鸿和妙音
     // 共用同一张图，界面上看起来就是"两个职业图标一样"，这种缺陷不该再溜回来。
@@ -1976,14 +2063,14 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       const results = [];
       for (const f of all) results.push(await probe(f));
 
-      // 种一个带主职业的成员，切到成员主档页，确认职业图标真的渲染成 DOM
-      const made = await window.omnia.player.create({ gameId: '__icon_probe__', name: '图标探针', mainClass: '素问' });
-      const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('成员主档'));
+      // 职业图标真正渲染成 DOM 的地方改为**总览页的职业分布**：
+      // 成员主档已不持有职业（职业改由报名表提供），那里的职业图标自然会消失，
+      // 而总览的职业分布对 12 个职业恒定渲染图标，是更稳的断言点。
+      const nav = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('总览'));
       if (nav) nav.click();
-      await new Promise(r => setTimeout(r, 700));
-      const chipIcons = document.querySelectorAll('img.chip-icon').length;
-      const firstSrc = document.querySelector('img.chip-icon')?.getAttribute('src') || '';
-      if (made.ok) await window.omnia.player.remove(made.data.id);
+      await new Promise(r => setTimeout(r, 800));
+      const chipIcons = document.querySelectorAll('img[src*="class-icons"]').length;
+      const firstSrc = document.querySelector('img[src*="class-icons"]')?.getAttribute('src') || '';
       // 和其它探针统一走 { ok, steps, value } 信封，值放 value 里
       return { ok: true, steps: [], value: { base, results, dom: chipIcons, firstSrc } };
     })()`, '探针12');
@@ -2007,7 +2094,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
       && scoring.ok === true && season.ok === true && iconOk && lineup.ok === true
-      && geom.ok === true && slot.ok === true && cap.ok === true && r.schemaVersion >= 9;
+      && geom.ok === true && slot.ok === true && cap.ok === true && sgImp.ok === true
+      && r.schemaVersion >= 10;
     log('[smoke] 写操作往返          :', crud.ok ? 'PASS' : 'FAIL');
     log('[smoke] 结果                :', pass ? 'PASS' : 'FAIL');
     app.exit(pass ? 0 : 1);

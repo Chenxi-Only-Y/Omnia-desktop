@@ -398,6 +398,45 @@ const MIGRATIONS: Migration[] = [
       db.exec(`ALTER TABLE participation ADD COLUMN slot_no INTEGER NOT NULL DEFAULT -1`);
     },
   },
+  {
+    version: 10,
+    name: 'single_id_signup_classes',
+    up: (db) => {
+      // ── 1) 成员身份合并成单列「ID」 ──────────────────────────────
+      // 用户口径：主档里的「ID名」和「昵称」合成一个字段，就叫 ID。
+      // 以 game_id 为准（它本来就是 ID名，且带 UNIQUE）；为空时用 name 补，
+      // 补的时候跳过会撞 UNIQUE 的那些，避免整条迁移失败。
+      db.exec(`
+        UPDATE player SET game_id = name
+         WHERE trim(COALESCE(game_id, '')) = ''
+           AND trim(COALESCE(name, '')) <> ''
+           AND NOT EXISTS (
+             SELECT 1 FROM player p2 WHERE p2.game_id = player.name AND p2.id <> player.id
+           )`);
+      // name 跟随 game_id，避免两处显示不一致（不再作为独立字段使用）
+      db.exec(`UPDATE player SET name = game_id WHERE name <> game_id`);
+
+      // ── 2) 删除主职业 / 副职业（职业改为只从报名表来） ─────────────
+      db.exec(`DROP INDEX IF EXISTS idx_player_main_class`);
+      for (const col of ['main_class', 'sub_class']) {
+        try {
+          db.exec(`ALTER TABLE player DROP COLUMN ${col}`);
+        } catch {
+          // 个别 SQLite 版本不支持 DROP COLUMN：退化为留空列（界面已不使用）
+          db.exec(`UPDATE player SET ${col} = ''`);
+        }
+      }
+
+      // ── 3) 报名表带来的职业与麦克风 ──────────────────────────────
+      // 「主职业(能打联赛)」「副职(能打联赛)」「有无麦克风」都来自报名表，
+      // 因此存在 signup（人 × 场）上；主档不再持有职业。
+      db.exec(`ALTER TABLE signup ADD COLUMN main_class TEXT NOT NULL DEFAULT ''`);
+      db.exec(`ALTER TABLE signup ADD COLUMN sub_class TEXT NOT NULL DEFAULT ''`);
+      db.exec(`ALTER TABLE signup ADD COLUMN mic TEXT NOT NULL DEFAULT ''`);
+      // 报名表里的提交时间（原样保留，便于查重复提交的先后）
+      db.exec(`ALTER TABLE signup ADD COLUMN submitted_at TEXT NOT NULL DEFAULT ''`);
+    },
+  },
 ];
 
 export interface DbHandle {

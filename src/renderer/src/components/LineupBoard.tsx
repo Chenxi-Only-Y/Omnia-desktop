@@ -36,6 +36,8 @@ interface Props extends PageProps {
   onRemoveSquad?: (squadId: number, name: string) => void;
   /** 就地改战术（队名列里直接改） */
   onChangeTactic?: (squadId: number, tactic: string) => void;
+  /** 就地改本场职业（主职 / 二职二选一） */
+  onChangeClass?: (playerId: number, cls: string) => void;
 }
 
 /** 拖拽携带的数据格式（自定义 MIME，避免和外部拖入的文件混淆） */
@@ -58,7 +60,7 @@ function readDrag(ev: React.DragEvent): DragPayload | null {
 
 export default function LineupBoard({
   rows, catalog, classMap, onPickSlot, onRemoveRow, onAssign, onUnassign, onSkillNote,
-  onAddSquad, onRemoveSquad, onChangeTactic,
+  onAddSquad, onRemoveSquad, onChangeTactic, onChangeClass,
 }: Props) {
   // 上场的都看得到：只排除明确"替补/请假"的。
   // 注意不能写成 state === 'PLAY' —— 参战记录的 state 可能是空串（历史数据/未设置），
@@ -155,6 +157,7 @@ export default function LineupBoard({
                   classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                   onSkillNote={onSkillNote}
                   onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
+            onChangeClass={onChangeClass}
                   dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
                   draggingIds={dragIds.current} />
           )}
@@ -168,6 +171,7 @@ export default function LineupBoard({
                   classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                   onSkillNote={onSkillNote}
                   onAddSquad={onAddSquad} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
+            onChangeClass={onChangeClass}
                   dragProps={dragProps} dropProps={dropProps} hoverSquad={hoverSquad}
                   draggingIds={dragIds.current} />
           )}
@@ -210,6 +214,7 @@ export default function LineupBoard({
 function Half({
   title, groups, squads, bySquad, classMap, onPickSlot, onRemoveRow, onSkillNote,
   dragProps, dropProps, hoverSquad, draggingIds, onAddSquad, onRemoveSquad, onChangeTactic,
+  onChangeClass,
 }: {
   title: string;
   groups: SquadCatalog['groups'];
@@ -229,6 +234,8 @@ function Half({
   onRemoveSquad?: (squadId: number, name: string) => void;
   /** 就地改战术（队名列里直接改） */
   onChangeTactic?: (squadId: number, tactic: string) => void;
+  /** 就地改本场职业（主职 / 二职二选一） */
+  onChangeClass?: (playerId: number, cls: string) => void;
 }) {
   return (
     <div className="half">
@@ -253,6 +260,7 @@ function Half({
                 <SquadRowView key={s.id} squad={s} members={bySquad.get(s.name) ?? []}
                               classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                               onSkillNote={onSkillNote} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
+                      onChangeClass={onChangeClass}
                               dragProps={dragProps} dropProps={dropProps}
                               hovered={hoverSquad === s.name} draggingIds={draggingIds} />
               ))}
@@ -267,7 +275,7 @@ function Half({
 /** 一支小队 = 一整行：队名 + 6 张卡片横排铺开 */
 function SquadRowView({
   squad, members, classMap, onPickSlot, onRemoveRow, onSkillNote,
-  dragProps, dropProps, hovered, draggingIds, onRemoveSquad, onChangeTactic,
+  dragProps, dropProps, hovered, draggingIds, onRemoveSquad, onChangeTactic, onChangeClass,
 }: {
   squad: SquadRow;
   members: ParticipationRow[];
@@ -282,6 +290,8 @@ function SquadRowView({
   onRemoveSquad?: (squadId: number, name: string) => void;
   /** 就地改战术（队名列里直接改） */
   onChangeTactic?: (squadId: number, tactic: string) => void;
+  /** 就地改本场职业（主职 / 二职二选一） */
+  onChangeClass?: (playerId: number, cls: string) => void;
 }) {
   // 真正按格子落座：谁在第几格就渲染在第几格，**中间的空格留空**。
   // 只按槽号排序是不够的 —— 那样人还是会从 0 号位连续铺开，
@@ -335,6 +345,7 @@ function SquadRowView({
         {ordered.map((r, i) => (
           <PlayerCard key={i} row={r} slotIndex={i} squad={squad} classMap={classMap}
                       onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} onSkillNote={onSkillNote}
+                      onChangeClass={onChangeClass}
                       dragProps={dragProps} dragging={!!r && draggingIds.includes(r.playerId)} />
         ))}
       </div>
@@ -344,7 +355,8 @@ function SquadRowView({
 
 /** 一张队员卡片：标题=角色 ID 名 / 第一行=职业 / 第二行=技能备注（可编辑） */
 function PlayerCard({
-  row, slotIndex, squad, classMap, onPickSlot, onRemoveRow, onSkillNote, dragProps, dragging,
+  row, slotIndex, squad, classMap, onPickSlot, onRemoveRow, onSkillNote, onChangeClass,
+  dragProps, dragging,
 }: {
   row: ParticipationRow | null;
   slotIndex: number;
@@ -353,6 +365,8 @@ function PlayerCard({
   onPickSlot: (squadName: string, slotIndex: number) => void;
   onRemoveRow: (rowId: number) => void;
   onSkillNote?: (playerId: number, note: string) => void;
+  /** 就地改本场职业（主职 / 二职二选一） */
+  onChangeClass?: (playerId: number, cls: string) => void;
   dragProps: (playerIds: number[], label: string) => Record<string, unknown>;
   dragging: boolean;
 }) {
@@ -395,11 +409,26 @@ function PlayerCard({
            title={`${row.name}（ID: ${row.gameId}）· 点击移出本场`}>
         {row.gameId || row.name}
       </div>
-      <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
-           title="点击换人 / 放入队员">
-        {icon && <img className="pcard__icon" src={icon} alt="" />}
-        {cls || '未登记职业'}
-      </div>
+      {/* 职业：可就地改 —— 下拉里只放本场报名表的主职与二职（用户口径：
+          排表时可以选择职业）。没有报名数据时退化为纯文字。 */}
+      {onChangeClass && (row.mainClass || row.subClass) ? (
+        <select
+          className="pcard__cls pcard__cls--edit"
+          value={cls || row.mainClass || row.subClass}
+          title="选择本场使用职业（主职 / 二职）"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChangeClass(row.playerId, e.target.value)}
+        >
+          {row.mainClass && <option value={row.mainClass}>主职 · {row.mainClass}</option>}
+          {row.subClass && <option value={row.subClass}>二职 · {row.subClass}</option>}
+        </select>
+      ) : (
+        <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
+             title="点击换人 / 放入队员">
+          {icon && <img className="pcard__icon" src={icon} alt="" />}
+          {cls || '未登记职业'}
+        </div>
+      )}
       {/* 技能备注：单行、无框，看起来就是一行普通文字（用户口径） */}
       <input
         className="pcard__note"

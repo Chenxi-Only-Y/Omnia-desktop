@@ -493,6 +493,20 @@ textarea.input { resize: vertical; line-height: 1.5; }
   font-size: 15px; line-height: 1.2; opacity: .92; cursor: pointer;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
+
+/* 可就地改的职业：外观贴近那行普通文字（透明底、白字），点开才出现主职/二职选项 */
+.pcard__cls--edit {
+  appearance: none; -webkit-appearance: none;
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+  color: inherit; font-family: inherit; font-size: 15px; line-height: 1.2;
+  padding: 0 2px; max-width: 100%; cursor: pointer;
+}
+.pcard__cls--edit:hover { border-color: rgba(255, 255, 255, .55); background: rgba(0, 0, 0, .12); }
+.pcard__cls--edit:focus { outline: none; border-color: rgba(255, 255, 255, .8); }
+/* 下拉展开后的选项在白底上要看得清 */
+.pcard__cls--edit option { color: var(--text); background: var(--surface); }
+/* 交叉核对里成排的 ID 标签 */
+.chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
 .pcard__icon {

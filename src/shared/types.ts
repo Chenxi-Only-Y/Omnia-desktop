@@ -15,16 +15,15 @@ export type { CombatStat, MatchResult, NoteRole, PartState, Tactic, SquadGroup, 
 // ── 实体 ─────────────────────────────────────────────────────────
 export interface Player {
   id: number;
-  /** 游戏角色 ID / 角色名（原表「角色ID」），业务主键 */
+  /** 游戏角色 ID（原表「角色ID」），业务主键。与「昵称」已合并为此单一字段 */
   gameId: string;
+  /** 与 gameId 同值（保留列以兼容旧数据；界面只显示一个「ID」） */
   name: string;
   /** 入帮排序（原表 A 列） */
   joinedOrder: number | null;
   mic: '有' | '无' | '无需作答' | '';
   noteRole: NoteRole;
-  mainClass: string;
-  subClass: string;
-  /** active / inactive / left */
+  /** 注意：职业不在这里 —— 职业只从报名表来，存在 signup（人 × 场）上 */
   status: string;
   remark: string;
   createdAt: string;
@@ -37,8 +36,6 @@ export interface PlayerInput {
   joinedOrder?: number | null;
   mic?: Player['mic'];
   noteRole?: NoteRole;
-  mainClass?: string;
-  subClass?: string;
   status?: string;
   remark?: string;
 }
@@ -120,6 +117,44 @@ export interface ParticipationInput {
   slotIndex?: number;
 }
 
+// ── 报名表导入（WPS/表单导出的 xlsx） ─────────────────────────────
+/** 报名表里解析出的一行 */
+export interface SignupImportRow {
+  /** 原表行号（1 起，便于用户拿回 Excel 对照） */
+  line: number;
+  gameId: string;
+  status: 'JOIN' | 'LEAVE';
+  /** 有 / 无 / 空 */
+  mic: string;
+  mainClass: string;
+  subClass: string;
+  submittedAt: string;
+}
+
+/** 导入预览：先给用户审查，确认后再入库 */
+export interface SignupImportPreview {
+  rows: SignupImportRow[];
+  /** 同一 角色id 多次提交（按用户口径不自动取舍，标出来让用户处理） */
+  duplicates: { gameId: string; lines: number[] }[];
+  /** 行级错误：缺必填、状态无法识别等 */
+  invalid: { line: number; reason: string }[];
+  /** 报名表里有、成员主档里没有的 ID */
+  unmatched: string[];
+  headers: string[];
+  headerRow: number;
+  /** 已经在主档里的数量（方便用户判断补建范围） */
+  matchedCount?: number;
+}
+
+/** 报名 vs 主档 的交叉核对结果 */
+export interface SignupReview {
+  matchId: number;
+  /** 报名表有、主档没有 */
+  signedNotInRoster: { gameId: string; status: string; mainClass: string; subClass: string }[];
+  /** 主档有、本场没填表 */
+  inRosterNotSigned: { playerId: number; gameId: string; status: string }[];
+}
+
 // ── 评分引擎（M1 占位，算法待定） ────────────────────────────────
 export interface ScoreBreakdown {
   personalRaw: number;
@@ -160,8 +195,12 @@ export interface ParticipationRow {
   squad: string;
   group: string;
   tactic: string;
+  /** 本场实际使用的职业（排表时可选主职或二职） */
   classUsed: string;
+  /** 本场报名表里的主职业 */
   mainClass: string;
+  /** 本场报名表里的副职（排表时的「二职」选项） */
+  subClass: string;
   noteRole: NoteRole;
   /** 本场技能备注（排表页可编辑） */
   skillNote: string;
@@ -296,13 +335,16 @@ export interface SignupRow {
   playerId: number;
   gameId: string;
   name: string;
+  /** 本场报名表里的主职业（职业只从报名表来，主档不再持有） */
   mainClass: string;
+  /** 本场报名表里的副职（排表时可选用的「二职」） */
+  subClass: string;
   noteRole: string;
   mic: Player['mic'];
   status: Player['status'];
   /** 入帮序，用于排序 */
   joinedOrder: number | null;
-  /** 本场报名状态；null = 还没报名 */
+  /** 本场报名状态；null = 还没报名（主档有、报名表没有 → 界面标「未填表」） */
   signup: SignupStatus | null;
   /** 报名提交时间 */
   signupAt: string;
@@ -676,6 +718,16 @@ export interface OmniaApi {
     set(input: SignupInput): Promise<IpcResult<SignupRow>>;
     /** 把报名结果应用到上场名单（参加→上场、请假→请假、替补→替补） */
     apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
+    /** 解析报名表 xlsx，返回预览（含重复/无效行与未匹配 ID），不入库 */
+    parseSignup(matchId: number, data: Uint8Array): Promise<IpcResult<SignupImportPreview>>;
+    /** 提交报名导入；重复报名会直接报错（用户口径：手动处理） */
+    importSignups(matchId: number, rows: SignupImportRow[]):
+      Promise<IpcResult<{ imported: number; unmatched: string[] }>>;
+    /** 交叉核对：主档有但本场未填表的名单，以及报名有主档没有的清单 */
+    reviewSignups(matchId: number): Promise<IpcResult<SignupReview>>;
+    /** 补建缺失成员（职业不进主档，只建 ID 并写入该场报名记录） */
+    createMissingPlayers(matchId: number, gameIds: string[]):
+      Promise<IpcResult<{ created: number; signups: number }>>;
   };
   rules: {
     list(): Promise<IpcResult<RuleSet[]>>;
@@ -745,6 +797,14 @@ export const IPC = {
 
   // 报名 / 请假
   signupBoard: 'signup:board',
+  /** 解析报名 xlsx（只预览，不入库） */
+  signupParse: 'signup:parse',
+  /** 提交报名导入 */
+  signupImport: 'signup:import',
+  /** 报名 vs 主档 交叉核对 */
+  signupReview: 'signup:review',
+  /** 补建「报名有、主档没有」的成员 */
+  signupCreateMissing: 'signup:create-missing',
   signupSet: 'signup:set',
   signupApply: 'signup:apply',
 

@@ -7,7 +7,8 @@ import type {
   ImportPreview, IpcResult, JoinMode, Match, MatchInput, MatchSummary, ParticipationInput,
   ParticipationRow, Player, PlayerDetail, PlayerInput, RuleSet, RuleSetInput, RuleSetValidation,
   SavedScore, ScoreRunSummary, Season, SeasonInput, SeasonSummary, SheetGrid, SheetList,
-  SignupBoard, SignupInput, SignupRow, SquadCatalog, SquadInput, SquadRow,
+  SignupBoard, SignupImportPreview, SignupImportRow, SignupInput, SignupReview, SignupRow,
+  SquadCatalog, SquadInput, SquadRow,
 } from '@shared/types';
 
 export class ApiError extends Error {
@@ -245,6 +246,17 @@ export const api = {
     set: (input: SignupInput): Promise<SignupRow> => unwrap(bridge().signup.set(input)),
     apply: (matchId: number, playerIds: number[]): Promise<{ applied: number }> =>
       unwrap(bridge().signup.apply(matchId, playerIds)),
+    /** 解析报名表 xlsx（只预览，不入库） */
+    parse: (matchId: number, data: Uint8Array): Promise<SignupImportPreview> =>
+      unwrap(bridge().signup.parseSignup(matchId, data)),
+    importRows: (matchId: number, rows: SignupImportRow[]):
+      Promise<{ imported: number; unmatched: string[] }> =>
+      unwrap(bridge().signup.importSignups(matchId, rows)),
+    review: (matchId: number): Promise<SignupReview> =>
+      unwrap(bridge().signup.reviewSignups(matchId)),
+    createMissing: (matchId: number, gameIds: string[]):
+      Promise<{ created: number; signups: number }> =>
+      unwrap(bridge().signup.createMissingPlayers(matchId, gameIds)),
   },
 
   rules: {

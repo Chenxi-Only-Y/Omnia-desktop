@@ -9,7 +9,7 @@
  * 一旦拿到立绘，只需把图片放到 src/renderer/public/hero/ 并填 HERO_IMAGE 即可切换。
  */
 import { useCallback, useEffect, useState } from 'react';
-import type { AppInfo, Player, SquadCatalog } from '@shared/types';
+import type { AppInfo, Player, SignupRow, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
@@ -29,14 +29,28 @@ interface Props extends PageProps {
 export default function OverviewPage({ onCount, onGo, info }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
+  /** 最近一场的报名表：职业只存在于报名记录里，所以职业分布按它统计 */
+  const [latestSignups, setLatestSignups] = useState<SignupRow[]>([]);
+  const [latestMatchLabel, setLatestMatchLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [rows, cat] = await Promise.all([api.player.list(), api.meta.squads()]);
+      const [rows, cat, matches] = await Promise.all([
+        api.player.list(), api.meta.squads(), api.match.list(),
+      ]);
       setPlayers(rows);
       setCatalog(cat);
       onCount(rows.length);
+      if (matches.length) {
+        const m = matches[0];
+        const board = await api.signup.board(m.id);
+        setLatestSignups(board.rows.filter((r) => r.signup !== null));
+        setLatestMatchLabel(`${m.date} 第 ${m.indexInDay} 场`);
+      } else {
+        setLatestSignups([]);
+        setLatestMatchLabel('');
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -45,14 +59,14 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
+  // 职业分布：按最近一场报名表里的主职业统计
   const byClass = new Map<string, number>();
-  for (const p of players) {
-    if (!p.mainClass) continue;
-    byClass.set(p.mainClass, (byClass.get(p.mainClass) ?? 0) + 1);
+  for (const r of latestSignups) {
+    if (!r.mainClass) continue;
+    byClass.set(r.mainClass, (byClass.get(r.mainClass) ?? 0) + 1);
   }
   const active = players.filter((p) => p.status === 'active').length;
-  const withMain = players.filter((p) => p.mainClass).length;
-  const ready = players.filter((p) => p.status === 'active' && p.mainClass).length;
+  const ready = latestSignups.filter((r) => r.signup === 'JOIN').length;
   const capacity = catalog?.capacity ?? TOTAL_MATCH_SLOTS;
   const heroSrc = HERO_IMAGE ? `${import.meta.env.BASE_URL}${HERO_IMAGE}` : null;
 
@@ -103,10 +117,10 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
         <div className="stat">
           <div className="k">成员总数</div>
           <div className="v">{players.length}<small> 人</small></div>
-          <div className="hint" style={{ marginTop: 4 }}>在队 {active} · 职业已填 {withMain}</div>
+          <div className="hint" style={{ marginTop: 4 }}>在队 {active} · 本场报名 {latestSignups.length}</div>
         </div>
         <div className="stat">
-          <div className="k">可编入阵容</div>
+          <div className="k">本场可上阵</div>
           <div className="v" style={{ color: ready >= capacity ? 'var(--ok)' : 'var(--warn)' }}>
             {ready}<small> / {capacity} 槽位</small>
           </div>
@@ -127,7 +141,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>
-        <h3>职业分布（主职业）</h3>
+        <h3>职业分布（按本场报名表）{latestMatchLabel ? ` · ${latestMatchLabel}` : ''}</h3>
         {players.length === 0 ? (
           <div className="hint" style={{ padding: '12px 0' }}>
             还没有成员数据。去
@@ -157,7 +171,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
             })}
           </div>
         )}
-        <div className="hint">12 职业的口径与平衡系数来自原表「下滑预选」；未登记的职业会在成员列表里标黄问号。</div>
+        <div className="hint">职业不再存在成员主档里 —— 它来自各场次的报名表，因此这里统计的是最有参考价值的「本场报名」分布。12 职业口径与平衡系数来自原表「下滑预选」。</div>
       </div>
 
       <div className="card">

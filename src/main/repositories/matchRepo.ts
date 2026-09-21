@@ -28,13 +28,14 @@ interface PartRow {
   id: number; match_id: number; player_id: number; side: string;
   squad: string; tactic: string; team_role: string; class_used: string;
   note_role: string; skill_note: string; slot_no: number; mic: string; state: string;
-  game_id: string; name: string; main_class: string;
+  game_id: string; name: string;
   kills: number | null; fountain_kills: number | null; assists: number | null;
   resource: number | null; dmg_player: number | null; dmg_player_armor: number | null;
   dmg_building: number | null; dmg_building_armor: number | null;
   healing: number | null; damage_taken: number | null; deaths: number | null;
   revives: number | null; bone_burn: number | null;
   stat_id: number | null;
+  signup_main_class: string | null; signup_sub_class: string | null;
 }
 
 const n = (v: unknown): number => {
@@ -218,12 +219,14 @@ export class MatchRepo {
   // ── 参战名单 ─────────────────────────────────────────────────
   participations(matchId: number): ParticipationRow[] {
     const rows = this.db.prepare(
-      `SELECT p.*, pl.game_id, pl.name, pl.main_class,
+      `SELECT p.*, pl.game_id, pl.name,
+              sg.main_class AS signup_main_class, sg.sub_class AS signup_sub_class,
               cs.participation_id AS stat_id, cs.kills, cs.fountain_kills, cs.assists, cs.resource,
               cs.dmg_player, cs.dmg_player_armor, cs.dmg_building, cs.dmg_building_armor,
               cs.healing, cs.damage_taken, cs.deaths, cs.revives, cs.bone_burn
        FROM participation p
        JOIN player pl ON pl.id = p.player_id
+       LEFT JOIN signup sg ON sg.match_id = p.match_id AND sg.player_id = p.player_id
        LEFT JOIN combat_stat cs ON cs.participation_id = p.id
        WHERE p.match_id = ?
        ORDER BY CASE p.side WHEN 'our' THEN 0 ELSE 1 END,
@@ -244,7 +247,9 @@ export class MatchRepo {
         group: (r.squad || '').replace(/[123]$/, ''),
         tactic: r.tactic || '',
         classUsed: r.class_used || '',
-        mainClass: r.main_class || '',
+        // 主职/二职都来自本场报名表（主档已不持有职业）
+        mainClass: r.signup_main_class || '',
+        subClass: r.signup_sub_class || '',
         noteRole: (r.note_role || '') as NoteRole,
         skillNote: r.skill_note || '',
         slotNo: Number.isFinite(r.slot_no) ? r.slot_no : -1,
@@ -303,8 +308,8 @@ export class MatchRepo {
   upsertParticipation(input: ParticipationInput): number {
     const { matchId, playerId } = input;
     if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
-    const pl = this.db.prepare('SELECT id, main_class, note_role, mic FROM player WHERE id = ?')
-      .get(playerId) as { id: number; main_class: string; note_role: string; mic: string } | undefined;
+    const pl = this.db.prepare('SELECT id, note_role, mic FROM player WHERE id = ?')
+      .get(playerId) as { id: number; note_role: string; mic: string } | undefined;
     if (!pl) throw new Error(`成员不存在：id=${playerId}`);
 
     const squadInput = s(input.squad);
@@ -327,7 +332,12 @@ export class MatchRepo {
       }
     }
 
-    const classUsed = s(input.classUsed) || pl.main_class;
+    // 职业默认取**本场报名表**的主职业（主档已不持有职业）。
+    // pl 仍来自 player 的查询，所以不能用 signup 的别名，这里单独查一次。
+    const signupMain = (this.db.prepare(
+      'SELECT main_class FROM signup WHERE match_id = ? AND player_id = ?',
+    ).get(matchId, playerId) as { main_class: string } | undefined)?.main_class ?? '';
+    const classUsed = s(input.classUsed) || signupMain;
     if (classUsed && !findClass(classUsed)) {
       throw new Error(`职业「${classUsed}」不在 12 职业表内（可用别名见职业字典）`);
     }
@@ -533,7 +543,7 @@ export class MatchRepo {
 
     const rows = this.db.prepare(`
       SELECT p.id AS participation_id, p.player_id, pl.name AS player_name,
-             COALESCE(NULLIF(p.class_used,''), pl.main_class) AS class_used,
+             COALESCE(NULLIF(p.class_used,''), sg.main_class, '') AS class_used,
              COALESCE(c.role, 'DPS') AS role,
              p.squad, p.tactic, p.team_role, p.note_role, p.state,
              cs.kills, cs.fountain_kills, cs.assists, cs.resource,
@@ -541,7 +551,8 @@ export class MatchRepo {
              cs.healing, cs.damage_taken, cs.deaths, cs.revives, cs.bone_burn
       FROM participation p
       JOIN player pl ON pl.id = p.player_id
-      LEFT JOIN class c ON c.name = COALESCE(NULLIF(p.class_used,''), pl.main_class)
+      LEFT JOIN signup sg ON sg.match_id = p.match_id AND sg.player_id = p.player_id
+      LEFT JOIN class c ON c.name = COALESCE(NULLIF(p.class_used,''), sg.main_class, '')
       LEFT JOIN combat_stat cs ON cs.participation_id = p.id
       WHERE p.match_id = ? AND p.side = 'our'
       ORDER BY p.id

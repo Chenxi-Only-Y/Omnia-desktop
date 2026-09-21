@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MatchSummary, ParticipationRow, Player, SquadCatalog } from '@shared/types';
+import type { MatchSummary, ParticipationRow, SignupRow, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { BENCH_SQUADS } from '@shared/domain';
@@ -25,7 +25,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   const [matches, setMatches] = useState<MatchSummary[]>([]);
   const [matchId, setMatchId] = useState<number | null>(initialMatchId);
   const [rows, setRows] = useState<ParticipationRow[]>([]);
-  const [roster, setRoster] = useState<Player[]>([]);
+  /** 本场已报名的人（主档有 + 本场报名有）；排表候选只看这个 */
+  const [signupRows, setSignupRows] = useState<SignupRow[]>([]);
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
   const [cellPick, setCellPick] = useState<{ squad: string; slotIndex: number } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -46,13 +47,14 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
 
   const loadDetail = useCallback(async (id: number) => {
     try {
-      const [parts, players, cat] = await Promise.all([
+      const [parts, board, cat] = await Promise.all([
         api.match.participations(id),
-        api.player.list(),
+        api.signup.board(id),
         api.meta.squads(),
       ]);
       setRows(parts);
-      setRoster(players);
+      // 只留「本场填过报名表」的人：主档有但没填表的不进候选
+      setSignupRows(board.rows.filter((r) => r.signup !== null));
       setCatalog(cat);
       setError(null);
     } catch (err) {
@@ -110,21 +112,32 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
     await run(() => api.match.unassign(matchId, playerId));
   }
 
-  async function addPlayer(playerId: number) {
+  async function addPlayer(playerId: number, subClass = '') {
     if (matchId === null) return;
-    const p = roster.find((x) => x.id === playerId);
-    if (!p) return;
+    const r = signupRows.find((x) => x.playerId === playerId);
+    if (!r) return;
+    // 二职选择：传了副职就用副职，否则用主职业
+    const cls = subClass || r.mainClass;
     await run(async () => {
       await api.match.upsertParticipation({
-        matchId, playerId, classUsed: p.mainClass, state: 'PLAY',
+        matchId, playerId, classUsed: cls, state: 'PLAY',
       });
-      setNotice(`已把 ${p.name} 加入本场（未分配小队）`);
+      setNotice(`已把 ${r.gameId} 加入本场（${cls || '未定职业'}，未分配小队）`);
     });
   }
 
   async function removeRow(row: ParticipationRow) {
     if (matchId === null) return;
     await run(() => api.match.removeParticipation(row.id), `已把 ${row.name} 移出本场`);
+  }
+
+  /** 就地改本场职业（主职 / 二职）：只改 classUsed，不动小队与状态 */
+  async function changeClass(playerId: number, cls: string) {
+    if (matchId === null) return;
+    await run(async () => {
+      await api.match.upsertParticipation({ matchId, playerId, classUsed: cls });
+      setNotice(`本场职业已改为「${cls}」`);
+    });
   }
 
   /** 把整个排表功能区截成 PNG（主进程 capturePage + 保存对话框） */
@@ -188,10 +201,10 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
         </div>
         {showAdd && (
           <AddPlayerPicker
-            roster={roster}
+            candidates={signupRows}
             existing={new Set(our.map((r) => r.playerId))}
             classMap={classMap}
-            onPick={(id) => { void addPlayer(id); }}
+            onPick={(id, subClass) => { void addPlayer(id, subClass); }}
           />
         )}
       </div>
@@ -223,19 +236,26 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           onChangeTactic={(squadId, tactic) => void run(
             () => api.meta.setSquadTactic(squadId, tactic), `战术已改为「${tactic || '未定'}」`,
           )}
+          onChangeClass={(playerId, cls) => void changeClass(playerId, cls)}
         />
       </div>
 
       {cellPick && (
         <CellPicker
           squad={cellPick.squad}
-          roster={roster}
+          candidates={signupRows}
           rows={our}
           classMap={classMap}
           onClose={() => setCellPick(null)}
-          onAssign={async (playerId, targetSquad) => {
+          onAssign={async (playerId, targetSquad, subClass) => {
             // 点的是第几格就放第几格 —— 不再总是挤到最左边
             await assign([playerId], targetSquad, cellPick.slotIndex);
+            // 选了二职就同时把本场职业换成它
+            if (subClass && matchId !== null) {
+              await run(() => api.match.upsertParticipation({
+                matchId, playerId, classUsed: subClass,
+              }));
+            }
             setCellPick(null);
           }}
         />

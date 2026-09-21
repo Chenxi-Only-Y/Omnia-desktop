@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { SignupBoard, SignupStatus } from '@shared/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { SignupBoard, SignupImportPreview, SignupReview, SignupStatus } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
@@ -37,10 +37,18 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
   const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
+  /** 导入预览（确认后才入库） */
+  const [preview, setPreview] = useState<SignupImportPreview | null>(null);
+  /** 交叉核对：本场未填表 / 报名有主档没有 */
+  const [review, setReview] = useState<SignupReview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
-      setBoard(await api.signup.board(matchId));
+      const b = await api.signup.board(matchId);
+      setBoard(b);
+      setReview(await api.signup.review(matchId));
       setError(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -75,6 +83,69 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
     }
   }
 
+  /** 选报名表 xlsx → 解析出预览（不入库） */
+  async function handleSignupFile(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const data = new Uint8Array(await file.arrayBuffer());
+      const pv = await api.signup.parse(matchId, data);
+      setPreview(pv);
+      setError(null);
+      setNotice(null);
+    } catch (err) {
+      setPreview(null);
+      setError(`解析报名表失败：${err instanceof ApiError ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  /** 确认导入 */
+  async function commitImport() {
+    if (!preview) return;
+    if (preview.duplicates.length) {
+      setError('还有重复报名未处理，不能导入');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await api.signup.importRows(matchId, preview.rows);
+      setPreview(null);
+      setNotice(
+        `已导入 ${res.imported} 条报名`
+        + (res.unmatched.length ? `；其中 ${new Set(res.unmatched).size} 个 ID 不在成员主档，已在下方列出` : ''),
+      );
+      setError(null);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** 补建「报名有、主档没有」的成员 */
+  async function createMissing() {
+    if (!review?.signedNotInRoster.length) return;
+    const ids = review.signedNotInRoster.map((r) => r.gameId);
+    if (!window.confirm(`把 ${ids.length} 个 ID 补建为成员主档，并写入本场报名？`)) return;
+    setBusy(true);
+    try {
+      const res = await api.signup.createMissing(matchId, ids);
+      setNotice(`已补建 ${res.created} 名成员，写入 ${res.signups} 条报名`);
+      setError(null);
+      await load();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function applyToLineup() {
     if (!board) return;
     const marked = board.rows.filter((r) => r.signup !== null).length;
@@ -100,8 +171,8 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
       if (filter === 'leave' && r.signup !== 'LEAVE') return false;
       if (filter === 'bench' && r.signup !== 'BENCH') return false;
       if (!key) return true;
-      return r.name.toLowerCase().includes(key) || r.gameId.toLowerCase().includes(key)
-        || r.mainClass.includes(q.trim());
+      return r.gameId.toLowerCase().includes(key) || r.mainClass.includes(q.trim())
+        || r.subClass.includes(q.trim());
     });
   }, [board, filter, q]);
 
@@ -119,6 +190,11 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
           <button className="btn" onClick={onBack}>← 返回对局</button>
           <h3 style={{ margin: 0 }}>报名 / 请假 · {matchLabel}</h3>
           <div className="spacer grow" />
+          <input ref={fileRef} type="file" accept=".xlsx" style={{ display: 'none' }}
+                 onChange={(e) => void handleSignupFile(e.target.files?.[0])} />
+          <button className="btn primary" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? '处理中…' : '导入报名表 xlsx'}
+          </button>
           <button className="btn" onClick={() => void markAllPendingJoin()}>
             未报名者全部标为参加
           </button>
@@ -163,8 +239,9 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
             <thead>
               <tr>
                 <th style={{ width: 50 }}>序</th>
-                <th>成员</th>
+                <th>ID</th>
                 <th style={{ width: 90 }}>主职业</th>
+                <th style={{ width: 90 }}>副职</th>
                 <th style={{ width: 90 }}>备注角色</th>
                 <th style={{ width: 70 }}>麦</th>
                 <th style={{ width: 250 }}>报名</th>
@@ -173,22 +250,25 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && <tr><td className="empty" colSpan={8}>没有符合条件的成员</td></tr>}
+              {rows.length === 0 && <tr><td className="empty" colSpan={9}>没有符合条件的成员</td></tr>}
               {rows.map((r, i) => (
                 <tr key={r.playerId} style={r.status !== 'active' ? { opacity: .6 } : undefined}>
                   <td className="num">{r.joinedOrder ?? i + 1}</td>
                   <td>
-                    {r.name}
-                    {r.gameId !== r.name && (
-                      <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>{r.gameId}</span>
-                    )}
+                    {r.gameId}
                     {r.status !== 'active' && (
                       <span className="badge-state inactive" style={{ marginLeft: 6 }}>
                         {r.status === 'left' ? '离队' : '暂离'}
                       </span>
                     )}
+                    {matchId && r.signup === null && (
+                      <span className="badge-flag" style={{ marginLeft: 6 }}>未填表</span>
+                    )}
                   </td>
                   <td><ClassChip name={r.mainClass} classMap={classMap} /></td>
+                  <td>{r.subClass
+                    ? <ClassChip name={r.subClass} classMap={classMap} />
+                    : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                   <td>{r.noteRole ? <span className="badge-note">{r.noteRole}</span> : '—'}</td>
                   <td><span className="badge-mic">{r.mic || '—'}</span></td>
                   <td>
@@ -229,6 +309,134 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
         <div className="hint">
           「报名」是意愿，「上场名单」是排表结果 —— 两者允许不一致（人工调阵容时会出现差异）。
           「按报名更新上场名单」只改状态：参加的人保留已排的小队，替补/请假会清空小队。
+        </div>
+      </div>
+
+      {/* 报名表导入预览：先让用户审查，确认后才入库 */}
+      {preview && (
+        <div className="modal" onClick={() => setPreview(null)}>
+          <div className="modal__box modal__box--wide" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__head">
+              <h3>报名表预览 · 共 {preview.rows.length} 条</h3>
+              <button className="btn sm ghost" onClick={() => setPreview(null)}>关闭</button>
+            </div>
+
+            {preview.duplicates.length > 0 && (
+              <div className="msg error">
+                有 {preview.duplicates.length} 个 ID 重复报名，请回 Excel 处理后重新导入：{' '}
+                {preview.duplicates.slice(0, 6).map((d) => `${d.gameId}（第 ${d.lines.join('、')} 行）`).join('；')}
+                {preview.duplicates.length > 6 ? ' …' : ''}
+              </div>
+            )}
+            {preview.invalid.length > 0 && (
+              <div className="msg warn">
+                {preview.invalid.length} 行无法识别（将被跳过）：
+                {preview.invalid.slice(0, 6).map((x) => `第 ${x.line} 行 ${x.reason}`).join('；')}
+                {preview.invalid.length > 6 ? ' …' : ''}
+              </div>
+            )}
+            {preview.unmatched.length > 0 && (
+              <div className="msg warn">
+                有 {preview.unmatched.length} 个 ID 不在成员主档（导入后可在下方审查并补建）：
+                {preview.unmatched.slice(0, 8).join('、')}
+                {preview.unmatched.length > 8 ? ' …' : ''}
+              </div>
+            )}
+
+            <div className="table-wrap" style={{ maxHeight: '46vh' }}>
+              <table className="grid">
+                <thead>
+                  <tr>
+                    <th style={{ width: 64 }}>行</th>
+                    <th>ID</th>
+                    <th style={{ width: 84 }}>参加/请假</th>
+                    <th style={{ width: 60 }}>麦</th>
+                    <th style={{ width: 90 }}>主职业</th>
+                    <th style={{ width: 90 }}>副职</th>
+                    <th style={{ width: 80 }}>在主档</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((r) => (
+                    <tr key={`${r.line}-${r.gameId}`}>
+                      <td className="num">{r.line}</td>
+                      <td>{r.gameId}</td>
+                      <td>{r.status === 'JOIN' ? '参加' : '请假'}</td>
+                      <td>{r.mic || '—'}</td>
+                      <td>{r.mainClass || '—'}</td>
+                      <td>{r.subClass || '—'}</td>
+                      <td>{preview.unmatched.includes(r.gameId)
+                        ? <span className="badge-flag">缺档</span>
+                        : <span style={{ color: 'var(--text-faint)' }}>是</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="toolbar" style={{ marginTop: 10, marginBottom: 0 }}>
+              <span className="hint" style={{ margin: 0 }}>
+                识别到的列：{preview.headers.filter(Boolean).join(' / ')}
+              </span>
+              <div className="spacer grow" />
+              <button className="btn ghost" onClick={() => setPreview(null)}>取消</button>
+              <button className="btn primary" disabled={busy || preview.duplicates.length > 0}
+                      onClick={() => void commitImport()}>
+                {busy ? '导入中…' : `确认导入 ${preview.rows.length} 条`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 交叉核对：两侧不一致的人 */}
+      <div className="card" style={{ marginTop: 12 }}>
+        <h3>交叉核对</h3>
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div>
+            <div className="k" style={{ marginBottom: 4 }}>
+              主档有、本场未填表（{review?.inRosterNotSigned.length ?? 0}）
+            </div>
+            {review?.inRosterNotSigned.length
+              ? (
+                <div className="chip-row">
+                  {review.inRosterNotSigned.slice(0, 60).map((r) => (
+                    <span key={r.playerId} className="badge-flag">{r.gameId}</span>
+                  ))}
+                  {review.inRosterNotSigned.length > 60
+                    && <span className="hint">… 等 {review.inRosterNotSigned.length} 人</span>}
+                </div>
+              )
+              : <span className="hint">没有遗漏 —— 在队成员都已填表</span>}
+          </div>
+
+          <div>
+            <div className="k" style={{ marginBottom: 4 }}>
+              报名有、主档没有（{review?.signedNotInRoster.length ?? 0}）
+            </div>
+            {review?.signedNotInRoster.length
+              ? (
+                <>
+                  <div className="chip-row">
+                    {review.signedNotInRoster.map((r) => (
+                      <span key={r.gameId} className="badge-flag"
+                            title={`报名：${r.status === 'JOIN' ? '参加' : '请假'}`}>
+                        {r.gameId}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="toolbar" style={{ marginTop: 8, marginBottom: 0 }}>
+                    <button className="btn" disabled={busy} onClick={() => void createMissing()}>
+                      补建为成员主档（{review.signedNotInRoster.length} 个）
+                    </button>
+                    <span className="hint" style={{ margin: 0 }}>
+                      补建只写 ID 与麦克风，职业仍从报名表来
+                    </span>
+                  </div>
+                </>
+              )
+              : <span className="hint">没有孤儿报名 —— 报名表里的 ID 都在主档里</span>}
+          </div>
         </div>
       </div>
     </>

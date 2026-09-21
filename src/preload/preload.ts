@@ -85,6 +85,11 @@ const api = {
     board: (matchId: number) => invoke('signup:board', matchId),
     set: (input: SignupInput) => invoke('signup:set', input),
     apply: (matchId: number, playerIds: number[]) => invoke('signup:apply', matchId, playerIds),
+    parseSignup: (matchId: number, data: Uint8Array) => invoke('signup:parse', matchId, data),
+    importSignups: (matchId: number, rows: unknown) => invoke('signup:import', matchId, rows),
+    reviewSignups: (matchId: number) => invoke('signup:review', matchId),
+    createMissingPlayers: (matchId: number, gameIds: string[]) =>
+      invoke('signup:create-missing', matchId, gameIds),
   },
   rules: {
     list: () => invoke('rules:list'),

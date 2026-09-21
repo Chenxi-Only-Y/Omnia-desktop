@@ -55,9 +55,8 @@ const HEADER_MAP: Record<string, keyof PlayerInput> = {
   '入帮排序': 'joinedOrder', '入帮序': 'joinedOrder', '排序': 'joinedOrder', 'joinedorder': 'joinedOrder',
   '麦': 'mic', '麦克风': 'mic', '有无麦克风（必填）': 'mic', '有无麦克风': 'mic', 'mic': 'mic',
   '备注': 'remark', '备注(角色)': 'noteRole', 'remark': 'remark',
-  '主职业': 'mainClass', '主职业(能打联赛)（必填）': 'mainClass', '主职业(能打联赛)': 'mainClass',
-  '职业': 'mainClass', 'mainclass': 'mainClass',
-  '副职': 'subClass', '副职(能打联赛)': 'subClass', 'subclass': 'subClass',
+  // 职业列（主职业/副职）在旧表里存在，但本系统职业只从报名表来 —— 这里**忽略**这些列，
+  //  不映射到成员主档，避免导入时因未知字段报错。
   '状态': 'status', 'status': 'status',
 };
 
@@ -75,7 +74,6 @@ function normHeader(h: string): string {
 const POSITION_FALLBACK: Record<number, keyof PlayerInput> = {
   0: 'joinedOrder',
   2: 'gameId',
-  3: 'mainClass',
 };
 
 function mapHeader(h: string, index: number): keyof PlayerInput | null {
@@ -114,7 +112,7 @@ export function parseTableText(text: string): PlayerInput[] {
         if (field) rec[field] = (cells[i] ?? '').trim();
       });
     } else {
-      const fallback: (keyof PlayerInput)[] = ['gameId', 'name', 'mainClass', 'subClass', 'mic', 'remark'];
+      const fallback: (keyof PlayerInput)[] = ['gameId', 'name', 'mic', 'remark'];
       fallback.forEach((f, i) => { rec[f] = (cells[i] ?? '').trim(); });
     }
     rows.push(rec);
@@ -137,8 +135,6 @@ export function parseTableText(text: string): PlayerInput[] {
       gameId: gameId || name,
       name: name || gameId,
       joinedOrder: joined !== null && Number.isFinite(joined) ? joined : null,
-      mainClass: (r.mainClass ?? '').trim(),
-      subClass: (r.subClass ?? '').trim(),
       mic,
       noteRole: note as PlayerInput['noteRole'],
       status: (r.status ?? '').trim() || 'active',
@@ -151,9 +147,6 @@ export function parseTableText(text: string): PlayerInput[] {
 const EXPORT_HEADERS: { key: keyof PlayerInput; label: string }[] = [
   { key: 'joinedOrder', label: '入帮排序' },
   { key: 'gameId', label: '角色ID' },
-  { key: 'name', label: '玩家名字' },
-  { key: 'mainClass', label: '主职业' },
-  { key: 'subClass', label: '副职' },
   { key: 'mic', label: '麦克风' },
   { key: 'noteRole', label: '备注角色' },
   { key: 'status', label: '状态' },

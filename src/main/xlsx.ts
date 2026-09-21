@@ -240,8 +240,15 @@ export function readXlsx(buf: Buffer, opts: ReadOptions = {}): string[][] {
   const wb = zip.get('xl/workbook.xml')?.toString('utf8') ?? '';
   const relsXml = zip.get('xl/_rels/workbook.xml.rels')?.toString('utf8') ?? '';
   const relMap = new Map<string, string>();
-  for (const m of relsXml.matchAll(/<Relationship[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"/g)) {
-    relMap.set(m[1], m[2]);
+  // 注意：**不能假设属性顺序**。实测「霜序客联赛报名」导出的关系文件写成
+  //   <Relationship Target="worksheets/sheet1.xml" Type="..." Id="rId3"/>
+  // 即 Target 在前、Id 在后；早前用 /Id=...Target=.../ 一条正则匹配，
+  // 遇到这种顺序就全部落空 → 找不到工作表（真实报名表读不进来）。
+  // 改为先切出每个 <Relationship .../> 标签，再分别取两个属性。
+  for (const tag of relsXml.matchAll(/<Relationship\b[^>]*\/?>/g)) {
+    const id = ATTR(tag[0], 'Id');
+    const target = ATTR(tag[0], 'Target');
+    if (id && target) relMap.set(id, target);
   }
   const sheetTags = [...wb.matchAll(/<sheet[^>]*\/>/g)].map((m) => m[0]);
   const sheetList = sheetTags.map((tag, index) => {

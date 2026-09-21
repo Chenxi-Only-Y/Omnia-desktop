@@ -8,10 +8,11 @@ import fs from 'node:fs';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type {
   MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput,
-  RuleSetInput, SeasonInput, SignupInput, SquadInput,
+  RuleSetInput, SeasonInput, SignupImportRow, SignupInput, SquadInput,
 } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
+import { parseSignupGrid } from '../shared/signupImport';
 import type { DbHandle } from './db';
 import { PlayerRepo } from './repositories/playerRepo';
 import { MatchRepo } from './repositories/matchRepo';
@@ -53,9 +54,10 @@ export function registerIpc(ctx: IpcContext): void {
   const seasons = new SeasonRepo(ctx.handle.db);
 
   const rosterEntries = (): RosterEntry[] =>
-    (ctx.handle.db.prepare('SELECT id, game_id, name, main_class FROM player')
-      .all() as unknown as { id: number; game_id: string; name: string; main_class: string }[])
-      .map((r) => ({ id: r.id, gameId: r.game_id, name: r.name, mainClass: r.main_class }));
+    (ctx.handle.db.prepare('SELECT id, game_id, name FROM player')
+      .all() as unknown as { id: number; game_id: string; name: string }[])
+      // 职业不再来自主档（改由报名表提供），这里只给匹配用的 ID 与名字
+    .map((r) => ({ id: r.id, gameId: r.game_id, name: r.name, mainClass: '' }));
 
   const knownClassNames = (): string[] =>
     (ctx.handle.db.prepare('SELECT name FROM class').all() as unknown as { name: string }[])
@@ -89,8 +91,6 @@ export function registerIpc(ctx: IpcContext): void {
     joinedOrder: p.joinedOrder,
     mic: p.mic,
     noteRole: p.noteRole,
-    mainClass: p.mainClass,
-    subClass: p.subClass,
     status: p.status,
     remark: p.remark,
   }))));
@@ -199,11 +199,11 @@ export function registerIpc(ctx: IpcContext): void {
     for (const row of preview.rows) {
       let playerId = row.playerId;
       if (playerId === null) {
-        // 完整名单模式：为不在主档的人自动建档（主职业取行内职业）
+        // 完整名单模式：为不在主档的人自动建档
+        // （职业不进主档：它只从报名表来，这里只建 ID）
         const made = players.create({
           gameId: row.gameId || row.name,
           name: row.name,
-          mainClass: row.classUsed,
         });
         playerId = made.id;
         created++;
@@ -348,6 +348,28 @@ export function registerIpc(ctx: IpcContext): void {
   ipcMain.handle(IPC.signupApply, safe((matchId: number, playerIds: number[]) => ({
     applied: signup.apply(matchId, playerIds),
   })));
+
+  // 解析报名表 xlsx：只出预览不入库；同时算出「报名有、主档没有」的 ID
+  ipcMain.handle(IPC.signupParse, safe((matchId: number, data: Uint8Array) => {
+    const grid = readXlsx(Buffer.from(data)) as unknown as string[][];
+    const preview = parseSignupGrid(grid);
+    const inRoster = new Set(signup.board(matchId).rows.map((r) => r.gameId));
+    const unmatched = [...new Set(preview.rows.map((r) => r.gameId).filter((id) => !inRoster.has(id)))];
+    return { ...preview, unmatched, matchedCount: preview.rows.length - unmatched.length };
+  }));
+
+  ipcMain.handle(IPC.signupImport, safe((matchId: number, rows: SignupImportRow[]) => {
+    const res = signup.importSignups(matchId, rows);
+    // 记下「报名有、主档没有」的清单，供报名页审查与补建
+    const orphans = rows.filter((r) => res.unmatched.includes(r.gameId));
+    if (orphans.length) signup.saveOrphans(matchId, orphans);
+    return res;
+  }));
+
+  ipcMain.handle(IPC.signupReview, safe((matchId: number) => signup.review(matchId)));
+  ipcMain.handle(IPC.signupCreateMissing, safe((matchId: number, gameIds: string[]) => (
+    signup.createMissing(matchId, gameIds)
+  )));
 
   // ── 评分规则集（M4） ───────────────────────────────────────────
   ipcMain.handle(IPC.rulesList, safe(() => rules.list()));

@@ -63,7 +63,9 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
   if (!detail) return <div className="card"><div className="hint">加载中…</div></div>;
 
   const { player, totals, radar, teamAverage } = detail;
-  const clsColor = classMap.get(player.mainClass)?.color ?? 'var(--fg)';
+  // 职业不再挂在主档上：用该成员最近一场报名表里的主职业着色
+  const latestCls = detail.matches.map((m) => m.classUsed).find((c) => c) ?? '';
+  const clsColor = classMap.get(latestCls)?.color ?? 'var(--fg)';
   const listRows = onlyFilled
     ? detail.matches.filter((m) => m.statFilled)
     : detail.matches;
@@ -84,14 +86,9 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
       <div className="card">
         <div className="toolbar" style={{ marginBottom: 8 }}>
           <button className="btn" onClick={onBack}>← 成员主档</button>
-          <h3 style={{ margin: 0 }}>
-            {player.name}
-            {player.gameId !== player.name && (
-              <span style={{ color: 'var(--text-faint)', marginLeft: 8, fontSize: 12 }}>{player.gameId}</span>
-            )}
-          </h3>
-          <ClassChip name={player.mainClass} classMap={classMap} />
-          {player.subClass && <ClassChip name={player.subClass} classMap={classMap} />}
+          <h3 style={{ margin: 0 }}>{player.gameId}</h3>
+          {/* 职业来自报名表（分场次），这里显示最近一场用过的职业 */}
+          {latestCls && <ClassChip name={latestCls} classMap={classMap} />}
           {player.noteRole && <span className="badge-note">{player.noteRole}</span>}
           <span className={`badge-state ${player.status}`}>
             {player.status === 'active' ? '在队' : player.status === 'left' ? '离队' : '暂离'}

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Player, PlayerInput } from '@shared/types';
+import type { Match, Player, PlayerInput, SignupStatus } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
-import ClassChip from '../components/ClassChip';
 import ImportWizard from '../components/ImportWizard';
 import { parseTableText, toCsv } from '../lib/importer';
 
@@ -13,11 +12,9 @@ interface Props extends PageProps {
 }
 
 interface Draft {
-  gameId: string;
-  name: string;
+  /** 「ID名」与「昵称」已合并为单一字段 ID */
+  id: string;
   joinedOrder: string;
-  mainClass: string;
-  subClass: string;
   mic: Player['mic'];
   noteRole: Player['noteRole'];
   status: string;
@@ -25,8 +22,7 @@ interface Draft {
 }
 
 const EMPTY_DRAFT: Draft = {
-  gameId: '', name: '', joinedOrder: '', mainClass: '', subClass: '',
-  mic: '', noteRole: '', status: 'active', remark: '',
+  id: '', joinedOrder: '', mic: '', noteRole: '', status: 'active', remark: '',
 };
 
 const STATUS_LABEL: Record<string, string> = { active: '在队', inactive: '暂离', left: '离队' };
@@ -37,8 +33,12 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [filterClass, setFilterClass] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  /** 当前场次：用于判定「未填表」（报名表是分场次的） */
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [matchId, setMatchId] = useState<number | null>(null);
+  /** playerId → 本场报名状态（null 表示未填表） */
+  const [signupOf, setSignupOf] = useState<Map<number, SignupStatus | null>>(new Map());
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editId, setEditId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
@@ -61,44 +61,56 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
 
   useEffect(() => { void load(); }, [load]);
 
+  // 场次列表：默认选最新一场（报名表是按场次导入的）
+  useEffect(() => {
+    void api.match.list().then((ms) => {
+      setMatches(ms);
+      setMatchId((cur) => cur ?? (ms.length ? ms[0].id : null));
+    }).catch(() => { /* 没有场次时保持空 */ });
+  }, []);
+
+  // 拉该场的报名状态，供「未填表 / 参加 / 请假」标记
+  useEffect(() => {
+    if (matchId === null) { setSignupOf(new Map()); return; }
+    void api.signup.board(matchId).then((b) => {
+      setSignupOf(new Map(b.rows.map((r) => [r.playerId, r.signup])));
+    }).catch(() => setSignupOf(new Map()));
+  }, [matchId]);
+
   const filtered = useMemo(() => {
     const key = q.trim().toLowerCase();
     return players.filter((p) => {
-      if (filterClass && p.mainClass !== filterClass && p.subClass !== filterClass) return false;
       if (filterStatus && p.status !== filterStatus) return false;
       if (!key) return true;
-      return (
-        p.gameId.toLowerCase().includes(key) ||
-        p.name.toLowerCase().includes(key) ||
-        p.mainClass.toLowerCase().includes(key) ||
-        p.remark.toLowerCase().includes(key)
-      );
+      return p.gameId.toLowerCase().includes(key) || p.remark.toLowerCase().includes(key);
     });
-  }, [players, q, filterClass, filterStatus]);
+  }, [players, q, filterStatus]);
 
   const stats = useMemo(() => {
     const byStatus: Record<string, number> = {};
-    const byClass: Record<string, number> = {};
-    let noMain = 0;
     let noMic = 0;
     for (const p of players) {
       byStatus[p.status] = (byStatus[p.status] ?? 0) + 1;
-      if (p.mainClass) byClass[p.mainClass] = (byClass[p.mainClass] ?? 0) + 1;
-      else noMain++;
       if (!p.mic) noMic++;
     }
-    return { byStatus, byClass, noMain, noMic };
-  }, [players]);
+    // 「未填表」= 在队但本场没有报名记录（报名表是分场次的）
+    const active = players.filter((p) => p.status === 'active');
+    const notFilled = matchId === null
+      ? 0
+      : active.filter((p) => (signupOf.get(p.id) ?? null) === null).length;
+    const joined = active.filter((p) => signupOf.get(p.id) === 'JOIN').length;
+    const leave = active.filter((p) => signupOf.get(p.id) === 'LEAVE').length;
+    return { byStatus, noMic, notFilled, joined, leave };
+  }, [players, signupOf, matchId]);
 
   async function handleCreate() {
-    if (!draft.gameId.trim()) { setError('角色 ID 必填'); return; }
+    const id = draft.id.trim();
+    if (!id) { setError('ID 必填'); return; }
     try {
       await api.player.create({
-        gameId: draft.gameId.trim(),
-        name: draft.name.trim() || draft.gameId.trim(),
+        gameId: id,
+        name: id,   // ID 名与昵称已合并，两处同值
         joinedOrder: draft.joinedOrder === '' ? null : Number(draft.joinedOrder),
-        mainClass: draft.mainClass,
-        subClass: draft.subClass,
         mic: draft.mic,
         noteRole: draft.noteRole,
         status: draft.status,
@@ -106,7 +118,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       });
       setDraft(EMPTY_DRAFT);
       setError(null);
-      setNotice(`已添加 ${draft.gameId.trim()}`);
+      setNotice(`已添加 ${id}`);
       await load();
     } catch (err) {
       setNotice(null);
@@ -117,9 +129,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   function startEdit(p: Player) {
     setEditId(p.id);
     setEditDraft({
-      gameId: p.gameId, name: p.name,
+      id: p.gameId,
       joinedOrder: p.joinedOrder === null ? '' : String(p.joinedOrder),
-      mainClass: p.mainClass, subClass: p.subClass,
       mic: p.mic, noteRole: p.noteRole, status: p.status, remark: p.remark,
     });
   }
@@ -127,12 +138,11 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   async function saveEdit() {
     if (editId === null) return;
     try {
+      const id = editDraft.id.trim();
       await api.player.update(editId, {
-        gameId: editDraft.gameId.trim(),
-        name: editDraft.name.trim(),
+        gameId: id,
+        name: id,
         joinedOrder: editDraft.joinedOrder === '' ? null : Number(editDraft.joinedOrder),
-        mainClass: editDraft.mainClass,
-        subClass: editDraft.subClass,
         mic: editDraft.mic,
         noteRole: editDraft.noteRole,
         status: editDraft.status,
@@ -147,11 +157,11 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   }
 
   async function handleRemove(p: Player) {
-    if (!window.confirm(`确认删除成员「${p.name}」（${p.gameId}）？`)) return;
+    if (!window.confirm(`确认删除成员「${p.gameId}」？`)) return;
     try {
       await api.player.remove(p.id);
       setError(null);
-      setNotice(`已删除 ${p.name}`);
+      setNotice(`已删除 ${p.gameId}`);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -208,8 +218,11 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         <div className="stat"><div className="k">在队 / 暂离 / 离队</div>
           <div className="v">{stats.byStatus.active ?? 0}<small> / {stats.byStatus.inactive ?? 0} / {stats.byStatus.left ?? 0}</small></div>
         </div>
-        <div className="stat"><div className="k">缺主职业</div>
-          <div className="v" style={{ color: stats.noMain ? 'var(--warn)' : undefined }}>{stats.noMain}</div>
+        <div className="stat"><div className="k">本场未填表</div>
+          <div className="v" style={{ color: stats.notFilled ? 'var(--warn)' : undefined }}>{stats.notFilled}</div>
+        </div>
+        <div className="stat"><div className="k">本场参加 / 请假</div>
+          <div className="v">{stats.joined}<small> / {stats.leave}</small></div>
         </div>
         <div className="stat"><div className="k">缺麦克风信息</div>
           <div className="v" style={{ color: stats.noMic ? 'var(--warn)' : undefined }}>{stats.noMic}</div>
@@ -219,20 +232,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       <div className="card">
         <h3>新增成员</h3>
         <div className="toolbar">
-          <input className="input" placeholder="角色 ID *" style={{ width: 150 }}
-                 value={draft.gameId} onChange={(e) => setDraft({ ...draft, gameId: e.target.value })} />
-          <input className="input" placeholder="显示名" style={{ width: 130 }}
-                 value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          <select className="select" value={draft.mainClass}
-                  onChange={(e) => setDraft({ ...draft, mainClass: e.target.value })}>
-            <option value="">主职业</option>
-            {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-          </select>
-          <select className="select" value={draft.subClass}
-                  onChange={(e) => setDraft({ ...draft, subClass: e.target.value })}>
-            <option value="">副职业</option>
-            {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-          </select>
+          <input className="input" placeholder="ID *" style={{ width: 200 }}
+                 value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
           <select className="select" value={draft.mic}
                   onChange={(e) => setDraft({ ...draft, mic: e.target.value as Player['mic'] })}>
             <option value="">麦克风</option>
@@ -251,11 +252,18 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         </div>
 
         <div className="toolbar" style={{ marginBottom: 0 }}>
-          <input className="input grow" placeholder="搜索角色 ID / 名字 / 职业 / 备注"
+          <input className="input grow" placeholder="搜索 ID / 备注"
                  value={q} onChange={(e) => setQ(e.target.value)} />
-          <select className="select" value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
-            <option value="">全部职业</option>
-            {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+          {/* 「未填表」是相对某一场的报名表而言，所以这里必须选场次 */}
+          <select className="select" value={matchId ?? ''}
+                  onChange={(e) => setMatchId(e.target.value === '' ? null : Number(e.target.value))}
+                  title="选择场次：用于判定成员是否已填报名表">
+            <option value="">（不比对场次）</option>
+            {matches.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.date} 第 {m.indexInDay} 场 · {m.oppSide}
+              </option>
+            ))}
           </select>
           <select className="select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="">全部状态</option>
@@ -292,10 +300,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
             <thead>
               <tr>
                 <th style={{ width: 56 }}>序</th>
-                <th>角色 ID</th>
-                <th>显示名</th>
-                <th>主职业</th>
-                <th>副职</th>
+                <th>ID</th>
+                <th>本场报名</th>
                 <th>麦克风</th>
                 <th>备注角色</th>
                 <th>状态</th>
@@ -304,9 +310,9 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td className="empty" colSpan={10}>加载中…</td></tr>}
+              {loading && <tr><td className="empty" colSpan={8}>加载中…</td></tr>}
               {!loading && filtered.length === 0 && (
-                <tr><td className="empty" colSpan={10}>
+                <tr><td className="empty" colSpan={8}>
                   暂无成员。可以用上面的表单添加，或导入旧表的成员主档。
                 </td></tr>
               )}
@@ -317,24 +323,9 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                     <td className="num">{p.joinedOrder ?? '—'}</td>
                     {editing ? (
                       <>
-                        <td><input className="input" style={{ width: 120 }} value={editDraft.gameId}
-                                   onChange={(e) => setEditDraft({ ...editDraft, gameId: e.target.value })} /></td>
-                        <td><input className="input" style={{ width: 110 }} value={editDraft.name}
-                                   onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} /></td>
-                        <td>
-                          <select className="select" value={editDraft.mainClass}
-                                  onChange={(e) => setEditDraft({ ...editDraft, mainClass: e.target.value })}>
-                            <option value="">—</option>
-                            {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                          </select>
-                        </td>
-                        <td>
-                          <select className="select" value={editDraft.subClass}
-                                  onChange={(e) => setEditDraft({ ...editDraft, subClass: e.target.value })}>
-                            <option value="">—</option>
-                            {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                          </select>
-                        </td>
+                        <td><input className="input" style={{ width: 180 }} value={editDraft.id}
+                                   onChange={(e) => setEditDraft({ ...editDraft, id: e.target.value })} /></td>
+                        <td style={{ color: 'var(--text-faint)' }}>—</td>
                         <td>
                           <select className="select" value={editDraft.mic}
                                   onChange={(e) => setEditDraft({ ...editDraft, mic: e.target.value as Player['mic'] })}>
@@ -366,17 +357,22 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                       </>
                     ) : (
                       <>
-                        <td>{p.gameId}</td>
                         <td>
                           <span className="roster-name-link" role="button" tabIndex={0}
                                 title="查看个人详情"
                                 onClick={() => onOpenDetail(p.id)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') onOpenDetail(p.id); }}>
-                            {p.name}
+                            {p.gameId}
                           </span>
                         </td>
-                        <td><ClassChip name={p.mainClass} classMap={classMap} /></td>
-                        <td>{p.subClass ? <ClassChip name={p.subClass} classMap={classMap} /> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
+                        <td>{(() => {
+                          const st = signupOf.get(p.id) ?? null;
+                          if (matchId === null) return <span style={{ color: 'var(--text-faint)' }}>—</span>;
+                          if (st === 'JOIN') return <span className="badge-state active">参加</span>;
+                          if (st === 'LEAVE') return <span className="badge-state left">请假</span>;
+                          if (st === 'BENCH') return <span className="badge-state inactive">替补</span>;
+                          return <span className="badge-flag">未填表</span>;
+                        })()}</td>
                         <td><span className="badge-mic">{p.mic || '—'}</span></td>
                         <td>{p.noteRole ? <span className="badge-note">{p.noteRole}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                         <td><span className={`badge-state ${p.status}`}>{STATUS_LABEL[p.status] ?? p.status}</span></td>

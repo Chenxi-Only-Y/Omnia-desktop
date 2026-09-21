@@ -13,8 +13,6 @@ interface PlayerRow {
   joined_order: number | null;
   mic: string;
   note_role: string;
-  main_class: string;
-  sub_class: string;
   status: string;
   remark: string;
   created_at: string;
@@ -22,7 +20,7 @@ interface PlayerRow {
 }
 
 const COLS = `id, game_id, name, joined_order, mic, note_role,
-              main_class, sub_class, status, remark, created_at, updated_at`;
+              status, remark, created_at, updated_at`;
 
 function toPlayer(r: PlayerRow): Player {
   return {
@@ -32,8 +30,6 @@ function toPlayer(r: PlayerRow): Player {
     joinedOrder: r.joined_order,
     mic: (r.mic || '') as Player['mic'],
     noteRole: (r.note_role || '') as Player['noteRole'],
-    mainClass: r.main_class || '',
-    subClass: r.sub_class || '',
     status: r.status || 'active',
     remark: r.remark || '',
     createdAt: r.created_at,
@@ -88,22 +84,21 @@ export class PlayerRepo {
 
   create(input: PlayerInput): Player {
     const gameId = norm(input.gameId) || norm(input.name);
-    if (!gameId) throw new Error('角色 ID 不能为空');
+    if (!gameId) throw new Error('ID 不能为空');
     if (this.db.prepare('SELECT 1 FROM player WHERE game_id = ?').get(gameId)) {
-      throw new Error(`角色 ID 已存在：${gameId}`);
+      throw new Error(`ID 已存在：${gameId}`);
     }
     const stmt = this.db.prepare(
-      `INSERT INTO player (game_id, name, joined_order, mic, note_role, main_class, sub_class, status, remark)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO player (game_id, name, joined_order, mic, note_role, status, remark)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
     const info = stmt.run(
       gameId,
-      norm(input.name) || gameId,
+      // 「ID名」与「昵称」已合并为单一字段 ID：两列同值，避免出现两个不同的名字
+      gameId,
       num(input.joinedOrder),
       norm(input.mic),
       norm(input.noteRole),
-      norm(input.mainClass),
-      norm(input.subClass),
       norm(input.status) || 'active',
       norm(input.remark),
     );
@@ -130,13 +125,15 @@ export class PlayerRepo {
     const vals: SqlValue[] = [];
     const put = (col: string, v: SqlValue) => { sets.push(`${col} = ?`); vals.push(v); };
 
-    if (patch.gameId !== undefined) put('game_id', norm(patch.gameId));
-    if (patch.name !== undefined) put('name', norm(patch.name));
+    // 「ID名」与「昵称」已合并：改了 ID 就把 name 一并对齐，不允许两者分叉
+    if (patch.gameId !== undefined) {
+      put('game_id', norm(patch.gameId));
+      put('name', norm(patch.gameId));
+    }
+    if (patch.name !== undefined && patch.gameId === undefined) put('name', norm(patch.name));
     if (patch.joinedOrder !== undefined) put('joined_order', num(patch.joinedOrder));
     if (patch.mic !== undefined) put('mic', norm(patch.mic));
     if (patch.noteRole !== undefined) put('note_role', norm(patch.noteRole));
-    if (patch.mainClass !== undefined) put('main_class', norm(patch.mainClass));
-    if (patch.subClass !== undefined) put('sub_class', norm(patch.subClass));
     if (patch.status !== undefined) put('status', norm(patch.status) || 'active');
     if (patch.remark !== undefined) put('remark', norm(patch.remark));
 
@@ -194,8 +191,7 @@ export class PlayerRepo {
           if (raw.joinedOrder !== undefined && raw.joinedOrder !== null) patch.joinedOrder = raw.joinedOrder;
           if (norm(raw.mic)) patch.mic = raw.mic;
           if (norm(raw.noteRole)) patch.noteRole = raw.noteRole;
-          if (norm(raw.mainClass)) patch.mainClass = raw.mainClass;
-          if (norm(raw.subClass)) patch.subClass = raw.subClass;
+          // 旧表的主职业/副职列此处忽略：职业已不在成员主档
           if (norm(raw.status)) patch.status = raw.status;
           if (norm(raw.remark)) patch.remark = raw.remark;
           if (Object.keys(patch).length) {

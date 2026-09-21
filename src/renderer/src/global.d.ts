@@ -64,6 +64,12 @@ declare global {
         board(matchId: number): Promise<IpcResult<SignupBoard>>;
         set(input: SignupInput): Promise<IpcResult<SignupRow>>;
         apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
+        parseSignup(matchId: number, data: Uint8Array): Promise<IpcResult<SignupImportPreview>>;
+        importSignups(matchId: number, rows: SignupImportRow[]):
+          Promise<IpcResult<{ imported: number; unmatched: string[] }>>;
+        reviewSignups(matchId: number): Promise<IpcResult<SignupReview>>;
+        createMissingPlayers(matchId: number, gameIds: string[]):
+          Promise<IpcResult<{ created: number; signups: number }>>;
       };
       rules: {
         list(): Promise<IpcResult<RuleSet[]>>;

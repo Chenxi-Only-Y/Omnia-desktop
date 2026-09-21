@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
-  CombatStat, Match, ParticipationRow, Player, SquadCatalog,
+  CombatStat, Match, ParticipationRow, SignupRow, SquadCatalog,
 } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -45,7 +45,8 @@ const GRID_FIELDS: { key: keyof CombatStat; label: string }[] = [
 export default function MatchDetail({ matchId, classes, classMap, onBack, onChanged }: Props) {
   const [match, setMatch] = useState<Match | null>(null);
   const [rows, setRows] = useState<ParticipationRow[]>([]);
-  const [roster, setRoster] = useState<Player[]>([]);
+  /** 本场已报名的人（主档有 + 本场报名有）：排表候选只看这个 */
+  const [signupRows, setSignupRows] = useState<SignupRow[]>([]);
   const [tab, setTab] = useState<TabKey>('lineup');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -60,15 +61,16 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
 
   const load = useCallback(async () => {
     try {
-      const [m, ps, pl, cat] = await Promise.all([
+      const [m, ps, board, cat] = await Promise.all([
         api.match.get(matchId),
         api.match.participations(matchId),
-        api.player.list(),
+        api.signup.board(matchId),
         api.meta.squads(),
       ]);
       setMatch(m);
       setRows(ps);
-      setRoster(pl);
+      // 只留本场填过报名表的人：主档有但没填表的不进候选
+      setSignupRows(board.rows.filter((r) => r.signup !== null));
       setCatalog(cat);
       setDrafts({});
       setDirty(new Set());
@@ -138,9 +140,12 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
     }
   }
 
-  async function addPlayer(playerId: number) {
+  async function addPlayer(playerId: number, subClass = '') {
     try {
-      await api.match.upsertParticipation({ matchId, playerId, state: 'PLAY' });
+      const r = signupRows.find((x) => x.playerId === playerId);
+      // 二职选择：传了副职就用副职，否则用报名表里的主职业
+      const cls = subClass || r?.mainClass || '';
+      await api.match.upsertParticipation({ matchId, playerId, state: 'PLAY', classUsed: cls });
       setError(null);
       await load();
       onChanged();
@@ -340,6 +345,18 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   setError(err instanceof ApiError ? err.message : String(err));
                 }
               }}
+              onChangeClass={async (playerId, cls) => {
+                try {
+                  // 只改本场职业，不动小队与状态
+                  await api.match.upsertParticipation({ matchId, playerId, classUsed: cls });
+                  setNotice(`本场职业已改为「${cls}」`);
+                  setError(null);
+                  await load();
+                  onChanged();
+                } catch (err) {
+                  setError(err instanceof ApiError ? err.message : String(err));
+                }
+              }}
               onRemoveSquad={async (squadId, name) => {
                 try {
                   await api.meta.removeSquad(squadId);
@@ -361,13 +378,19 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
           {cellPick && (
             <CellPicker
               squad={cellPick.squad}
-              roster={roster}
+              candidates={signupRows}
               rows={our}
               classMap={classMap}
               onClose={() => setCellPick(null)}
-              onAssign={async (playerId, targetSquad) => {
+              onAssign={async (playerId, targetSquad, subClass) => {
                 // 点的是第几格就放第几格
                 await addPlayerToSquad(playerId, targetSquad, cellPick.slotIndex);
+                // 选了二职就同时把本场职业换成它
+                if (subClass) {
+                  await api.match.upsertParticipation({ matchId, playerId, classUsed: subClass });
+                  await load();
+                  onChanged();
+                }
                 setCellPick(null);
               }}
             />
@@ -385,10 +408,10 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
             </div>
             {showAdd && (
               <AddPlayerPicker
-                roster={roster}
+                candidates={signupRows}
                 existing={new Set(our.map((r) => r.playerId))}
                 classMap={classMap}
-                onPick={(id) => { void addPlayer(id); }}
+                onPick={(id, subClass) => { void addPlayer(id, subClass); }}
               />
             )}
           </div>

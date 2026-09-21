@@ -49,7 +49,7 @@ export class DashboardRepo {
   playerDetail(playerId: number): PlayerDetail {
     const pl = this.db.prepare('SELECT * FROM player WHERE id = ?').get(playerId) as unknown as {
       id: number; game_id: string; name: string; joined_order: number | null;
-      mic: string; note_role: string; main_class: string; sub_class: string;
+      mic: string; note_role: string;
       status: string; remark: string; created_at: string; updated_at: string;
     } | undefined;
     if (!pl) throw new Error(`成员不存在：id=${playerId}`);
@@ -198,8 +198,6 @@ export class DashboardRepo {
         joinedOrder: pl.joined_order,
         mic: (pl.mic || '') as PlayerDetail['player']['mic'],
         noteRole: (pl.note_role || '') as PlayerDetail['player']['noteRole'],
-        mainClass: pl.main_class || '',
-        subClass: pl.sub_class || '',
         status: pl.status || 'active',
         remark: pl.remark || '',
         createdAt: pl.created_at,
@@ -259,7 +257,13 @@ export class DashboardRepo {
 
     // 出勤：以「所有成员」为基准，左连接参战记录
     const attendanceRows = this.db.prepare(`
-      SELECT pl.id, pl.game_id, pl.name, pl.main_class, pl.note_role, pl.status,
+      SELECT pl.id, pl.game_id, pl.name, pl.note_role, pl.status,
+             COALESCE((
+               SELECT sg.main_class FROM signup sg
+                JOIN match m2 ON m2.id = sg.match_id
+                WHERE sg.player_id = pl.id AND sg.main_class <> ''
+                ORDER BY m2.date DESC, m2.index_in_day DESC LIMIT 1
+             ), '') AS main_class,
              COALESCE(SUM(CASE WHEN p.state='PLAY' THEN 1 ELSE 0 END), 0) AS plays,
              COALESCE(SUM(CASE WHEN p.state='BENCH' THEN 1 ELSE 0 END), 0) AS benches,
              COALESCE(SUM(CASE WHEN p.state='LEAVE' THEN 1 ELSE 0 END), 0) AS leaves,
@@ -275,7 +279,7 @@ export class DashboardRepo {
       GROUP BY pl.id
       ORDER BY plays DESC, pl.joined_order IS NULL, pl.joined_order, pl.id
     `).all() as unknown as {
-      id: number; game_id: string; name: string; main_class: string; note_role: string;
+      id: number; game_id: string; name: string; main_class: string | null; note_role: string;
       status: string; plays: number; benches: number; leaves: number; matches: number; filled: number;
     }[];
 
@@ -283,7 +287,7 @@ export class DashboardRepo {
       playerId: r.id,
       gameId: r.game_id,
       name: r.name,
-      mainClass: r.main_class,
+      mainClass: r.main_class ?? '',
       noteRole: r.note_role,
       status: r.status,
       matches: Number(r.matches),
@@ -295,7 +299,12 @@ export class DashboardRepo {
     }));
 
     const classPlayCount = (this.db.prepare(`
-      SELECT COALESCE(NULLIF(p.class_used, ''), NULLIF(pl.main_class, '')) AS cls,
+      SELECT COALESCE(NULLIF(p.class_used, ''), (
+               SELECT sg.main_class FROM signup sg
+                JOIN match m2 ON m2.id = sg.match_id
+                WHERE sg.player_id = pl.id AND sg.main_class <> ''
+                ORDER BY m2.date DESC, m2.index_in_day DESC LIMIT 1
+             ), '') AS cls,
              COUNT(*) AS c
       FROM participation p JOIN player pl ON pl.id = p.player_id
       WHERE p.side = 'our' AND p.state = 'PLAY'

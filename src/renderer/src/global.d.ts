@@ -33,6 +33,7 @@ declare global {
         removeSquad(id: number): Promise<IpcResult<true>>;
         setSquadTactic(id: number, tactic: string): Promise<IpcResult<SquadRow>>;
         captureRegion(): Promise<IpcResult<{ path: string | null; width: number; height: number }>>;
+        captureRect(): Promise<IpcResult<string>>;
         captureMaxWin(): Promise<IpcResult<{ w: number; h: number }>>;
         captureRestoreWin(): Promise<IpcResult<true>>;
         captureRect(): Promise<IpcResult<string>>;

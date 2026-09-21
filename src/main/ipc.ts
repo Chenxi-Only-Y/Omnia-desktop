@@ -3,7 +3,7 @@
  * 所有处理函数都返回 IpcResult<T>，异常被捕获并转成 { ok:false, error }，
  * 避免 IPC 序列化丢失堆栈。
  */
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, nativeImage } from 'electron';
 import fs from 'node:fs';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type {
@@ -292,121 +292,54 @@ export function registerIpc(ctx: IpcContext): void {
   // 只有一次截图 → 没有接缝 → 不可能错位；内容一个不少，代价是文字等比变小。
   //
   // 需要多大空间由渲染层通过 app_setting.capturePlan 告知（这批 IPC 传不了实参）。
-  const CAPTURE_PLAN_KEY = 'capturePlan';
 
-  const SHELL_OFF = `(function () {
-    var st = document.getElementById('__omnia_shot_css');
-    if (!st) {
-      st = document.createElement('style');
-      st.id = '__omnia_shot_css';
-      st.textContent = [
-        '.sidebar,.topbar,aside{display:none !important}',
-        '.app{grid-template-columns:0 1fr !important}',
-        '.content{overflow:visible !important;padding:0 !important}',
-        '.board__scroll{overflow:visible !important}',
-        '.board__scroll::-webkit-scrollbar,.content::-webkit-scrollbar{display:none !important}'
-      ].join('');
-      document.head.appendChild(st);
-    }
-    return 'ok';
-  })()`;
-  const SHELL_ON = `(function () {
-    var st = document.getElementById('__omnia_shot_css');
-    if (st) st.remove();
-    var g = document.querySelector('.board__halves');
-    if (g) { g.style.transform = ''; g.style.transformOrigin = ''; g.style.width = ''; }
-    return 'ok';
-  })()`;
 
+  // 分块截图：矩形由渲染层写进 app_setting.captureRect（这批 IPC 传不了实参）
+  ipcMain.handle(IPC.captureRect, safe(async () => {
+    const rr = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+      .get('captureRect') as { value: string } | undefined;
+    if (!rr?.value) throw new Error('没有待截区域（app_setting.captureRect 为空）');
+    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run('captureRect');
+    const rect = JSON.parse(rr.value) as { x: number; y: number; width: number; height: number };
+    if (!(rect.width > 0) || !(rect.height > 0)) throw new Error(`分块区域无效：${rr.value}`);
+    const w = BrowserWindow.getAllWindows()[0];
+    if (!w) throw new Error('找不到窗口，无法截图');
+    const img = await w.webContents.capturePage({
+      x: Math.round(rect.x), y: Math.round(rect.y),
+      width: Math.round(rect.width), height: Math.round(rect.height),
+    });
+    return img.toDataURL();
+  }));
+
+  // 收下渲染层拼好的 PNG 并存盘（渲染层负责三块截图 + 拼合，理由见 api.ts）
   ipcMain.handle(IPC.captureRegion, safe(async () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
     if (!win) throw new Error('找不到窗口，无法截图');
-
     const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
-      .get(CAPTURE_PLAN_KEY) as { value: string } | undefined;
-    if (!row?.value) throw new Error('没有截图计划（渲染层未写入 capturePlan）');
-    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run(CAPTURE_PLAN_KEY);
-    JSON.parse(row.value);   // 计划本身只用于确认渲染层已就绪
+      .get('capturePng') as { value: string } | undefined;
+    if (!row?.value) throw new Error('没有截图数据（渲染层未写入 capturePng）');
+    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run('capturePng');
 
-    const prevBounds = win.getBounds();
-    const prevContent = win.getContentSize();
-    try {
-      await win.webContents.executeJavaScript(SHELL_OFF);
-      await new Promise((r) => setTimeout(r, 600));
-
-      // 窗口撑到屏幕最大，尽量少缩小
-      const work = require('electron').screen.getDisplayMatching(prevBounds).workAreaSize;
-      win.setBounds({
-        x: prevBounds.x, y: prevBounds.y,
-        width: Math.round(work.width + (prevBounds.width - prevContent[0])),
-        height: Math.round(work.height + (prevBounds.height - prevContent[1])),
-      });
-      await new Promise((r) => setTimeout(r, 900));   // 等重排落定
-
-      // 按可用空间把功能区等比缩小，并回报缩放后的实际矩形
-      const info = await win.webContents.executeJavaScript(`(function () {
-        var g = document.querySelector('.board__halves');
-        if (!g) return JSON.stringify({ err: 'no-grid' });
-        var needW = g.scrollWidth, needH = g.scrollHeight;
-        var availW = window.innerWidth - 16, availH = window.innerHeight - 16;
-        var k = Math.min(1, availW / needW, availH / needH);
-        // 网格自身被父级约束（scrollWidth 1972 但可见宽只有 690），
-        // 只加 transform 缩放的是它的**盒子**、内容照样溢出；
-        // 所以先显式把宽度撑成内容宽，再整体缩放。
-        g.style.width = needW + 'px';
-        g.style.transformOrigin = 'top left';
-        g.style.transform = k < 1 ? ('scale(' + k + ')') : '';
-        var gr = g.getBoundingClientRect();
-        // 取「网格缩放后的矩形」与「窗口视口」的交集，并记录两者
-        var vw = window.innerWidth, vh = window.innerHeight;
-        var x0 = Math.max(0, gr.left), y0 = Math.max(0, gr.top);
-        var x1 = Math.min(vw, gr.right), y1 = Math.min(vh, gr.bottom);
-        return JSON.stringify({ k: k, x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0),
-          gridW: gr.width, gridH: gr.height, vw: vw, vh: vh,
-          needW: needW, needH: needH });
-      })()`) as string;
-      const a = JSON.parse(info) as {
-        err?: string; k?: number; x?: number; y?: number; w?: number; h?: number;
-        gridW?: number; gridH?: number; vw?: number; vh?: number;
-        needW?: number; needH?: number;
-      };
-      if (a.err) throw new Error('页面里找不到排表功能区');
-      await new Promise((r) => setTimeout(r, 400));
-
-      const img = await win.webContents.capturePage({
-        x: Math.max(0, Math.round(a.x ?? 0)), y: Math.max(0, Math.round(a.y ?? 0)),
-        width: Math.round(a.w ?? 0), height: Math.round(a.h ?? 0),
-      });
-      const size = img.getSize();
-      console.log('[capture] 一次截完: 缩放=' + (a.k ?? 1).toFixed(3)
-        + ' 原尺寸=' + a.needW + 'x' + a.needH
-        + ' 缩放后=' + Math.round(a.gridW ?? 0) + 'x' + Math.round(a.gridH ?? 0)
-        + ' 视口=' + a.vw + 'x' + a.vh
-        + ' 截取=' + Math.round(a.w ?? 0) + 'x' + Math.round(a.h ?? 0)
-        + ' 成图=' + size.width + 'x' + size.height);
-
-      const buf = img.toPNG();
-      const defaultName = `排表_${new Date().toISOString().slice(0, 10)}.png`;
-      const outDir = process.env.OMNIA_CAPTURE_DIR;
-      if (outDir) {
-        fs.mkdirSync(outDir, { recursive: true });
-        const out = require('node:path').join(outDir, defaultName);
-        fs.writeFileSync(out, buf);
-        return { path: out, width: size.width, height: size.height };
-      }
-      const picked = await dialog.showSaveDialog(win, {
-        title: '保存截图', defaultPath: defaultName,
-        filters: [{ name: 'PNG 图片', extensions: ['png'] }],
-      });
-      if (picked.canceled || !picked.filePath) {
-        return { path: null, width: size.width, height: size.height };
-      }
-      fs.writeFileSync(picked.filePath, buf);
-      return { path: picked.filePath, width: size.width, height: size.height };
-    } finally {
-      await win.webContents.executeJavaScript(SHELL_ON).catch(() => {});
-      win.setBounds(prevBounds);
+    const buf = Buffer.from(row.value.replace(/^data:image\/png;base64,/, ''), 'base64');
+    const size = nativeImage.createFromBuffer(buf).getSize();
+    const defaultName = `排表_${new Date().toISOString().slice(0, 10)}.png`;
+    const outDir = process.env.OMNIA_CAPTURE_DIR;
+    if (outDir) {
+      fs.mkdirSync(outDir, { recursive: true });
+      const out = require('node:path').join(outDir, defaultName);
+      fs.writeFileSync(out, buf);
+      console.log('[capture] 已写出', out, size.width + 'x' + size.height);
+      return { path: out, width: size.width, height: size.height };
     }
+    const picked = await dialog.showSaveDialog(win, {
+      title: '保存截图', defaultPath: defaultName,
+      filters: [{ name: 'PNG 图片', extensions: ['png'] }],
+    });
+    if (picked.canceled || !picked.filePath) {
+      return { path: null, width: size.width, height: size.height };
+    }
+    fs.writeFileSync(picked.filePath, buf);
+    return { path: picked.filePath, width: size.width, height: size.height };
   }));
 
   // ── 报名 / 请假 ────────────────────────────────────────────────

@@ -46,9 +46,9 @@ const api = {
      * （多参只到第一个、单参也丢，实测多次），所以只能用「触发」语义。
      */
     captureRegion: () => invoke('app:capture-region'),
+    captureRect: () => invoke('app:capture-rect'),
     captureMaxWin: () => invoke('app:capture-maxwin'),
     captureRestoreWin: () => invoke('app:capture-restorewin'),
-    captureRect: () => invoke('app:capture-rect'),
     xlsxSheets: (data: Uint8Array) => invoke('meta:xlsx:sheets', data),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number) =>
       invoke('meta:xlsx:grid', data, sheet, headerRow),

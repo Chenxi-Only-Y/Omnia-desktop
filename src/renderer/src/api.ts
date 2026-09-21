@@ -60,12 +60,134 @@ export const api = {
      * （早前"隐藏侧栏"失败是因为只隐藏 <aside> 而没塌掉 .app 的两列网格，
      *   留下 216px 空列把内容挤成 355px 宽，原因已在主进程里一并处理。）
      */
+    /**
+     * 截取排表功能区，**完整**（含右半区与下半部分），存成 PNG。
+     *
+     * 采用「固定三块」方案（用户给的思路，比自动分块可靠得多）：
+     *   ① 左半区 —— 滑块拉到最左，截左半区
+     *   ② 中缝   —— 滑块居中，只截中间那条图
+     *   ③ 右半区 —— 滑块拉到最右，截右半区
+     * 三块的切分点落在**中缝及其两侧的间隙**上，那里是平坦底色，
+     * 所以拼缝不可见 —— 这正是自动分块拼合失败的痛点所在。
+     *
+     * 每块的裁切范围按实测的 DOM 位置算（半区宽、中缝宽、间隙），
+     * 并且只取「当前滚动位置下确实可见」的那一段，避免被滚动钳制后取到旧位置。
+     */
     captureBoard: async (): Promise<{ path: string | null; width: number; height: number }> => {
-      const board = document.querySelector('.board');
-      if (!board) throw new Error('排表功能区还没渲染，无法截图');
-      // 只做「已就绪」标记：截取区域由主进程在页面里现量（这批 IPC 传不了实参）
-      await api.meta.setSetting('capturePlan', JSON.stringify({ ready: true }));
-      return unwrap(bridge().meta.captureRegion());
+      const board = document.querySelector('.board') as HTMLElement | null;
+      const hsc = document.querySelector('.board__scroll') as HTMLElement | null;
+      const vsc = document.querySelector('.content') as HTMLElement | null;
+      const grid = document.querySelector('.board__halves') as HTMLElement | null;
+      const halves = document.querySelectorAll('.half');
+      const divider = document.querySelector('.board__divider') as HTMLElement | null;
+      if (!board || !hsc || !vsc || !grid || halves.length < 2 || !divider) {
+        throw new Error('排表功能区还没渲染，无法截图');
+      }
+      const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const prev = { x: hsc.scrollLeft, y: vsc.scrollTop };
+      // 截图期间隐藏滚动条，免得被截进图里
+      const hideBar = document.createElement('style');
+      hideBar.textContent = '.board__scroll::-webkit-scrollbar,.content::-webkit-scrollbar'
+        + '{display:none!important}'
+        // 收起顶部工具条、提示条、顶栏，并去掉内容区留白：
+        // 看板因此上移约 150px，整列 6 行（778px）才进得了视口
+        // —— 之前 originY=177、可视高仅 706，底部 72px 落在屏幕外被截断
+        + '.content > .card:first-child{display:none!important}'
+        + '.content > .msg{display:none!important}'
+        + '.topbar{display:none!important}'
+        + '.content{padding:0!important}';
+      document.head.appendChild(hideBar);
+
+      try {
+        // 先滚到左上，量出三块在「看板内容坐标」里的位置
+        hsc.scrollLeft = 0;
+        vsc.scrollTop = 0;
+        await settle(350);
+        const gRect = grid.getBoundingClientRect();
+        const bRect = board.getBoundingClientRect();
+        const rel = (el: Element) => Math.round(el.getBoundingClientRect().left - gRect.left);
+        const divFrom = rel(divider);
+        const divTo = divFrom + Math.round(divider.getBoundingClientRect().width);
+        // 完整宽度取**右半区右边缘**：网格自身被父级约束，gRect.width 只是可视宽
+        const fullW = Math.round(halves[1].getBoundingClientRect().right - gRect.left);
+        const blocks = [
+          { name: '左半区', from: 0, to: divFrom },
+          { name: '中缝', from: divFrom, to: divTo },
+          { name: '右半区', from: divTo, to: fullW },
+        ].filter((b) => b.to - b.from > 2);
+        // 竖向：确保所有小队行都在视口内（用户口径：下拉到最下面）
+        const fullH = Math.min(Math.round(grid.scrollHeight), Math.round(bRect.height));
+        // 裁剪用的固定几何：看板左边缘在窗口里的 x、以及可视宽高
+        const originX = Math.round(bRect.left - hsc.scrollLeft);
+        const originY = Math.round(bRect.top);
+        const viewW = hsc.clientWidth;
+        const viewH = Math.min(vsc.clientHeight, Math.max(0, window.innerHeight - originY));
+        const maxScroll = Math.max(0, hsc.scrollWidth - viewW);
+
+        const drawn: { url: string; sx: number; w: number; at: number }[] = [];
+        const diag: string[] = [`三块=${JSON.stringify(blocks)} 完整=${fullW}x${fullH}`
+          + ` 可视=${viewW}x${viewH} maxScroll=${maxScroll}`];
+        for (const b of blocks) {
+          // 让这一块完整可见：滚动量取「块起点」，再夹到合法范围
+          const want = Math.min(Math.max(b.from, 0), maxScroll);
+          hsc.scrollLeft = want;
+          vsc.scrollTop = 0;
+          await settle(320);
+          const real = hsc.scrollLeft;
+          // 该滚动量下，块的可见区间（内容坐标）
+          const visFrom = Math.max(b.from, real);
+          const visTo = Math.min(b.to, real + viewW);
+          if (visTo - visFrom <= 2) { diag.push(`${b.name}: 不可见，跳过`); continue; }
+          const w = visTo - visFrom;
+          // 对应的窗口坐标
+          const x = originX + (visFrom - real);
+          const h = fullH;
+          diag.push(`${b.name}: 滚=${real} 取=${visFrom}..${visTo} → 窗口x=${x} ${w}x${h}`);
+          await api.meta.setSetting('captureRect', JSON.stringify({
+            x, y: originY, width: Math.round(w), height: Math.round(h),
+          }));
+          const res = await bridge().meta.captureRect();
+          if (!res.ok) throw new Error(res.error || `${b.name} 截图失败`);
+          const im0 = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error('分块图片解码失败'));
+            el.src = res.data;
+          });
+          diag.push(`${b.name}: 分块图=${im0.naturalWidth}x${im0.naturalHeight}`
+            + ` (期望 ${Math.round(w)}x${h} CSS ×dpr) originY=${originY} viewH=${viewH}`);
+          drawn.push({ url: res.data, sx: 0, w: Math.round(w), at: visFrom });
+        }
+        console.log('[capture] ' + diag.join(' ｜ '));
+        (window as unknown as { __captureDiag?: string }).__captureDiag = diag.join(' ｜ ');
+
+        // 拼合：按各块在内容坐标里的位置画回原尺寸
+        const dpr = window.devicePixelRatio || 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(fullW * dpr);
+        canvas.height = Math.round(fullH * dpr);
+        const g = canvas.getContext('2d');
+        if (!g) throw new Error('无法创建画布');
+        g.fillStyle = '#E6E1E6';
+        g.fillRect(0, 0, canvas.width, canvas.height);
+        for (const d of drawn) {
+          const im = await new Promise<HTMLImageElement>((resolve, reject) => {
+            const el = new Image();
+            el.onload = () => resolve(el);
+            el.onerror = () => reject(new Error('分块图片解码失败'));
+            el.src = d.url;
+          });
+          g.drawImage(im, 0, 0, Math.round(d.w * dpr), Math.round(fullH * dpr),
+            Math.round(d.at * dpr), 0, Math.round(d.w * dpr), Math.round(fullH * dpr));
+        }
+
+        await api.meta.setSetting('capturePng', canvas.toDataURL('image/png'));
+        return await unwrap(bridge().meta.captureRegion());
+      } finally {
+        hideBar.remove();
+        hsc.scrollLeft = prev.x;
+        vsc.scrollTop = prev.y;
+      }
     },
 
     xlsxSheets: (data: Uint8Array): Promise<SheetList> => unwrap(bridge().meta.xlsxSheets(data)),

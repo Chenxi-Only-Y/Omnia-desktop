@@ -628,6 +628,11 @@ export interface OmniaApi {
      * （capturePage 只截可见区域，必须分块），主进程只负责落盘。
      */
     captureRegion(): Promise<IpcResult<{ path: string | null; width: number; height: number }>>;
+    /**
+     * 分块截图，返回 PNG dataURL。
+     * 要截的矩形先写进 app_setting.captureRect —— 这批 IPC 传不了实参。
+     */
+    captureRect(): Promise<IpcResult<string>>;
     /** 把窗口临时撑到屏幕最大，返回内容区尺寸（截图用，拿最大可见区域） */
     captureMaxWin(): Promise<IpcResult<{ w: number; h: number }>>;
     /** 还原窗口尺寸 */
@@ -717,12 +722,12 @@ export const IPC = {
   metaSquadTactic: 'meta:squad:tactic',
   /** 截取窗口内某个区域的图片（排表功能区导出用） */
   captureRegion: 'app:capture-region',
+  /** 分块截图（三块：左半区 / 中缝 / 右半区）；矩形走 app_setting.captureRect */
+  captureRect: 'app:capture-rect',
   /** 截图前把窗口临时撑到屏幕最大（拿最大可见区域） */
   captureMaxWin: 'app:capture-maxwin',
   /** 截图后还原窗口尺寸 */
   captureRestoreWin: 'app:capture-restorewin',
-  /** 分块截图；矩形走 app_setting.captureRect（这条 IPC 传不了实参） */
-  captureRect: 'app:capture-rect',
   metaXlsxSheets: 'meta:xlsx:sheets',
   metaXlsxGrid: 'meta:xlsx:grid',
 

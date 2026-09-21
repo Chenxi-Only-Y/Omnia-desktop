@@ -19,6 +19,7 @@ declare global {
         remove(id: number): Promise<IpcResult<true>>;
         import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number; errors: string[] }>>;
         export(): Promise<IpcResult<PlayerInput[]>>;
+        reorder(playerIds: number[]): Promise<IpcResult<true>>;
         detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
       };
       meta: {

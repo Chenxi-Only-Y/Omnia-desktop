@@ -554,6 +554,43 @@ tr.row--leave > td { background: var(--surface-3); }
      两个可点区域只靠 hover 高亮区分 */
 }
 .picker-item__sub--empty { cursor: default; }
+/* ── 成员主档：卡片列表（可拖动换位） ─────────────────────────── */
+.roster-cards { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow: auto; }
+.roster-card {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 6px 10px;
+  box-shadow: var(--shadow);
+}
+.roster-card:hover { border-color: var(--line-strong); }
+.roster-card--dragging { opacity: .4; }
+.roster-card--over { border-color: var(--fg); box-shadow: 0 0 0 3px var(--accent-soft); }
+.roster-card__handle {
+  cursor: grab; color: var(--text-faint); font-size: 14px; user-select: none;
+  padding: 0 2px;
+}
+.roster-card__handle:active { cursor: grabbing; }
+.roster-card__order { width: 54px; text-align: center; }
+.roster-card__id {
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: var(--fg); font-weight: 700; padding: 0;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.roster-card__id:hover { text-decoration: underline; }
+.roster-card__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--text-dim); flex: 1 1 auto; min-width: 0;
+}
+.roster-card__meta b { color: var(--text); font-weight: 400; }
+.roster-card__orange { display: inline-flex; align-items: center; gap: 5px; }
+.roster-card__orange-input { width: 96px; padding: 1px 6px; font-size: 12px; }
+.roster-card__actions { display: flex; gap: 4px; flex: 0 0 auto; }
+.roster-card__edit {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  flex-basis: 100%; margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--line);
+}
+
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
 .pcard__icon {

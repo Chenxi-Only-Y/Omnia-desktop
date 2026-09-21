@@ -23,6 +23,8 @@ export interface Player {
   joinedOrder: number | null;
   mic: '有' | '无' | '无需作答' | '';
   noteRole: NoteRole;
+  /** 橙武（空 = 没有，界面显示「-」） */
+  orangeWeapon: string;
   /** 注意：职业不在这里 —— 职业只从报名表来，存在 signup（人 × 场）上 */
   status: string;
   remark: string;
@@ -36,6 +38,8 @@ export interface PlayerInput {
   joinedOrder?: number | null;
   mic?: Player['mic'];
   noteRole?: NoteRole;
+  /** 橙武（空串表示没有） */
+  orangeWeapon?: string;
   status?: string;
   remark?: string;
 }
@@ -647,6 +651,8 @@ export interface OmniaApi {
     remove(id: number): Promise<IpcResult<true>>;
     import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number }>>;
     export(): Promise<IpcResult<PlayerInput[]>>;
+    /** 按给定 id 顺序重排成员：序 = 下标 + 1（拖拽换位后调用） */
+    reorder(playerIds: number[]): Promise<IpcResult<true>>;
     /** 个人详情（历史 + 汇总 + 雷达） */
     detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
   };
@@ -760,6 +766,8 @@ export const IPC = {
   playerUpdate: 'player:update',
   playerRemove: 'player:remove',
   playerImport: 'player:import',
+  /** 按给定顺序重排成员（拖拽换位后调用），写回「序」 */
+  playerReorder: 'player:reorder',
   playerExport: 'player:export',
   playerDetail: 'player:detail',
   metaClasses: 'meta:classes',

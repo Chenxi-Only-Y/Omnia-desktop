@@ -198,6 +198,7 @@ export class DashboardRepo {
         joinedOrder: pl.joined_order,
         mic: (pl.mic || '') as PlayerDetail['player']['mic'],
         noteRole: (pl.note_role || '') as PlayerDetail['player']['noteRole'],
+        orangeWeapon: (pl as { orange_weapon?: string }).orange_weapon || '',
         status: pl.status || 'active',
         remark: pl.remark || '',
         createdAt: pl.created_at,

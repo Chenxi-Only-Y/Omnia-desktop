@@ -84,6 +84,11 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
   ipcMain.handle(IPC.playerImport, safe((rows: PlayerInput[]) => players.importMany(rows)));
+  // 拖拽换位后整批写回「序」
+  ipcMain.handle(IPC.playerReorder, safe((playerIds: number[]) => {
+    players.reorder(playerIds);
+    return true as const;
+  }));
   ipcMain.handle(IPC.playerDetail, safe((playerId: number) => dashboard.playerDetail(playerId)));
   ipcMain.handle(IPC.playerExport, safe(() => players.list().map((p): PlayerInput => ({
     gameId: p.gameId,

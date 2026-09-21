@@ -13,6 +13,7 @@ interface PlayerRow {
   joined_order: number | null;
   mic: string;
   note_role: string;
+  orange_weapon: string;
   status: string;
   remark: string;
   created_at: string;
@@ -20,7 +21,7 @@ interface PlayerRow {
 }
 
 const COLS = `id, game_id, name, joined_order, mic, note_role,
-              status, remark, created_at, updated_at`;
+              orange_weapon, status, remark, created_at, updated_at`;
 
 function toPlayer(r: PlayerRow): Player {
   return {
@@ -30,6 +31,7 @@ function toPlayer(r: PlayerRow): Player {
     joinedOrder: r.joined_order,
     mic: (r.mic || '') as Player['mic'],
     noteRole: (r.note_role || '') as Player['noteRole'],
+    orangeWeapon: r.orange_weapon || '',
     status: r.status || 'active',
     remark: r.remark || '',
     createdAt: r.created_at,
@@ -89,8 +91,8 @@ export class PlayerRepo {
       throw new Error(`ID 已存在：${gameId}`);
     }
     const stmt = this.db.prepare(
-      `INSERT INTO player (game_id, name, joined_order, mic, note_role, status, remark)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO player (game_id, name, joined_order, mic, note_role, orange_weapon, status, remark)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const info = stmt.run(
       gameId,
@@ -99,6 +101,7 @@ export class PlayerRepo {
       num(input.joinedOrder),
       norm(input.mic),
       norm(input.noteRole),
+      norm(input.orangeWeapon),
       norm(input.status) || 'active',
       norm(input.remark),
     );
@@ -134,6 +137,7 @@ export class PlayerRepo {
     if (patch.joinedOrder !== undefined) put('joined_order', num(patch.joinedOrder));
     if (patch.mic !== undefined) put('mic', norm(patch.mic));
     if (patch.noteRole !== undefined) put('note_role', norm(patch.noteRole));
+    if (patch.orangeWeapon !== undefined) put('orange_weapon', norm(patch.orangeWeapon));
     if (patch.status !== undefined) put('status', norm(patch.status) || 'active');
     if (patch.remark !== undefined) put('remark', norm(patch.remark));
 
@@ -191,6 +195,8 @@ export class PlayerRepo {
           if (raw.joinedOrder !== undefined && raw.joinedOrder !== null) patch.joinedOrder = raw.joinedOrder;
           if (norm(raw.mic)) patch.mic = raw.mic;
           if (norm(raw.noteRole)) patch.noteRole = raw.noteRole;
+          // 橙武允许被导入覆盖（空值不覆盖，避免把已有值擦掉）
+          if (norm(raw.orangeWeapon)) patch.orangeWeapon = raw.orangeWeapon;
           // 旧表的主职业/副职列此处忽略：职业已不在成员主档
           if (norm(raw.status)) patch.status = raw.status;
           if (norm(raw.remark)) patch.remark = raw.remark;
@@ -217,5 +223,22 @@ export class PlayerRepo {
       summary.errors.push('警告：导入后成员总数与预期不符，请检查重复角色 ID');
     }
     return summary;
+  }
+
+  /**
+   * 按给定顺序重排成员：序 = 下标 + 1。
+   * 拖拽换位后调用，整批写回 —— 保证「序」连续，且与界面看到的顺序一致。
+   */
+  reorder(playerIds: number[]): void {
+    if (!playerIds.length) throw new Error('没有要排序的成员');
+    const stmt = this.db.prepare('UPDATE player SET joined_order = ? WHERE id = ?');
+    this.db.exec('BEGIN');
+    try {
+      playerIds.forEach((id, i) => { stmt.run(i + 1, id); });
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 }

@@ -437,6 +437,17 @@ const MIGRATIONS: Migration[] = [
       db.exec(`ALTER TABLE signup ADD COLUMN submitted_at TEXT NOT NULL DEFAULT ''`);
     },
   },
+  {
+    version: 11,
+    name: 'player_orange_weapon',
+    up: (db) => {
+      // 橙武：成员主档里「备注」之后的一列，默认空（界面显示为「-」）。
+      // 空串与「-」都表示没有，所以只存空串，展示层再统一成「-」。
+      db.exec(`ALTER TABLE player ADD COLUMN orange_weapon TEXT NOT NULL DEFAULT ''`);
+      // 序（joined_order）允许改 → 排序必须稳定：先按序、再按 id。
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_player_joined_order ON player(joined_order)`);
+    },
+  },
 ];
 
 export interface DbHandle {

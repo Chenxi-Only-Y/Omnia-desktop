@@ -25,6 +25,7 @@ const api = {
     update: (id: number, patch: Partial<PlayerInput>) => invoke('player:update', id, patch),
     remove: (id: number) => invoke('player:remove', id),
     import: (rows: PlayerInput[]) => invoke('player:import', rows),
+    reorder: (playerIds: number[]) => invoke('player:reorder', playerIds),
     export: () => invoke('player:export'),
     detail: (playerId: number) => invoke('player:detail', playerId),
   },

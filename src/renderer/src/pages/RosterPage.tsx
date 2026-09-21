@@ -17,12 +17,14 @@ interface Draft {
   joinedOrder: string;
   mic: Player['mic'];
   noteRole: Player['noteRole'];
+  /** 橙武（空 = 没有） */
+  orangeWeapon: string;
   status: string;
   remark: string;
 }
 
 const EMPTY_DRAFT: Draft = {
-  id: '', joinedOrder: '', mic: '', noteRole: '', status: 'active', remark: '',
+  id: '', joinedOrder: '', mic: '', noteRole: '', orangeWeapon: '', status: 'active', remark: '',
 };
 
 const STATUS_LABEL: Record<string, string> = { active: '在队', inactive: '暂离', left: '离队' };
@@ -50,6 +52,12 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 拖拽换位：正在拖的、以及当前悬停的目标 */
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  /** 「序」与「橙武」的内联草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
+  const [orderDraft, setOrderDraftState] = useState<Record<number, string>>({});
+  const [orangeDraft, setOrangeDraft] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,9 +118,78 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     return players.filter((p) => {
       if (filterStatus && p.status !== filterStatus) return false;
       if (!key) return true;
-      return p.gameId.toLowerCase().includes(key) || p.remark.toLowerCase().includes(key);
+      return p.gameId.toLowerCase().includes(key) || p.remark.toLowerCase().includes(key)
+        || (p.orangeWeapon ?? '').toLowerCase().includes(key);
     });
   }, [players, q, filterStatus]);
+
+  /** 列表顺序：按「序」排（没填序的排最后），同序按 id —— 改序 / 拖拽都立刻反映在这里 */
+  const sorted = useMemo(() => [...filtered].sort((a, b) => {
+    const oa = a.joinedOrder ?? Number.MAX_SAFE_INTEGER;
+    const ob = b.joinedOrder ?? Number.MAX_SAFE_INTEGER;
+    if (oa !== ob) return oa - ob;
+    return a.id - b.id;
+  }), [filtered]);
+
+  function setOrderDraft(id: number, v: string) {
+    setOrderDraftState((d) => ({ ...d, [id]: v }));
+  }
+
+  /** 提交「序」：空值 = 清除（排到最后） */
+  async function commitOrder(p: Player) {
+    const raw = orderDraft[p.id];
+    if (raw === undefined) return;
+    const next = raw.trim() === '' ? null : Number(raw);
+    if (next !== null && !Number.isFinite(next)) return;
+    if (next === (p.joinedOrder ?? null)) { setOrderDraftState((d) => { const n = { ...d }; delete n[p.id]; return n; }); return; }
+    try {
+      await api.player.update(p.id, { joinedOrder: next });
+      setOrderDraftState((d) => { const n = { ...d }; delete n[p.id]; return n; });
+      setError(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
+
+  /** 提交「橙武」 */
+  async function commitOrange(p: Player) {
+    const raw = orangeDraft[p.id];
+    if (raw === undefined) return;
+    const next = raw.trim();
+    if (next === (p.orangeWeapon ?? '')) {
+      setOrangeDraft((d) => { const n = { ...d }; delete n[p.id]; return n; });
+      return;
+    }
+    try {
+      await api.player.update(p.id, { orangeWeapon: next });
+      setOrangeDraft((d) => { const n = { ...d }; delete n[p.id]; return n; });
+      setError(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
+
+  /**
+   * 拖拽换位：把 fromId 挪到 toId 的位置，然后整批写回「序」。
+   * 只用当前**列表顺序**（sorted）算新顺序，所以拖完立即与界面一致。
+   */
+  async function moveTo(fromId: number, toId: number) {
+    const ids = sorted.map((x) => x.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    try {
+      await api.player.reorder(ids);
+      setError(null);
+      setNotice(`已按新顺序保存（${ids.length} 人）`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    }
+  }
 
   const stats = useMemo(() => {
     const byStatus: Record<string, number> = {};
@@ -141,6 +218,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         joinedOrder: draft.joinedOrder === '' ? null : Number(draft.joinedOrder),
         mic: draft.mic,
         noteRole: draft.noteRole,
+        orangeWeapon: draft.orangeWeapon,
         status: draft.status,
         remark: draft.remark,
       });
@@ -159,7 +237,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     setEditDraft({
       id: p.gameId,
       joinedOrder: p.joinedOrder === null ? '' : String(p.joinedOrder),
-      mic: p.mic, noteRole: p.noteRole, status: p.status, remark: p.remark,
+      mic: p.mic, noteRole: p.noteRole,
+      orangeWeapon: p.orangeWeapon ?? '', status: p.status, remark: p.remark,
     });
   }
 
@@ -173,6 +252,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         joinedOrder: editDraft.joinedOrder === '' ? null : Number(editDraft.joinedOrder),
         mic: editDraft.mic,
         noteRole: editDraft.noteRole,
+        orangeWeapon: editDraft.orangeWeapon,
         status: editDraft.status,
         remark: editDraft.remark,
       });
@@ -322,108 +402,123 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       )}
 
       <div className="card">
-        <h3>成员列表（{filtered.length} / {players.length}）</h3>
-        <div className="table-wrap" style={{ maxHeight: '52vh' }}>
-          <table className="grid">
-            <thead>
-              <tr>
-                <th style={{ width: 56 }}>序</th>
-                <th>ID</th>
-                <th>本场报名</th>
-                <th>麦克风</th>
-                <th>备注角色</th>
-                <th>状态</th>
-                <th>备注</th>
-                <th style={{ width: 120 }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && <tr><td className="empty" colSpan={8}>加载中…</td></tr>}
-              {!loading && filtered.length === 0 && (
-                <tr><td className="empty" colSpan={8}>
-                  暂无成员。可以用上面的表单添加，或导入旧表的成员主档。
-                </td></tr>
-              )}
-              {!loading && filtered.map((p) => {
-                const editing = editId === p.id;
-                return (
-                  <tr key={p.id}>
-                    <td className="num">{p.joinedOrder ?? '—'}</td>
-                    {editing ? (
-                      <>
-                        <td><input className="input" style={{ width: 180 }} value={editDraft.id}
-                                   onChange={(e) => setEditDraft({ ...editDraft, id: e.target.value })} /></td>
-                        <td style={{ color: 'var(--text-faint)' }}>—</td>
-                        <td>
-                          <select className="select" value={editDraft.mic}
-                                  onChange={(e) => setEditDraft({ ...editDraft, mic: e.target.value as Player['mic'] })}>
-                            <option value="">—</option>
-                            <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
-                          </select>
-                        </td>
-                        <td>
-                          <select className="select" value={editDraft.noteRole}
-                                  onChange={(e) => setEditDraft({ ...editDraft, noteRole: e.target.value as Player['noteRole'] })}>
-                            <option value="">—</option>
-                            {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
-                          </select>
-                        </td>
-                        <td>
-                          <select className="select" value={editDraft.status}
-                                  onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
-                            <option value="active">在队</option><option value="inactive">暂离</option><option value="left">离队</option>
-                          </select>
-                        </td>
-                        <td><input className="input" style={{ width: 140 }} value={editDraft.remark}
-                                   onChange={(e) => setEditDraft({ ...editDraft, remark: e.target.value })} /></td>
-                        <td className="actions">
-                          <div className="row-edit" style={{ justifyContent: 'flex-end' }}>
-                            <button className="btn sm primary" onClick={() => void saveEdit()}>保存</button>
-                            <button className="btn sm ghost" onClick={() => setEditId(null)}>取消</button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td>
-                          <span className="roster-name-link" role="button" tabIndex={0}
-                                title="查看个人详情"
-                                onClick={() => onOpenDetail(p.id)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') onOpenDetail(p.id); }}>
-                            {p.gameId}
-                          </span>
-                        </td>
-                        <td>{(() => {
-                          const st = signupOf.get(p.id) ?? null;
-                          if (matchId === null) return <span style={{ color: 'var(--text-faint)' }}>—</span>;
-                          if (st === 'JOIN') return <span className="badge-state active">参加</span>;
-                          if (st === 'LEAVE') return <span className="badge-state left">请假</span>;
-                          if (st === 'BENCH') return <span className="badge-state inactive">替补</span>;
-                          return <span className="badge-flag">未填表</span>;
-                        })()}</td>
-                        <td><span className="badge-mic">{p.mic || '—'}</span></td>
-                        <td>{p.noteRole ? <span className="badge-note">{p.noteRole}</span> : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
-                        <td>{(() => {
-                          const s = statusOf(p);
-                          return <span className={`badge-state ${s.kind}`}>{s.label}</span>;
-                        })()}</td>
-                        <td style={{ color: 'var(--text-dim)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.remark || '—'}</td>
-                        <td className="actions">
-                          <div className="row-edit" style={{ justifyContent: 'flex-end' }}>
-                            <button className="btn sm" onClick={() => onOpenDetail(p.id)}>详情</button>
-                            <button className="btn sm" onClick={() => startEdit(p)}>编辑</button>
-                            <button className="btn sm danger" onClick={() => void handleRemove(p)}>删除</button>
-                          </div>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="toolbar" style={{ marginBottom: 8 }}>
+          <h3 style={{ margin: 0 }}>成员列表（{filtered.length} / {players.length}）</h3>
+          <div className="spacer grow" />
+          <span className="hint" style={{ margin: 0 }}>
+            拖动卡片可换位；「序」也可直接改，列表按序排列
+          </span>
+        </div>
+
+        <div className="roster-cards">
+          {loading && <div className="hint">加载中…</div>}
+          {!loading && filtered.length === 0 && (
+            <div className="hint">暂无成员。可以用上面的表单添加，或导入旧表的成员主档。</div>
+          )}
+          {!loading && sorted.map((p) => {
+            const st = statusOf(p);
+            const dragOver = dragOverId === p.id && dragId !== null && dragId !== p.id;
+            return (
+              <div
+                key={p.id}
+                className={`roster-card${dragId === p.id ? ' roster-card--dragging' : ''}${dragOver ? ' roster-card--over' : ''}`}
+                draggable
+                onDragStart={(e) => {
+                  setDragId(p.id);
+                  e.dataTransfer.effectAllowed = 'move';
+                  // 某些环境必须 setData 才会触发后续 dragOver
+                  e.dataTransfer.setData('text/plain', String(p.id));
+                }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverId(p.id); }}
+                onDragLeave={() => setDragOverId((cur) => (cur === p.id ? null : cur))}
+                onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const fromId = Number(e.dataTransfer.getData('text/plain')) || dragId;
+                  setDragId(null);
+                  setDragOverId(null);
+                  if (fromId && fromId !== p.id) void moveTo(fromId, p.id);
+                }}
+              >
+                <span className="roster-card__handle" title="拖动换位">⠿</span>
+                {/* 序：可直接改，改完列表按序重排 */}
+                <input
+                  className="input roster-card__order"
+                  type="number"
+                  title="序（改完按序排列）"
+                  value={p.joinedOrder ?? ''}
+                  onChange={(e) => setOrderDraft(p.id, e.target.value)}
+                  onBlur={() => void commitOrder(p)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void commitOrder(p); }}
+                />
+                <button className="roster-card__id" onClick={() => onOpenDetail(p.id)}
+                        title="查看个人详情">{p.gameId}</button>
+
+                <span className={`badge-state ${signupOf.get(p.id) === 'JOIN' ? 'active' : signupOf.get(p.id) === 'LEAVE' ? 'left' : 'inactive'}`}>
+                  {matchId === null ? '—'
+                    : signupOf.get(p.id) === 'JOIN' ? '参加'
+                      : signupOf.get(p.id) === 'LEAVE' ? '请假'
+                        : signupOf.get(p.id) === 'BENCH' ? '替补' : '未填表'}
+                </span>
+                <span className={`badge-state ${st.kind}`}>{st.label}</span>
+
+                <span className="roster-card__meta">
+                  <span>麦克风 <b>{p.mic || '—'}</b></span>
+                  <span>备注角色 <b>{p.noteRole || '—'}</b></span>
+                  {/* 橙武：默认显示「-」，点进去可直接填 */}
+                  <span className="roster-card__orange">
+                    橙武
+                    <input
+                      className="input roster-card__orange-input"
+                      placeholder="-"
+                      value={orangeDraft[p.id] ?? p.orangeWeapon ?? ''}
+                      onChange={(e) => setOrangeDraft((d) => ({ ...d, [p.id]: e.target.value }))}
+                      onBlur={() => void commitOrange(p)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') void commitOrange(p); }}
+                    />
+                  </span>
+                  <span>备注 <b>{p.remark || '—'}</b></span>
+                </span>
+
+                <span className="roster-card__actions">
+                  <button className="btn sm" onClick={() => onOpenDetail(p.id)}>详情</button>
+                  <button className="btn sm" onClick={() => startEdit(p)}>编辑</button>
+                  <button className="btn sm danger" onClick={() => void handleRemove(p)}>删除</button>
+                </span>
+
+                {editId === p.id && (
+                  <div className="roster-card__edit">
+                    <span className="hint">编辑模式：改 ID / 麦克风 / 备注角色 / 序 / 备注 / 橙武</span>
+                    <input className="input" style={{ width: 160 }} value={editDraft.id}
+                           onChange={(e) => setEditDraft({ ...editDraft, id: e.target.value })} />
+                    <select className="select" value={editDraft.mic}
+                            onChange={(e) => setEditDraft({ ...editDraft, mic: e.target.value as Player['mic'] })}>
+                      <option value="">—</option>
+                      <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
+                    </select>
+                    <select className="select" value={editDraft.noteRole}
+                            onChange={(e) => setEditDraft({ ...editDraft, noteRole: e.target.value as Player['noteRole'] })}>
+                      <option value="">—</option>
+                      {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <input className="input" style={{ width: 76 }} placeholder="序" value={editDraft.joinedOrder}
+                           onChange={(e) => setEditDraft({ ...editDraft, joinedOrder: e.target.value })} />
+                    <input className="input" style={{ width: 120 }} placeholder="橙武"
+                           value={editDraft.orangeWeapon}
+                           onChange={(e) => setEditDraft({ ...editDraft, orangeWeapon: e.target.value })} />
+                    <input className="input" style={{ width: 160 }} placeholder="备注"
+                           value={editDraft.remark}
+                           onChange={(e) => setEditDraft({ ...editDraft, remark: e.target.value })} />
+                    <button className="btn sm primary" onClick={() => void saveEdit()}>保存</button>
+                    <button className="btn sm ghost" onClick={() => setEditId(null)}>取消</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
+
     </>
   );
 }

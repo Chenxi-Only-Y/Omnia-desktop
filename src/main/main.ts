@@ -1070,10 +1070,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('乙 上场=' + (d2.ok ? d2.data.totals.plays : '?')
           + ' 已填战报=' + (d2.ok ? d2.data.totals.statFilled : '?') + '（应 2 / 1）');
 
-        // 页面渲染：进成员主档 → 点「详情」
+        // 页面渲染：进成员主档 → 点某张成员卡片上的「详情」
+        // 注意：成员列表已从表格改为卡片，选择器要跟着改（找不到就会超时，
+        // 进而跳过下面的清理、把残留数据留给后面的探针 —— 已经踩过一次）
         const nav = [...document.querySelectorAll('button.nav-item')].find(x => x.textContent.includes('成员主档'));
         nav.click();
-        const btn = await waitFor(() => [...document.querySelectorAll('table.grid button')]
+        const btn = await waitFor(() => [...document.querySelectorAll('.roster-card__actions button')]
           .find(x => x.textContent.trim() === '详情'), '「详情」按钮');
         btn.click();
         const radar = await waitFor(() => document.querySelector('svg.radar'), '雷达图');

@@ -204,6 +204,8 @@ export const api = {
     remove: (id: number): Promise<true> => unwrap(bridge().player.remove(id)),
     import: (rows: PlayerInput[]) => unwrap(bridge().player.import(rows)),
     export: (): Promise<PlayerInput[]> => unwrap(bridge().player.export()),
+    /** 拖拽换位后整批写回「序」 */
+    reorder: (playerIds: number[]): Promise<true> => unwrap(bridge().player.reorder(playerIds)),
     detail: (playerId: number): Promise<PlayerDetail> => unwrap(bridge().player.detail(playerId)),
   },
 

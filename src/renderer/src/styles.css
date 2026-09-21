@@ -521,25 +521,30 @@ tr.row--leave > td { background: var(--surface-3); }
   background: var(--surface-2); border-radius: 8px; padding: 0 6px;
 }
 
-/* 候选条目拆成两个点击目标：主职一块、副职一块（靠虚线边区分，不加文字） */
-.picker-item--split { padding: 0; gap: 0; overflow: hidden; min-width: 0; }
+/* 候选条目：固定两列 —— 左列「名字 + 主职」、右列「副职」。
+   右列给**最小宽度**：没有副职时若塌成 0，主职标签会被推右约 60px，
+   同一列的条目就对不齐了（实测漂移 63px）。 */
+.picker-item--split {
+  display: grid; grid-template-columns: 1fr 84px;
+  align-items: stretch; padding: 0; gap: 0; overflow: hidden; min-width: 0;
+}
 .picker-item__main,
 .picker-item__sub {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: grid; align-items: center;
   border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: inherit; padding: 6px 8px;
+  color: inherit; padding: 5px 8px;
 }
+.picker-item__main { grid-template-columns: 1fr auto; gap: 6px; min-width: 0; }
 .picker-item__main:hover,
 .picker-item__sub:hover { background: var(--hover); }
-/* 名字占满剩余宽度并在必要时省略，职业标签原样保留（不被压缩） */
-.picker-item__main { flex: 1 1 auto; min-width: 0; justify-content: flex-start; }
-.picker-item__main .nm { flex: 1 1 auto; min-width: 0; }
+/* 名字占满左格并在必要时省略；主职/副职标签原样保留，不被压缩 */
+.picker-item__main .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-item__sub {
-  flex: 0 0 auto;
-  border-left: 1px dashed var(--line-strong);
-  /* 副职标签：不给文字说明，靠虚线边表明它是另一个可选职业 */
+  justify-items: center;
+  /* 主职与副职标签外观完全一致（用户口径：不做特殊区分），
+     两个可点区域只靠 hover 高亮区分 */
 }
-.picker-item__sub .chip.class { border-style: dashed; opacity: .92; }
+.picker-item__sub--empty { cursor: default; }
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
 .pcard__icon {

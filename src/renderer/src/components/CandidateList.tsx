@@ -79,13 +79,13 @@ export default function CandidateList({
           <span className="nm">{r.gameId}</span>
           <ClassChip name={r.mainClass} classMap={classMap} />
         </button>
-        {/* 副职标签：同一个 ClassChip（图标与主职同源），只加虚线边区分，不加文字 */}
-        {sub && (
+        {/* 副职固定占第二列（没有副职时也占位），这样每一行的主职标签都对齐 */}
+        {sub ? (
           <button className="picker-item__sub" onClick={() => onPick(r.playerId, sub)}
                   title={`按副职 ${sub} 放入`}>
             <ClassChip name={sub} classMap={classMap} />
           </button>
-        )}
+        ) : <span className="picker-item__sub picker-item__sub--empty" />}
         {renderExtra?.(r)}
       </div>
     );

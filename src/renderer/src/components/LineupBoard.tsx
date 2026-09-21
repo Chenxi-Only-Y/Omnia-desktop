@@ -409,18 +409,20 @@ function PlayerCard({
            title={`${row.name}（ID: ${row.gameId}）· 点击移出本场`}>
         {row.gameId || row.name}
       </div>
-      {/* 职业：可就地改 —— 下拉里只放本场报名表的主职与二职（用户口径：
-          排表时可以选择职业）。没有报名数据时退化为纯文字。 */}
+      {/* 职业：可就地改 —— 下拉里只放本场报名表的主职与副职（用户口径：
+          排表时可以选择职业）。没有报名数据时退化为纯文字。
+          两栏填同一个职业时（样本里确实有）只出现一个选项，不重复。 */}
       {onChangeClass && (row.mainClass || row.subClass) ? (
         <select
           className="pcard__cls pcard__cls--edit"
           value={cls || row.mainClass || row.subClass}
-          title="选择本场使用职业（主职 / 二职）"
+          title="选择本场使用职业"
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onChangeClass(row.playerId, e.target.value)}
         >
-          {row.mainClass && <option value={row.mainClass}>主职 · {row.mainClass}</option>}
-          {row.subClass && <option value={row.subClass}>二职 · {row.subClass}</option>}
+          {row.mainClass && <option value={row.mainClass}>{row.mainClass}</option>}
+          {row.subClass && row.subClass !== row.mainClass
+            && <option value={row.subClass}>{row.subClass}</option>}
         </select>
       ) : (
         <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}

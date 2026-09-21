@@ -260,6 +260,8 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   display: inline-flex; align-items: center; gap: 5px;
   border-radius: 999px; padding: 1px 9px; font-size: 12px;
   border: 1px solid var(--border-strong); background: var(--surface);
+  /* 职业名不能被拆成两行（"妙音"曾断成 妙/音），chip 一律不换行 */
+  white-space: nowrap; flex: 0 0 auto;
 }
 .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
 /* 职业图标保持原色（用户要求不变色）。浅底上给一层白托底 + 细描边，
@@ -325,7 +327,7 @@ table.grid td .cell-num { background: var(--surface); }
 
 /* ── 队员选择器 ───────────────────────────────────────────── */
 .picker-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 6px; max-height: 220px; overflow: auto;
 }
 .picker-item {
@@ -509,6 +511,35 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
 /* 导入预览里请假行：整体压暗，和参加行一眼区分 */
 tr.row--leave > td { background: var(--surface-3); }
+
+/* ── 报名候选：按职业分组 ─────────────────────────────────────── */
+.picker-group { border-top: 1px solid var(--line); padding-top: 6px; }
+.picker-group:first-child { border-top: 0; padding-top: 0; }
+.picker-group__head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.picker-group__count {
+  font-size: 11px; color: var(--text-faint);
+  background: var(--surface-2); border-radius: 8px; padding: 0 6px;
+}
+
+/* 候选条目拆成两个点击目标：主职一块、副职一块（靠虚线边区分，不加文字） */
+.picker-item--split { padding: 0; gap: 0; overflow: hidden; min-width: 0; }
+.picker-item__main,
+.picker-item__sub {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: inherit; padding: 6px 8px;
+}
+.picker-item__main:hover,
+.picker-item__sub:hover { background: var(--hover); }
+/* 名字占满剩余宽度并在必要时省略，职业标签原样保留（不被压缩） */
+.picker-item__main { flex: 1 1 auto; min-width: 0; justify-content: flex-start; }
+.picker-item__main .nm { flex: 1 1 auto; min-width: 0; }
+.picker-item__sub {
+  flex: 0 0 auto;
+  border-left: 1px dashed var(--line-strong);
+  /* 副职标签：不给文字说明，靠虚线边表明它是另一个可选职业 */
+}
+.picker-item__sub .chip.class { border-style: dashed; opacity: .92; }
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
 .pcard__icon {

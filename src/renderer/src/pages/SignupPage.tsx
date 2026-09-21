@@ -334,7 +334,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                     )}
                   </td>
                   <td><ClassChip name={r.mainClass} classMap={classMap} /></td>
-                  <td>{r.subClass
+                  <td>{r.subClass && r.subClass !== r.mainClass
                     ? <ClassChip name={r.subClass} classMap={classMap} />
                     : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
                   <td>{r.noteRole ? <span className="badge-note">{r.noteRole}</span> : '—'}</td>

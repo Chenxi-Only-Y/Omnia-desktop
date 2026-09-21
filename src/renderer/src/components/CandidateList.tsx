@@ -16,13 +16,22 @@ import ClassChip from './ClassChip';
 const CLASS_ORDER = CLASSES.map((c) => c.name);
 const UNKNOWN = '未登记职业';
 
+/**
+ * 按职业分组：**主职与副职都要进对应的组**。
+ * 一个人主职素问、副职妙音，就同时出现在「素问」与「妙音」两个组里 ——
+ * 这样想找妙音时不会漏掉他（用户口径）。
+ * 两者相同只进一次，避免同一人重复出现在同一组。
+ */
 function groupByClass(rows: SignupRow[]): [string, SignupRow[]][] {
   const map = new Map<string, SignupRow[]>();
+  const push = (key: string, r: SignupRow) => {
+    const arr = map.get(key);
+    if (arr) { if (!arr.includes(r)) arr.push(r); } else map.set(key, [r]);
+  };
   for (const r of rows) {
-    const k = r.mainClass || UNKNOWN;
-    const arr = map.get(k);
-    if (arr) arr.push(r);
-    else map.set(k, [r]);
+    const main = r.mainClass || UNKNOWN;
+    push(main, r);
+    if (r.subClass && r.subClass !== r.mainClass) push(r.subClass, r);
   }
   return [...map.entries()].sort((a, b) => {
     const ia = CLASS_ORDER.indexOf(a[0]);

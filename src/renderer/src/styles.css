@@ -507,6 +507,8 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .pcard__cls--edit option { color: var(--text); background: var(--surface); }
 /* 交叉核对里成排的 ID 标签 */
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+/* 导入预览里请假行：整体压暗，和参加行一眼区分 */
+tr.row--leave > td { background: var(--surface-3); }
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
 .pcard__icon {

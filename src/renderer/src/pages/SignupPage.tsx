@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SignupBoard, SignupImportPreview, SignupReview, SignupStatus } from '@shared/types';
+import type {
+  SignupBoard, SignupImportPreview, SignupImportRow, SignupReview, SignupStatus,
+} from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
@@ -31,17 +33,21 @@ const STATUS_ORDER: SignupStatus[] = ['JOIN', 'BENCH', 'LEAVE'];
  * 与原表的区别：旧表这块靠 WPS 在线表单（定义名已全 #REF!，功能已死），
  * 这里是库内实体。报名（意愿）与上场名单（排表结果）分开显示，允许不一致。
  */
-export default function SignupPage({ matchId, matchLabel, classMap, onBack, onChanged }: Props) {
+export default function SignupPage({ matchId, matchLabel, classes, classMap, onBack, onChanged }: Props) {
   const [board, setBoard] = useState<SignupBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  /** 导入预览（确认后才入库） */
-  const [preview, setPreview] = useState<SignupImportPreview | null>(null);
+  /** 导入预览：**可直接编辑**的行（改完再入库） */
+  const [importRows, setImportRows] = useState<SignupImportRow[] | null>(null);
+  /** 解析出来的元信息（列名、无法识别行）—— 这些不随编辑变化 */
+  const [importMeta, setImportMeta] = useState<Pick<SignupImportPreview, 'headers' | 'headerRow' | 'invalid'> | null>(null);
   /** 交叉核对：本场未填表 / 报名有主档没有 */
   const [review, setReview] = useState<SignupReview | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 导入时是否把「不在主档」的 ID 一并建成成员 */
+  const [autoCreate, setAutoCreate] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -83,18 +89,20 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
     }
   }
 
-  /** 选报名表 xlsx → 解析出预览（不入库） */
+  /** 选报名表 xlsx → 解析出预览（不入库；行可编辑） */
   async function handleSignupFile(file: File | undefined) {
     if (!file) return;
     setBusy(true);
     try {
       const data = new Uint8Array(await file.arrayBuffer());
       const pv = await api.signup.parse(matchId, data);
-      setPreview(pv);
+      setImportRows(pv.rows.map((r) => ({ ...r })));
+      setImportMeta({ headers: pv.headers, headerRow: pv.headerRow, invalid: pv.invalid });
       setError(null);
       setNotice(null);
     } catch (err) {
-      setPreview(null);
+      setImportRows(null);
+      setImportMeta(null);
       setError(`解析报名表失败：${err instanceof ApiError ? err.message : String(err)}`);
     } finally {
       setBusy(false);
@@ -102,20 +110,54 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
     }
   }
 
-  /** 确认导入 */
+  /** 改预览里的一行（ID / 参加请假 / 麦 / 主职 / 副职 都可改） */
+  function patchImportRow(idx: number, patch: Partial<SignupImportRow>) {
+    setImportRows((rows) => (rows ? rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)) : rows));
+  }
+
+  function removeImportRow(idx: number) {
+    setImportRows((rows) => (rows ? rows.filter((_, i) => i !== idx) : rows));
+  }
+
+  /** 确认导入（提交的是**编辑后**的行） */
   async function commitImport() {
-    if (!preview) return;
-    if (preview.duplicates.length) {
-      setError('还有重复报名未处理，不能导入');
+    if (!importRows) return;
+    if (importDup.length) {
+      setError('还有重复报名未处理（同 ID 出现多次），请改成唯一后再导入');
+      return;
+    }
+    const bad = importRows.filter((r) => !r.gameId.trim());
+    if (bad.length) {
+      setError(`有 ${bad.length} 行 ID 为空，请补上或删除这些行`);
       return;
     }
     setBusy(true);
     try {
-      const res = await api.signup.importRows(matchId, preview.rows);
-      setPreview(null);
+      const res = await api.signup.importRows(matchId, importRows.map((r) => ({
+        ...r,
+        gameId: r.gameId.trim(),
+        // 请假行不带职业与麦克风，这是表单约定
+        mainClass: r.status === 'JOIN' ? r.mainClass.trim() : '',
+        subClass: r.status === 'JOIN' ? r.subClass.trim() : '',
+        mic: r.status === 'JOIN' ? r.mic : '',
+      })));
+      setImportRows(null);
+      setImportMeta(null);
+      // 可选：不在主档的 ID 一并补建（报名表往往就是名单本身，省掉第二步）
+      // 注意补建**同时会写入这些人的报名记录**，所以提示里的总数要把两边加起来，
+      // 否则会出现「导入 0 条」但名单里其实全进来了这种误导性文案。
+      let extra = '';
+      let total = res.imported;
+      if (autoCreate && res.unmatched.length) {
+        const cm = await api.signup.createMissing(matchId, [...new Set(res.unmatched)]);
+        total += cm.signups;
+        extra = `，并补建 ${cm.created} 名成员`;
+      }
       setNotice(
-        `已导入 ${res.imported} 条报名`
-        + (res.unmatched.length ? `；其中 ${new Set(res.unmatched).size} 个 ID 不在成员主档，已在下方列出` : ''),
+        `已导入 ${total} 条报名${extra}`
+        + (res.unmatched.length && !autoCreate
+          ? `；其中 ${new Set(res.unmatched).size} 个 ID 不在成员主档，已在下方列出`
+          : ''),
       );
       setError(null);
       await load();
@@ -175,6 +217,32 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
         || r.subClass.includes(q.trim());
     });
   }, [board, filter, q]);
+
+  /**
+   * 预览里的实时校验：**编辑后立刻重算**，而不是用解析时的结果 ——
+   * 用户改 ID 就是为了修掉重复/缺档，若还用旧结果就等于白改。
+   */
+  const rosterIds = useMemo(
+    () => new Set((board?.rows ?? []).map((r) => r.gameId)),
+    [board],
+  );
+  const importDup = useMemo(() => {
+    if (!importRows) return [] as { gameId: string; lines: number[] }[];
+    const seen = new Map<string, number[]>();
+    for (const r of importRows) {
+      const id = r.gameId.trim();
+      if (!id) continue;
+      const arr = seen.get(id) ?? [];
+      arr.push(r.line);
+      seen.set(id, arr);
+    }
+    return [...seen.entries()].filter(([, l]) => l.length > 1)
+      .map(([gameId, lines]) => ({ gameId, lines }));
+  }, [importRows]);
+  const importMissing = useMemo(() => {
+    if (!importRows) return [] as string[];
+    return [...new Set(importRows.map((r) => r.gameId.trim()).filter((id) => id && !rosterIds.has(id)))];
+  }, [importRows, rosterIds]);
 
   if (error) return <div className="msg error">{error}</div>;
   if (!board) return <div className="card"><div className="hint">加载中…</div></div>;
@@ -312,78 +380,121 @@ export default function SignupPage({ matchId, matchLabel, classMap, onBack, onCh
         </div>
       </div>
 
-      {/* 报名表导入预览：先让用户审查，确认后才入库 */}
-      {preview && (
-        <div className="modal" onClick={() => setPreview(null)}>
+      {/* 报名表导入预览：**每一行都可直接修改**，改完再入库 */}
+      {importRows && (
+        <div className="modal" onClick={() => setImportRows(null)}>
           <div className="modal__box modal__box--wide" onClick={(e) => e.stopPropagation()}>
             <div className="modal__head">
-              <h3>报名表预览 · 共 {preview.rows.length} 条</h3>
-              <button className="btn sm ghost" onClick={() => setPreview(null)}>关闭</button>
+              <h3>报名表预览 · 共 {importRows.length} 条（可直接修改）</h3>
+              <button className="btn sm ghost" onClick={() => setImportRows(null)}>关闭</button>
             </div>
 
-            {preview.duplicates.length > 0 && (
+            {importDup.length > 0 && (
               <div className="msg error">
-                有 {preview.duplicates.length} 个 ID 重复报名，请回 Excel 处理后重新导入：{' '}
-                {preview.duplicates.slice(0, 6).map((d) => `${d.gameId}（第 ${d.lines.join('、')} 行）`).join('；')}
-                {preview.duplicates.length > 6 ? ' …' : ''}
+                有 {importDup.length} 个 ID 重复（同 ID 出现多次），就地把 ID 改掉或删掉多余行即可：{' '}
+                {importDup.slice(0, 6).map((d) => `${d.gameId}（第 ${d.lines.join('、')} 行）`).join('；')}
+                {importDup.length > 6 ? ' …' : ''}
               </div>
             )}
-            {preview.invalid.length > 0 && (
+            {importMeta && importMeta.invalid.length > 0 && (
               <div className="msg warn">
-                {preview.invalid.length} 行无法识别（将被跳过）：
-                {preview.invalid.slice(0, 6).map((x) => `第 ${x.line} 行 ${x.reason}`).join('；')}
-                {preview.invalid.length > 6 ? ' …' : ''}
+                {importMeta.invalid.length} 行无法从表里识别（已被跳过，不在此列表）：
+                {importMeta.invalid.slice(0, 6).map((x) => `第 ${x.line} 行 ${x.reason}`).join('；')}
+                {importMeta.invalid.length > 6 ? ' …' : ''}
               </div>
             )}
-            {preview.unmatched.length > 0 && (
+            {importMissing.length > 0 && (
               <div className="msg warn">
-                有 {preview.unmatched.length} 个 ID 不在成员主档（导入后可在下方审查并补建）：
-                {preview.unmatched.slice(0, 8).join('、')}
-                {preview.unmatched.length > 8 ? ' …' : ''}
+                有 {importMissing.length} 个 ID 不在成员主档 ——{' '}
+                {autoCreate
+                  ? '已勾选「一并补建」，导入时会自动建成成员（只建 ID 与麦克风）。'
+                  : '这些行会导入为「孤儿」，导入后到下方「交叉核对」里一键补建。'}
               </div>
             )}
 
-            <div className="table-wrap" style={{ maxHeight: '46vh' }}>
+            <div className="table-wrap" style={{ maxHeight: '50vh' }}>
               <table className="grid">
                 <thead>
                   <tr>
-                    <th style={{ width: 64 }}>行</th>
-                    <th>ID</th>
-                    <th style={{ width: 84 }}>参加/请假</th>
-                    <th style={{ width: 60 }}>麦</th>
-                    <th style={{ width: 90 }}>主职业</th>
-                    <th style={{ width: 90 }}>副职</th>
-                    <th style={{ width: 80 }}>在主档</th>
+                    <th style={{ width: 56 }}>行</th>
+                    <th style={{ minWidth: 180 }}>ID（可改）</th>
+                    <th style={{ width: 104 }}>参加/请假</th>
+                    <th style={{ width: 78 }}>麦</th>
+                    <th style={{ width: 104 }}>主职业</th>
+                    <th style={{ width: 104 }}>副职</th>
+                    <th style={{ width: 72 }}>在主档</th>
+                    <th style={{ width: 56 }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.rows.map((r) => (
-                    <tr key={`${r.line}-${r.gameId}`}>
+                  {importRows.map((r, i) => (
+                    <tr key={`${r.line}-${i}`} className={r.status === 'LEAVE' ? 'row--leave' : undefined}>
                       <td className="num">{r.line}</td>
-                      <td>{r.gameId}</td>
-                      <td>{r.status === 'JOIN' ? '参加' : '请假'}</td>
-                      <td>{r.mic || '—'}</td>
-                      <td>{r.mainClass || '—'}</td>
-                      <td>{r.subClass || '—'}</td>
-                      <td>{preview.unmatched.includes(r.gameId)
-                        ? <span className="badge-flag">缺档</span>
-                        : <span style={{ color: 'var(--text-faint)' }}>是</span>}</td>
+                      <td>
+                        <input className="input" style={{ width: '100%' }} value={r.gameId}
+                               onChange={(e) => patchImportRow(i, { gameId: e.target.value })} />
+                      </td>
+                      <td>
+                        <select className="select" value={r.status}
+                                onChange={(e) => patchImportRow(i, { status: e.target.value as 'JOIN' | 'LEAVE' })}>
+                          <option value="JOIN">参加</option>
+                          <option value="LEAVE">请假</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select className="select" value={r.mic} disabled={r.status === 'LEAVE'}
+                                onChange={(e) => patchImportRow(i, { mic: e.target.value })}>
+                          <option value="">—</option>
+                          <option value="有">有</option>
+                          <option value="无">无</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select className="select" value={r.mainClass} disabled={r.status === 'LEAVE'}
+                                onChange={(e) => patchImportRow(i, { mainClass: e.target.value })}>
+                          <option value="">—</option>
+                          {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <select className="select" value={r.subClass} disabled={r.status === 'LEAVE'}
+                                onChange={(e) => patchImportRow(i, { subClass: e.target.value })}>
+                          <option value="">—</option>
+                          {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                        </select>
+                      </td>
+                      <td>{rosterIds.has(r.gameId.trim())
+                        ? <span style={{ color: 'var(--text-faint)' }}>是</span>
+                        : <span className="badge-flag">缺档</span>}</td>
+                      <td>
+                        <button className="btn sm ghost" title="删掉这一行（不导入）"
+                                onClick={() => removeImportRow(i)}>×</button>
+                      </td>
                     </tr>
                   ))}
+                  {importRows.length === 0 && (
+                    <tr><td className="empty" colSpan={8}>所有行都被删掉了，没有可导入的内容</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
 
             <div className="toolbar" style={{ marginTop: 10, marginBottom: 0 }}>
-              <span className="hint" style={{ margin: 0 }}>
-                识别到的列：{preview.headers.filter(Boolean).join(' / ')}
-              </span>
+              <label className="hint" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={autoCreate}
+                       onChange={(e) => setAutoCreate(e.target.checked)} />
+                不在主档的 ID 一并补建为成员（只建 ID 与麦克风，职业仍留在报名表）
+              </label>
               <div className="spacer grow" />
-              <button className="btn ghost" onClick={() => setPreview(null)}>取消</button>
-              <button className="btn primary" disabled={busy || preview.duplicates.length > 0}
+              <button className="btn ghost" onClick={() => setImportRows(null)}>取消</button>
+              <button className="btn primary"
+                      disabled={busy || importDup.length > 0 || importRows.length === 0}
                       onClick={() => void commitImport()}>
-                {busy ? '导入中…' : `确认导入 ${preview.rows.length} 条`}
+                {busy ? '导入中…' : `确认导入 ${importRows.length} 条`}
               </button>
+            </div>
+            <div className="hint" style={{ marginTop: 6 }}>
+              识别到的列：{importMeta?.headers.filter(Boolean).join(' / ') || '—'}
             </div>
           </div>
         </div>

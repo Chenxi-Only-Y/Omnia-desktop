@@ -295,11 +295,17 @@ export class SignupRepo {
           .get(r.gameId) as { id: number } | undefined;
         let pid = exists?.id;
         if (!pid) {
+          // 补建时把报名表里的麦克风一并写进主档（职业仍只留在报名表）
           const info = this.db.prepare(
-            `INSERT INTO player (game_id, name, mic) VALUES (?, ?, '')`,
-          ).run(r.gameId, r.gameId);
+            `INSERT INTO player (game_id, name, mic) VALUES (?, ?, ?)`,
+          ).run(r.gameId, r.gameId, r.mic || '');
           pid = Number(info.lastInsertRowid);
           created += 1;
+        } else if (r.mic) {
+          // 已存在但主档没记麦克风：用报名表的补上
+          this.db.prepare(
+            "UPDATE player SET mic = ? WHERE id = ? AND trim(COALESCE(mic,'')) = ''",
+          ).run(r.mic, pid);
         }
         this.db.prepare(
           `INSERT INTO signup (match_id, player_id, status, remark, main_class, sub_class, mic, submitted_at)

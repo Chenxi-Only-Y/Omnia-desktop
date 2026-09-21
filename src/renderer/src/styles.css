@@ -512,10 +512,17 @@ textarea.input { resize: vertical; line-height: 1.5; }
 /* 导入预览里请假行：整体压暗，和参加行一眼区分 */
 tr.row--leave > td { background: var(--surface-3); }
 
-/* ── 报名候选：按职业分组 ─────────────────────────────────────── */
-.picker-group { border-top: 1px solid var(--line); padding-top: 6px; }
+/* ── 报名候选：按职业分组（可展开/收起，默认收起） ─────────────── */
+.picker-group { border-top: 1px solid var(--line); padding-top: 5px; }
 .picker-group:first-child { border-top: 0; padding-top: 0; }
-.picker-group__head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.picker-group__head {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  margin-bottom: 5px; padding: 3px 4px;
+  border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: inherit; text-align: left; border-radius: var(--radius-sm);
+}
+.picker-group__head:hover { background: var(--hover); }
+.picker-group__caret { width: 10px; color: var(--text-faint); font-size: 10px; }
 .picker-group__count {
   font-size: 11px; color: var(--text-faint);
   background: var(--surface-2); border-radius: 8px; padding: 0 6px;

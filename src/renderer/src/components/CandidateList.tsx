@@ -56,6 +56,9 @@ export default function CandidateList({
   const [q, setQ] = useState('');
   const [grouped, setGrouped] = useState(true);
   const [showLeave, setShowLeave] = useState(false);
+  /** 已展开的职业组（空集合 = 全部收起，这是默认状态） */
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const searching = q.trim().length > 0;
 
   const { joins, leaves } = useMemo(() => {
     const key = q.trim().toLowerCase();
@@ -104,15 +107,24 @@ export default function CandidateList({
     if (!grouped) return <div className="picker-grid">{rows.map(item)}</div>;
     return (
       <div style={{ display: 'grid', gap: 6 }}>
-        {groupByClass(rows).map(([cls, group]) => (
-          <div key={cls} className="picker-group">
-            <div className="picker-group__head">
-              <ClassChip name={cls === UNKNOWN ? '' : cls} classMap={classMap} />
-              <span className="picker-group__count">{group.length}</span>
+        {groupByClass(rows).map(([cls, group]) => {
+          // 默认收起；搜索时自动展开命中的组（否则搜完还要再点一次才能看到人）
+          const open = searching || expanded.has(cls);
+          return (
+            <div key={cls} className="picker-group">
+              <button className="picker-group__head" onClick={() => setExpanded((prev) => {
+                const next = new Set(prev);
+                if (next.has(cls)) next.delete(cls); else next.add(cls);
+                return next;
+              })}>
+                <span className="picker-group__caret">{open ? '▾' : '▸'}</span>
+                <ClassChip name={cls === UNKNOWN ? '' : cls} classMap={classMap} />
+                <span className="picker-group__count">{group.length}</span>
+              </button>
+              {open && <div className="picker-grid">{group.map(item)}</div>}
             </div>
-            <div className="picker-grid">{group.map(item)}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };

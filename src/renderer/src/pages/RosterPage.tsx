@@ -556,41 +556,43 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                   <button className="btn sm danger" onClick={() => void handleRemove(p)}>删除</button>
                 </span>
 
+                {/* 编辑栏与表头逐列对应：控件落在自己那一列下面，列头就是标签 */}
                 {editId === p.id && (
                   <div className="roster-card__edit">
-                    <span className="hint">编辑模式：改 ID / 麦克风 / 备注角色 / 序 / 备注 / 橙武</span>
-                    <input className="input" style={{ width: 160 }} value={editDraft.id}
-                           onChange={(e) => setEditDraft({ ...editDraft, id: e.target.value })} />
-                    <select className="select" value={editDraft.mic}
-                            onChange={(e) => setEditDraft({ ...editDraft, mic: e.target.value as Player['mic'] })}>
-                      <option value="">—</option>
-                      <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
-                    </select>
-                    <select className="select" value={editDraft.noteRole}
-                            onChange={(e) => setEditDraft({ ...editDraft, noteRole: e.target.value as Player['noteRole'] })}>
-                      <option value="">—</option>
-                      {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <input className="input" style={{ width: 76 }} placeholder="序" value={editDraft.joinedOrder}
+                    <span />
+                    <input className="input" value={editDraft.joinedOrder} placeholder="序"
                            onChange={(e) => setEditDraft({ ...editDraft, joinedOrder: e.target.value })} />
-                    <select className="select" value={editDraft.orangeWeapon}
-                            title="橙武：有 / 无"
-                            onChange={(e) => setEditDraft({ ...editDraft, orangeWeapon: e.target.value })}>
-                      <option value="">无</option>
-                      <option value="有">有</option>
-                    </select>
-                    {/* 状态：之前改造时漏掉了这个下拉，导致编辑里改不了在队状态 */}
+                    <input className="input" value={editDraft.id}
+                           onChange={(e) => setEditDraft({ ...editDraft, id: e.target.value })} />
+                    <span />
                     <select className="select" value={editDraft.status}
                             onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
                       <option value="active">在队</option>
                       <option value="inactive">暂离</option>
                       <option value="left">离队</option>
                     </select>
-                    <input className="input" style={{ width: 160 }} placeholder="备注"
-                           value={editDraft.remark}
+                    <select className="select" value={editDraft.mic}
+                            onChange={(e) => setEditDraft({ ...editDraft, mic: e.target.value as Player['mic'] })}>
+                      <option value="">—</option>
+                      <option value="有">有</option><option value="无">无</option>
+                      <option value="无需作答">无需作答</option>
+                    </select>
+                    <select className="select" value={editDraft.noteRole}
+                            onChange={(e) => setEditDraft({ ...editDraft, noteRole: e.target.value as Player['noteRole'] })}>
+                      <option value="">—</option>
+                      {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    <select className="select" value={editDraft.orangeWeapon}
+                            onChange={(e) => setEditDraft({ ...editDraft, orangeWeapon: e.target.value })}>
+                      <option value="">无</option>
+                      <option value="有">有</option>
+                    </select>
+                    <input className="input" value={editDraft.remark}
                            onChange={(e) => setEditDraft({ ...editDraft, remark: e.target.value })} />
-                    <button className="btn sm primary" onClick={() => void saveEdit()}>保存</button>
-                    <button className="btn sm ghost" onClick={() => setEditId(null)}>取消</button>
+                    <div className="roster-card__edit-actions">
+                      <button className="btn sm primary" onClick={() => void saveEdit()}>保存</button>
+                      <button className="btn sm ghost" onClick={() => setEditId(null)}>取消</button>
+                    </div>
                   </div>
                 )}
               </div>

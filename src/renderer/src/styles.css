@@ -561,12 +561,16 @@ tr.row--leave > td { background: var(--surface-3); }
 .roster-cards { display: flex; flex-direction: column; gap: 4px; max-height: 62vh; overflow: auto; }
 /* 单行紧凑卡片。**固定列宽**（用户口径：每项固定位置，不能从左往右依次排）——
    这样 67 行的「麦克风 / 备注角色 / 橙武 / 备注」都纵向对齐，一眼能扫。
-   [拖动] 序 ID 报名 状态 麦克风 备注角色 橙武 备注 ……… 操作 */
+   [拖动] 序 ID 报名 状态 麦克风 备注角色 橙武 备注 ……… 操作
+   列定义抽成变量，编辑栏复用同一套 → 编辑控件正好落在对应列下面。 */
+:root {
+  --roster-cols:
+    16px 46px minmax(120px, 200px) 62px 62px 86px 86px 58px minmax(0, 1fr) auto;
+}
 .roster-card,
 .roster-cards__head {
   display: grid;
-  grid-template-columns:
-    16px 46px minmax(120px, 200px) 62px 62px 86px 86px 58px minmax(0, 1fr) auto;
+  grid-template-columns: var(--roster-cols);
   align-items: center; gap: 8px;
 }
 /* 表头：与卡片共用列定义，所以逐列对齐 */
@@ -620,12 +624,17 @@ tr.row--leave > td { background: var(--surface-3); }
 }
 .roster-card__actions { display: flex; gap: 3px; justify-self: end; }
 .roster-card__actions .btn.sm { padding: 1px 7px; font-size: 11px; }
-/* 编辑栏横跨整行 */
+/* 编辑栏横跨整行，但内部用**同一套列定义** —— 每个控件正好落在它那一列下面，
+   所以不需要额外的小字说明（列头就是标签）。 */
 .roster-card__edit {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  display: grid; grid-template-columns: var(--roster-cols);
+  align-items: center; gap: 8px;
   grid-column: 1 / -1; margin-top: 4px; padding-top: 6px;
   border-top: 1px dashed var(--line);
 }
+.roster-card__edit .input,
+.roster-card__edit .select { width: 100%; min-width: 0; padding: 2px 6px; font-size: 12px; }
+.roster-card__edit-actions { display: flex; gap: 3px; justify-self: end; }
 
 /* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */

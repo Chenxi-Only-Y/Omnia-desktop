@@ -39,6 +39,15 @@ function apply(kind: string, file: string) {
   }
   host.style.setProperty('--wall', url ? `url("${url}")` : 'none');
   host.classList.toggle('home-wallpaper--on', !!url);
+  // 双保险：静态图直接铺到 body 背景上（body 背景绘制在 z-index:-1 的容器之上，
+  // 不会被任何东西盖住）；动态视频仍走容器内的 <video>，body 保持透明。
+  const bd = document.body.style;
+  const isVideo = kind === 'video' && !!url;
+  bd.backgroundImage = !isVideo && url ? `url("${url}")` : 'none';
+  bd.backgroundSize = 'cover';
+  bd.backgroundPosition = 'center';
+  bd.backgroundRepeat = 'no-repeat';
+  bd.backgroundAttachment = 'fixed';
   current = next;
 }
 

@@ -31,10 +31,17 @@ export default function SettingsPage({ info }: Props) {
     } catch (err) { setWallErr(String(err)); }
   }
   async function useWall(w: import('@shared/types').WallpaperItem): Promise<void> {
-    await api.meta.setSetting('wallpaperImage', w.file);
-    await api.meta.setSetting('wallpaperKind', w.kind);
+    // 落库失败也不挡切换：本项目部分 IPC 会丢参数，不能让 setSetting 的异常
+    // 把「切换壁纸」这件事一起带没。
+    let saved = true;
+    try {
+      await api.meta.setSetting('wallpaperImage', w.file);
+      await api.meta.setSetting('wallpaperKind', w.kind);
+    } catch { saved = false; }
     window.dispatchEvent(new CustomEvent('omnia:wallpaper', { detail: { kind: w.kind, file: w.file } }));
     setWallCur(w.file);
+    setNotice('已切换壁纸：' + w.name + '（' + (w.kind === 'video' ? '动态' : '静态') + '）'
+      + (saved ? '' : ' —— 但设置没保存成功，重启后会回到默认'));
   }
   // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
   useToastAutoClear(notice, setNotice);

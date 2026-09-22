@@ -1733,3 +1733,30 @@ table.grid img, .roster-card img, .stat img, .card img,
 }
 .pcard .pcard__cls--edit:hover { opacity: .85; }
 .pcard .pcard__cls--edit option { background: #FFFFFF; color: #0B0B0D; }
+
+/* 卡片上的职业下拉：自绘，替换原生 <select>（它的展开列表由系统画，改不了样式） */
+.pcard .cs { position: relative; display: inline-block; }
+.pcard .cs__btn {
+  list-style: none; cursor: pointer; color: inherit;
+  font: inherit; font-size: 15px; line-height: 1.2;
+  padding: 0 16px 0 0; position: relative; user-select: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 7px) 55%, calc(100% - 3px) 55%;
+  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+.pcard .cs__btn::-webkit-details-marker { display: none; }
+.pcard .cs__btn:hover { opacity: .85; }
+.pcard .cs__list {
+  position: absolute; z-index: 40; left: 0; top: calc(100% + 4px); min-width: 100%;
+  display: flex; flex-direction: column; gap: 1px; padding: 4px;
+  background: #FFFFFF; border: 1px solid rgba(11,11,13,.16); border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.22);
+}
+.pcard .cs__opt {
+  appearance: none; border: none; background: transparent; cursor: pointer;
+  text-align: left; padding: 5px 10px; border-radius: 6px; white-space: nowrap;
+  color: #0B0B0D; font-size: 14px; font-family: inherit;
+}
+.pcard .cs__opt:hover { background: rgba(11,11,13,.07); }
+.pcard .cs__opt.on { font-weight: 700; background: rgba(11,11,13,.10); }

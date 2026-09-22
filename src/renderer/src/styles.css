@@ -394,11 +394,18 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 /* ── 首屏 ───────────────────────────────────────────────────── */
 .home-hero {
   position: relative; overflow: hidden;
+  /* 壁纸铺最底（与 .home-wallpaper 同一张，保证首屏也是它），
+     渐变改成半透明叠层 —— 不再用不透明的 var(--bg) 盖死壁纸。 */
   background:
     radial-gradient(1100px 520px at 88% -8%,  rgba(110, 123, 255, .18), transparent 62%),
     radial-gradient(760px 420px at 4% 108%,  rgba(192, 132, 252, .14), transparent 60%),
     radial-gradient(520px 320px at 50% 118%, rgba(34, 211, 238, .10), transparent 62%),
-    var(--bg);
+    linear-gradient(178deg, rgba(11, 11, 13, .55) 0%, rgba(21, 21, 27, .35) 52%, rgba(11, 11, 13, .55) 100%),
+    var(--wallpaper-image, none), var(--wallpaper-fallback);
+  background-size: auto, auto, auto, auto, cover, cover;
+  background-position: center, center, center, center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: scroll, scroll, scroll, scroll, fixed, fixed;
 }
 /* 柔光呼吸（极缓，克制；减少动效偏好时关闭） */
 .home-hero::after {
@@ -612,6 +619,11 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
    首屏仍是深色剧场，下滑上来的内容层改为**白底黑字**，
    和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
 .home-cover {
+  /* 白底降为叠层（约 88% 不透明）→ 壁纸透得出来，但仍读作「白底」 */
+  background-color: rgba(255, 255, 255, .88);
+  background-image: var(--wallpaper-image, none);
+  background-size: cover; background-position: center;
+  background-repeat: no-repeat; background-attachment: fixed;
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F4F4F6;
@@ -639,6 +651,8 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   background: var(--surface-2);
   border-color: var(--line);
 }
+/* 卡片一律不透明：壁纸只在非卡片区域露出 */
+.home-cover .stat, .home-cover .card { background-color: #FFFFFF; }
 .home-cover .home-eyebrow { color: var(--text-faint); }
 .home-cover .home-eyebrow::before { background: var(--line-strong); }
 

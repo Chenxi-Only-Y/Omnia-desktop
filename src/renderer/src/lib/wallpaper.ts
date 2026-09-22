@@ -41,12 +41,16 @@ function apply(kind: string, file: string) {
       // 解码自检：能读元数据 ≠ 能解画面（HEVC 读得到 metadata 但解不出帧）。
       // 解不出来就把 <video> 藏掉，露出下面的 preview 动图 —— 否则黑画面会盖住预览。
       video.onloadeddata = () => {
-        if (!video!.videoWidth) {
+        // videoWidth 来自容器元数据（HEVC 没解码器也读得到），不能用它判断。
+        // requestVideoFrameCallback 只在**真解出一帧**时才回调；2.5 秒没出帧 = 解不了。
+        let gotFrame = false;
+        try { video!.requestVideoFrameCallback(() => { gotFrame = true; }); } catch { gotFrame = true; }
+        setTimeout(() => {
+          if (gotFrame) return;
           video!.style.display = 'none';
           window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-            detail: '该视频解不了码（多半是 HEVC/H.265），正在转码为 H.264…',
+            detail: '该视频解不出帧（HEVC/H.265 本机无解码器），正在转码为 H.264…',
           }));
-          // 转成 H.264 再播（一次转、缓存到 userData/wallpaper-cache）
           void (async () => {
             try {
               const out = await api.player.wallpaperTranscode();
@@ -64,7 +68,7 @@ function apply(kind: string, file: string) {
               }));
             }
           })();
-        }
+        }, 2500);
       };
       video.onerror = () => {
         video!.style.display = 'none';

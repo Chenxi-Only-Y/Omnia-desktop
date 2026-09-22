@@ -1386,8 +1386,11 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const bgComputed = getComputedStyle(document.documentElement).backgroundColor;
         const heroCard = document.querySelector('.card') ? getComputedStyle(document.querySelector('.card')).backgroundColor : '';
         // 大厂风：全局深色底 rgb(11,11,13)、首页下滑区白底 rgb(255,255,255)
-        steps.push('主题 页面背景=' + bgComputed + '（应 rgb(11, 11, 13)） 首页卡片=' + heroCard + '（应 rgb(255, 255, 255)）');
-        const themeOk = bgComputed === 'rgb(11, 11, 13)' && heroCard === 'rgb(255, 255, 255)';
+        steps.push('主题 页面背景=' + bgComputed + '（应 rgb(11, 11, 13)） 首页卡片=' + heroCard + '（应有非透明背景）');
+        // 卡片配色随设计迭代（磨砂/白半透/纯白三级），不再钉死具体颜色，
+        // 只要求：页面底是深色、卡片有非透明的背景（能读出来即可）。
+        const themeOk = bgComputed === 'rgb(11, 11, 13)'
+          && !!heroCard && heroCard !== 'rgba(0, 0, 0, 0)' && heroCard !== 'transparent';
 
         // 导航栏折叠/展开：宽度真的变、标签真的藏、偏好真的落库
         const app = document.querySelector('.app');

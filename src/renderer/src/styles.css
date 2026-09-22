@@ -1382,12 +1382,32 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
      · 其他页（除排表功能区）= 卡片半透明磨砂 + 侧边导航/顶栏同样磨砂
      · 排表功能区挂 .theme-light → 显式还原成不透明浅色，保持原样
    ═══════════════════════════════════════════════════════════════ */
-.card, .stat, .home-card, .roster-card, .picker-item, .modal,
-.roster-cards__head, .board {
-  background-color: rgba(19, 19, 23, .52) !important;
-  backdrop-filter: blur(18px) saturate(1.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
-  border-color: rgba(255, 255, 255, .10);
+/* ═══ 卡片三级层次（用户口径）═══════════════════════════════════
+   一级 = 磨砂半透明（深色玻璃，透出壁纸，白字）
+   二级 = 白色半透明（卡内行/格子，深字）
+   三级及更深 = 纯白（不透明，最深一层）
+   排表功能区仍走 .theme-light 还原，不受影响。
+   ═══════════════════════════════════════════════════════════════ */
+/* 一级：磨砂半透明（白系 —— 越往里越白，不是深色玻璃） */
+.card, .board {
+  --text: #0B0B0D; --text-dim: #4A4A55; --text-faint: #7C7C88;
+  --fg: #0B0B0D; --line: rgba(11, 11, 13, .16); --line-strong: rgba(11, 11, 13, .28);
+  --border: rgba(11, 11, 13, .16); --border-strong: rgba(11, 11, 13, .28);
+  --surface: #FFFFFF; --surface-2: rgba(255, 255, 255, .55); --surface-3: rgba(255, 255, 255, .40);
+  --hover: rgba(11, 11, 13, .07); --bg-hover: rgba(11, 11, 13, .07);
+  --bg-panel: #FFFFFF; --bg-panel-2: rgba(255, 255, 255, .55);
+  --accent: #0B0B0D; --accent-soft: rgba(11, 11, 13, .12);
+  background-color: rgba(255, 255, 255, .50) !important;
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, .40);
+  color: var(--text);
+}
+/* 一级里的输入框/下拉也翻浅，否则白卡上放深控件 */
+.card .input, .card .select, .board .input, .board .select {
+  background-color: rgba(255, 255, 255, .88) !important;
+  color: #0B0B0D !important;
+  border-color: rgba(11, 11, 13, .18) !important;
 }
 .sidebar, .topbar {
   background: rgba(11, 11, 13, .55) !important;
@@ -1395,16 +1415,64 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
   -webkit-backdrop-filter: blur(18px) saturate(1.15);
   border-color: rgba(255, 255, 255, .08);
 }
-/* 首页下滑区是纯白底：卡片在那上面不要磨砂，用不透明白 + 描边 */
-.hero-cover.home-cover .card, .hero-cover.home-cover .stat, .hero-cover.home-cover .home-card {
+/* 二级：白色半透明（卡内的行/格子/浮层），文字翻黑 */
+.stat, .roster-card, .picker-item, .modal, .home-card, .roster-cards__head {
+  --text: #0B0B0D;
+  --text-dim: #4A4A55;
+  --text-faint: #7C7C88;
+  --fg: #0B0B0D;
+  --fg-on: #FFFFFF;
+  --line: rgba(11, 11, 13, .14);
+  --line-strong: rgba(11, 11, 13, .26);
+  --border: rgba(11, 11, 13, .14);
+  --border-strong: rgba(11, 11, 13, .26);
+  --surface: #FFFFFF;
+  --surface-2: rgba(255, 255, 255, .55);
+  --surface-3: rgba(255, 255, 255, .40);
+  --hover: rgba(11, 11, 13, .07);
+  --bg-hover: rgba(11, 11, 13, .07);
+  --bg-panel: #FFFFFF;
+  --bg-panel-2: rgba(255, 255, 255, .55);
+  --accent: #0B0B0D;
+  --accent-soft: rgba(11, 11, 13, .12);
+  background-color: rgba(255, 255, 255, .78) !important;
+  backdrop-filter: blur(20px) saturate(1.25);
+  -webkit-backdrop-filter: blur(20px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, .45);
+  color: var(--text);
+}
+/* 二级里的输入框/下拉：浅底深字，免得白卡上放深控件 */
+.stat .input, .stat .select, .roster-card .input, .roster-card .select,
+.picker-item .input, .picker-item .select,
+.roster-cards__head .input, .roster-cards__head .select {
+  background-color: rgba(255, 255, 255, .88) !important;
+  color: #0B0B0D !important;
+  border-color: rgba(11, 11, 13, .18) !important;
+}
+/* 三级及更深：纯白不透明 */
+.roster-card__edit, .card .card, .modal .card, .stat .stat,
+.roster-card .card, .picker-item .card {
   background-color: #FFFFFF !important;
   backdrop-filter: none; -webkit-backdrop-filter: none;
-  border: 1px solid var(--line);
+  --text: #0B0B0D; --text-dim: #4A4A55; --text-faint: #7C7C88;
+  --line: rgba(11, 11, 13, .14); --line-strong: rgba(11, 11, 13, .26);
+  --surface: #FFFFFF; --surface-2: #F4F4F6; --surface-3: #EFEFF2;
+  color: #0B0B0D;
 }
 /* 排表功能区（.theme-light）显式还原：不透明浅色、不磨砂 —— 用户要求不做改动 */
-.theme-light .card, .theme-light .stat, .theme-light .roster-card,
-.theme-light .picker-item, .theme-light .modal, .theme-light .board,
+/* 用户口径更新：排表区**也**套三级卡片；只保留卡内浅色令牌，
+   .pcard 等职业色块不受影响（换职业仍按职业色）。 */
+.theme-light .stat, .theme-light .roster-card,
+.theme-light .picker-item, .theme-light .modal,
 .theme-light .roster-cards__head {
   background-color: var(--surface) !important;
   backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  border-color: var(--line) !important;
+  --text: #4A4459; --text-dim: #6F6879; --text-faint: #928B9C; --fg: #4A4459;
+  --line: #D6CFDA; --line-strong: #B9AFC4;
+  --surface: #FCF8FD; --surface-2: #E6E0F0; --surface-3: #E9E0EA;
+  --hover: #DCD5E2; --bg-hover: #DCD5E2;
+  --border: #D6CFDA; --border-strong: #B9AFC4;
+  --accent: #4A4459; --accent-soft: #E0D8E8;
+  color: #4A4459;
 }

@@ -69,8 +69,10 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   /** 拖拽换位：正在拖的、以及当前悬停的目标 */
   const [dragId, setDragId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
-  /** 「序」的内联草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
-  const [orderDraft, setOrderDraftState] = useState<Record<number, string>>({});
+  /** 正在编辑「序」的那一行（null = 全部按纯文字显示，没有白框） */
+  const [orderEditId, setOrderEditId] = useState<number | null>(null);
+  /** 「序」输入中的草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
+  const [orderDraft, setOrderDraftState] = useState<string>('');
   /**
    * 表头排序：默认按「序」。点表头只改**查看顺序**，不动库里的序；
    * 换列排序后拖动换位仍按当前显示顺序写回序（见 moveTo 的说明）。
@@ -206,25 +208,41 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     else if (e.clientY > r.bottom - margin) el.scrollTop += 14;
   }
 
-  function setOrderDraft(id: number, v: string) {
-    setOrderDraftState((d) => ({ ...d, [id]: v }));
-  }
-
-  /** 提交「序」：空值 = 清除（排到最后） */
-  async function commitOrder(p: Player) {
-    const raw = orderDraft[p.id];
-    if (raw === undefined) return;
-    const next = raw.trim() === '' ? null : Number(raw);
-    if (next !== null && !Number.isFinite(next)) return;
-    if (next === (p.joinedOrder ?? null)) { setOrderDraftState((d) => { const n = { ...d }; delete n[p.id]; return n; }); return; }
+  /**
+   * 把某人挪到第 ordinal 位（插入语义）。
+   *
+   * 用户口径：改序号不该和已有的重复，前面后面的要往上/往下顺移。
+   * 做法是按**当前显示顺序**把人抽出来插到目标位置，再整批写回 1..N ——
+   * 这样编号永远连续、不可能重复（原来直接写一个数字，就会出现两个 40）。
+   */
+  async function moveToOrdinal(playerId: number, ordinal: number) {
+    const ids = sorted.map((x) => x.id);
+    const from = ids.indexOf(playerId);
+    if (from < 0) return;
+    const to = Math.min(Math.max(1, Math.round(ordinal)), ids.length) - 1;
+    if (to === from) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, playerId);
     try {
-      await api.player.update(p.id, { joinedOrder: next });
-      setOrderDraftState((d) => { const n = { ...d }; delete n[p.id]; return n; });
+      await api.player.reorder(ids);
+      // 写回后就是按序排列，把排序切回「序」否则显示顺序和刚改的对不上
+      setSortKey('order');
+      setSortDir(1);
       setError(null);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
+  }
+
+  /** 提交「序」：空值 = 排到最后 */
+  async function commitOrder(p: Player) {
+    const raw = orderDraft.trim();
+    setOrderEditId(null);
+    const target = raw === '' ? sorted.length : Number(raw);
+    if (!Number.isFinite(target) || target < 1) { setOrderDraftState(''); return; }
+    setOrderDraftState('');
+    await moveToOrdinal(p.id, target);
   }
 
   /**
@@ -305,16 +323,22 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       await api.player.update(editId, {
         gameId: id,
         name: id,
-        joinedOrder: editDraft.joinedOrder === '' ? null : Number(editDraft.joinedOrder),
+        // 序**不在这里直接写**：直接写数字会和别人撞号（截图里的两个 40 就是这么来的），
+        // 统一改走 moveToOrdinal 的插入语义，在下面处理。
         mic: editDraft.mic,
         noteRole: editDraft.noteRole,
         orangeWeapon: editDraft.orangeWeapon,
         status: editDraft.status,
         remark: editDraft.remark,
       });
+      // 序变了 → 插到目标位置，其余人自动顺移（编号恒为连续 1..N）
+      const rawOrder = editDraft.joinedOrder.trim();
+      const target = rawOrder === '' ? sorted.length : Number(rawOrder);
+      const cur = players.find((x) => x.id === editId)?.joinedOrder ?? null;
+      const changed = Number.isFinite(target) && target >= 1 && target !== cur;
       setEditId(null);
-      setError(null);
-      await load();
+      if (changed) await moveToOrdinal(editId, target);
+      else { setError(null); await load(); }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -520,16 +544,26 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
               >
                 <span className="roster-card__handle" title="拖动换位">⠿</span>
                 {/* 序：可直接改，改完列表按序重排 */}
-                <input
-                  className="input roster-card__order"
-                  type="number"
-                  title="序（改完按序排列）"
-                  value={p.joinedOrder ?? ''}
-                  placeholder={String(idx + 1)}
-                  onChange={(e) => setOrderDraft(p.id, e.target.value)}
-                  onBlur={() => void commitOrder(p)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') void commitOrder(p); }}
-                />
+                {/* 平时是纯文字（没有白框、也不像输入框）；点一下才变输入框。
+                    输入 N 会把这个人插到第 N 位，前后的人自动顺移。 */}
+                {orderEditId === p.id ? (
+                  <input
+                    className="input roster-card__order"
+                    type="number" min={1} max={sorted.length} autoFocus
+                    value={orderDraft}
+                    onChange={(e) => setOrderDraftState(e.target.value)}
+                    onBlur={() => void commitOrder(p)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void commitOrder(p);
+                      if (e.key === 'Escape') { setOrderEditId(null); setOrderDraftState(''); }
+                    }}
+                  />
+                ) : (
+                  <button className="roster-card__order-text" title="点击修改序（其余人会自动顺移）"
+                          onClick={() => { setOrderEditId(p.id); setOrderDraftState(String(p.joinedOrder ?? idx + 1)); }}>
+                    {p.joinedOrder ?? idx + 1}
+                  </button>
+                )}
                 <button className="roster-card__id" onClick={() => onOpenDetail(p.id)}
                         title="查看个人详情">{p.gameId}</button>
 

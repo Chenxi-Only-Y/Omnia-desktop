@@ -627,6 +627,14 @@ tr.row--leave > td { background: var(--surface-3); }
 .roster-card__order {
   width: 100%; text-align: center; padding: 1px 4px; font-size: 12px;
 }
+/* 「序」平时是纯文字：没有白框、也不像输入框。点一下才变成上面的 input。
+   （用户口径：取消没有编辑时的白框与"看起来可改"的样子） */
+.roster-card__order-text {
+  width: 100%; border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--text-dim);
+  text-align: center; padding: 1px 0; border-radius: var(--radius-sm);
+}
+.roster-card__order-text:hover { background: var(--hover); color: var(--fg); }
 .roster-card__id {
   border: 0; background: transparent; cursor: pointer; font: inherit;
   color: var(--fg); font-weight: 700; padding: 0; text-align: left;

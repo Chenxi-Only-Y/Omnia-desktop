@@ -304,17 +304,21 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           classMap={classMap}
           onClose={() => setCellPick(null)}
           onAssign={async (playerId, targetSquad, subClass) => {
-            // 顺序很重要：**先设职业、再落位**。
-            // 原来反过来：先 assign 放进小队，再用 upsertParticipation 只带 classUsed
-            // 去改职业 —— 那是 ON CONFLICT DO UPDATE，没传的 squad 会被写成空串，
-            // 等于刚放进去的人又被踢出小队，卡片就成了空白（没文字没职业）。
-            if (subClass && matchId !== null) {
-              await run(() => api.match.upsertParticipation({
-                matchId, playerId, classUsed: subClass,
-              }));
-            }
             // 点的是第几格就放第几格 —— 不再总是挤到最左边
             await assign([playerId], targetSquad, cellPick.slotIndex);
+            // 选了二职：**落位之后**再把职业写实，并且把 squad/state 一起带上。
+            // 两个坑都在这一步：
+            //  ① 只带 classUsed 调 upsertParticipation 时，ON CONFLICT DO UPDATE
+            //     会把没传的 squad 写成空串 → 刚放进去的人被踢出小队（卡片空白）；
+            //  ② 落位本身也会把 class_used 覆盖掉，而读取有一条兜底
+            //     COALESCE(NULLIF(class_used,''), sg.main_class, '') ——
+            //     所以空值会**回退显示成报名表主职**（就是"选了副职还是主职"）。
+            // 现在一次把 squad + state + classUsed 全写进去，两边都不会被清。
+            if (subClass && matchId !== null) {
+              await run(() => api.match.upsertParticipation({
+                matchId, playerId, classUsed: subClass, squad: targetSquad, state: 'PLAY',
+              }));
+            }
             setCellPick(null);
           }}
         />

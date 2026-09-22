@@ -23,7 +23,9 @@ export default function SettingsPage({ info }: Props) {
   const [wallCur, setWallCur] = useState('');
   async function scanWall(): Promise<void> {
     try {
-      const list = await api.player.listWallpapers(wallPath.trim() || undefined);
+      // 参数走 app_setting（IPC 会丢参数），再触发扫描
+      await api.meta.setSetting('wallpaperLibrary', wallPath.trim());
+      const list = await api.player.listWallpapers();
       setWallList(list);
       setWallErr(list.length ? null : '没扫到壁纸（换个目录再试）');
     } catch (err) { setWallErr(String(err)); }

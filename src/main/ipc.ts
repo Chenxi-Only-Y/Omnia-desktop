@@ -89,11 +89,19 @@ export function registerIpc(ctx: IpcContext): void {
     const pth = require('node:path') as typeof import('node:path');
     const IMG = new Set(['.jpg', '.jpeg', '.png', '.bmp', '.webp', '.gif']);
     const VID = new Set(['.mp4', '.webm', '.mov', '.mkv']);
-    const roots = [String(dir ?? '')].filter(Boolean);
+    // 注意：这条 IPC 的参数会被丢（项目已知问题），所以路径**从 app_setting 读**：
+    // 设置页先把用户填的地址写进 app_setting['wallpaperLibrary']，再触发本方法。
+    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+      .get('wallpaperLibrary') as { value: string } | undefined;
+    const roots = [String(dir ?? row?.value ?? '').trim()].filter(Boolean);
     // 默认壁纸库 = Wallpaper Engine 创意工坊（Steam AppID 431960）。
     // 没有就退回系统目录，再没有就空 —— 让用户在设置页填地址。
     const WE = ['C:\\Program Files (x86)\\Steam\\steamapps\\workshop\\content\\431960',
-      'C:\\Program Files\\Steam\\steamapps\\workshop\\content\\431960'];
+      'C:\\Program Files\\Steam\\steamapps\\workshop\\content\\431960',
+      // 副库（Steam 可以把库装到别的盘）
+      'D:\\SteamLibrary\\steamapps\\workshop\\content\\431960',
+      'D:\\Steam\\steamapps\\workshop\\content\\431960',
+      'E:\\SteamLibrary\\steamapps\\workshop\\content\\431960'];
     for (const w of WE) { try { if (fsp.statSync(w).isDirectory()) { roots.push(w); break; } } catch { /* 没装 WE */ } }
     if (!roots.length) {
       roots.push(

@@ -1692,14 +1692,17 @@ table.grid img, .roster-card img, .stat img, .card img,
    这次按实测到的真实类名写，效果对齐首页 .home-tray__item:hover 的 translateY(-2px)。
    ═══════════════════════════════════════════════════════════════ */
 .picker-group .chip, .chip.class, .chip-icon {
-  transition: transform .15s cubic-bezier(.2, .7, .2, 1), background-color .15s ease;
+  transition: transform .18s cubic-bezier(.34, 1.56, .64, 1), box-shadow .18s ease;
   will-change: transform;
 }
+/* 实测确认规则**已经命中**（transition 里就是这条），但 3px 肉眼看不出来 ——
+   加大到 6px + 轻微放大，并把动效做成带弹性的上浮。 */
 .picker-group .chip:hover, .chip.class:hover {
-  transform: translateY(-3px);
+  transform: translateY(-6px) scale(1.06);
   background: transparent !important;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, .18);
 }
-.picker-group .chip:active, .chip.class:active { transform: translateY(-1px); }
+.picker-group .chip:active, .chip.class:active { transform: translateY(-2px) scale(1.0); }
 /* 外圈不再做任何底色加深（上一轮的口径） */
 .picker-group .chip, .picker-group .chip:hover, .picker-group .chip:focus {
   outline: none !important;

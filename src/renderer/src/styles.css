@@ -638,6 +638,14 @@ tr.row--leave > td { background: var(--surface-3); }
 }
 .roster-card--drop-above::before { top: -3px; }
 .roster-card--drop-below::after { bottom: -3px; }
+/* 「定位 ID」命中的那一行：整行高亮一下，配合滚动就能一眼找到 */
+.roster-card--found {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  background: var(--hover);
+}
+.roster-locate-msg { color: var(--ok); }
+.roster-locate-msg--miss { color: var(--warn); }
 .roster-card__handle {
   cursor: grab; color: var(--text-faint); font-size: 13px; user-select: none;
   padding: 0 1px; line-height: 1;

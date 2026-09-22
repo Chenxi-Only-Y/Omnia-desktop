@@ -72,6 +72,12 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [dropAt, setDropAt] = useState<{ id: number; below: boolean } | null>(null);
   /** 正在编辑「序」的那一行（null = 全部按纯文字显示，没有白框） */
   const [orderEditId, setOrderEditId] = useState<number | null>(null);
+  /** 「定位 ID」：输入片段就滚到那个人并高亮；找不到给提示 */
+  const [locateQ, setLocateQ] = useState('');
+  const [locateMsg, setLocateMsg] = useState('');
+  const [locateMiss, setLocateMiss] = useState(false);
+  const [foundId, setFoundId] = useState<number | null>(null);
+  const foundTimer = useRef<number | null>(null);
   /** 「序」输入中的草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
   const [orderDraft, setOrderDraftState] = useState<string>('');
   /**
@@ -250,8 +256,51 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
    * 拖拽换位：把 fromId 挪到 toId 的位置，然后整批写回「序」。
    * 只用当前**列表顺序**（sorted）算新顺序，所以拖完立即与界面一致。
    */
-  async function moveTo(fromId: number, toId: number, below = false) {
-    const ids = sorted.map((x) => x.id);
+  /**
+   * 定位到某个成员：滚到它、高亮一下。
+   * 匹配顺序：**整串包含** → **字符按顺序出现**（模糊，例如「珺菌」能命中「珺珺不是菌子」）。
+   * reset=true（边打字边找）跳到第一个命中；reset=false（回车）跳到下一个命中。
+   */
+  function locateNext(query: string, reset: boolean) {
+    const key = query.trim().toLowerCase();
+    if (!key) { setLocateMsg(''); setLocateMiss(false); setFoundId(null); return; }
+    const fuzzy = (id: string) => {
+      const s = id.toLowerCase();
+      if (s.includes(key)) return true;
+      let i = 0;
+      for (const ch of s) { if (ch === key[i]) i += 1; if (i >= key.length) return true; }
+      return false;
+    };
+    const matches = sorted.filter((p) => fuzzy(p.gameId));
+    if (!matches.length) {
+      setFoundId(null);
+      setLocateMiss(true);
+      setLocateMsg(`没有匹配「${query.trim()}」的 ID（列表共 ${sorted.length} 人）`);
+      return;
+    }
+    let idx = 0;
+    if (!reset && foundId !== null) {
+      const cur = matches.findIndex((p) => p.id === foundId);
+      idx = cur >= 0 ? (cur + 1) % matches.length : 0;
+    }
+    const target = matches[idx];
+    setFoundId(target.id);
+    setLocateMiss(false);
+    setLocateMsg(matches.length > 1
+      ? `找到 ${matches.length} 个 · 第 ${idx + 1} 个：${target.gameId}（回车看下一个）`
+      : `找到：${target.gameId}`);
+
+    // 滚到列表可视区中间（列表自己是滚动容器）
+    requestAnimationFrame(() => {
+      const el = listRef.current?.querySelector(`[data-player-id="${target.id}"]`);
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+    // 高亮 2.5 秒后淡掉，避免一直闪
+    if (foundTimer.current) window.clearTimeout(foundTimer.current);
+    foundTimer.current = window.setTimeout(() => setFoundId(null), 2500);
+  }
+
+  async function moveTo(fromId: number, toId: number, below = false) {    const ids = sorted.map((x) => x.id);
     const from = ids.indexOf(fromId);
     const target = ids.indexOf(toId);
     if (from < 0 || target < 0) return;
@@ -493,9 +542,28 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       )}
 
       <div className="card">
-        <div className="toolbar" style={{ marginBottom: 8 }}>
+        {/* toolbar--fields：这一行里有带小标签的字段（定位 ID），
+            底边对齐才不会让标题和说明文字浮在半空 */}
+        <div className="toolbar toolbar--fields" style={{ marginBottom: 8 }}>
           <h3 style={{ margin: 0 }}>成员列表（{filtered.length} / {players.length}）</h3>
           <div className="spacer grow" />
+          {/* 定位框：不是筛选（筛选用上面的搜索），而是**直接滚到那个人并高亮**。
+              支持模糊：先按整串包含匹配，不行再按"字符按顺序出现"匹配。 */}
+          <label className="field">
+            <span>定位 ID</span>
+            <input
+              className="input" style={{ width: 170 }} placeholder="输入 ID 片段，回车找下一个"
+              value={locateQ}
+              onChange={(e) => { setLocateQ(e.target.value); locateNext(e.target.value, true); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') locateNext(locateQ, false); }}
+            />
+          </label>
+          {locateMsg && (
+            <span className={`hint roster-locate-msg${locateMiss ? ' roster-locate-msg--miss' : ''}`}
+                  style={{ margin: 0 }}>
+              {locateMsg}
+            </span>
+          )}
           <span className="hint" style={{ margin: 0 }}>
             拖动卡片可换位；「序」也可直接改，列表按序排列
           </span>
@@ -535,7 +603,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
             return (
               <div
                 key={p.id}
-                className={`roster-card${dragId === p.id ? ' roster-card--dragging' : ''}${dropLine}`}
+                data-player-id={p.id}
+                className={`roster-card${dragId === p.id ? ' roster-card--dragging' : ''}${dropLine}${foundId === p.id ? ' roster-card--found' : ''}`}
                 draggable
                 onDragStart={(e) => {
                   setDragId(p.id);

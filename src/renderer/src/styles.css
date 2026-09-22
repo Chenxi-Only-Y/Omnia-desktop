@@ -1537,23 +1537,22 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
    其他页没有这层蒙层，所以本来就一致。
    这里让首页顶栏套**同一串渐变**，两边接上就没有缝了。
    ═══════════════════════════════════════════════════════════════ */
-/* 首屏那层是**渐变**（横向明暗 + 右上角径向光晕），导航栏必须与它对上同一个渐变，
-   否则一眼就是两截。关键是径向光晕的**圆心位置**：
-   首屏里圆心在 .home-hero 的「88% 0%」（即首屏上缘）；
-   导航栏紧贴在它上方，所以圆心要放在导航栏的「88% 46px」（= 导航栏下缘 = 首屏上缘）。
-   这样上半圆在导航栏、下半圆在首屏，拼起来才是一个完整的晕，接缝处没有突变。
-   横向线性渐变两侧本来就一致（同一个 0→100% 区间），附件方式对齐 scroll 即可。 */
+/* 用户方案：**顶栏完全不画背景**，让首屏那一层向上盖住顶栏区
+   —— 一层渐变贯穿两区，物理上不可能有色差。
+
+   注意实现方式：不能给首屏加负 margin —— .hero--pinned 是 position:sticky，
+   **sticky 元素无法超出包含块的上边缘**（前面踩过这个坑，改数值完全没反应）。
+   所以改成给顶栏**加负的下边距**：整个内容区上移 46px 钻进顶栏下面，
+   顶栏透明 + 首屏渐变从视口最顶端开始铺 → 同一层渐变贯穿两区。
+   （顶栏高度见 .app 的布局：46px。） */
 .topbar--home {
-  background:
-    radial-gradient(900px 460px at 88% 46px, rgba(110, 123, 255, .10), transparent 62%),
-    linear-gradient(90deg,
-      rgba(11, 11, 13, .90) 0%,
-      rgba(11, 11, 13, .72) 30%,
-      rgba(11, 11, 13, .34) 52%,
-      rgba(11, 11, 13, .12) 72%,
-      rgba(11, 11, 13, .40) 100%) !important;
-  background-attachment: scroll, scroll !important;
-  background-size: auto, auto !important;
-  background-position: 0 0, 0 0 !important;
-  background-repeat: no-repeat, no-repeat !important;
+  background: none !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin-bottom: -46px !important;
 }
+/* 首屏改成整屏高：内容区上移 46px 后，仍要铺满整视口 */
+.hero.hero--pinned.home-hero { height: 100vh !important; }

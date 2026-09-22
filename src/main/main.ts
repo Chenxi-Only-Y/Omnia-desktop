@@ -4,7 +4,7 @@
  * 数据库位置：<userData>/lis.db（可用 OMNIA_DB_PATH / LIS_DB_PATH 覆盖，便于开发与测试）
  * 渲染层：开发时连 Vite dev server（OMNIA_DEV_SERVER_URL），生产时加载本地文件
  */
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, shell, nativeTheme } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
@@ -41,6 +41,10 @@ const DEV_SERVER_URL = env('OMNIA_DEV_SERVER_URL', 'LIS_DEV_SERVER_URL');
 // 视频壁纸「解码成功但画面黑」：Chromium 走 GPU 硬解 4K60 H.264 时，
 // 部分显卡/驱动会解出帧但合成黑屏（帧计数正常、readyState=4）。
 // 关掉硬件视频解码 → 改软件解码，这类文件就能正常出画。
+// 原生标题栏跟随深色：默认跟随系统（浅色）→ 窗口顶部一条白边。
+// 声明 dark 后 Windows 标题栏/边框自动变深，和 app 的深色主题一致。
+nativeTheme.themeSource = 'dark';
+
 app.commandLine.appendSwitch('disable-accelerated-video-decode');
 
 app.setPath('userData', path.join(app.getPath('appData'), 'omnia-desktop'));

@@ -41,13 +41,22 @@ function apply(kind: string, file: string) {
   host.classList.toggle('home-wallpaper--on', !!url);
   // 双保险：静态图直接铺到 body 背景上（body 背景绘制在 z-index:-1 的容器之上，
   // 不会被任何东西盖住）；动态视频仍走容器内的 <video>，body 保持透明。
-  const bd = document.body.style;
   const isVideo = kind === 'video' && !!url;
-  bd.backgroundImage = !isVideo && url ? `url("${url}")` : 'none';
-  bd.backgroundSize = 'cover';
-  bd.backgroundPosition = 'center';
-  bd.backgroundRepeat = 'no-repeat';
-  bd.backgroundAttachment = 'fixed';
+  const image = !isVideo && url ? `url("${url}")` : 'none';
+  // 内联样式优先级最高：逐个元素写死，任何 CSS 规则都压不过它
+  const targets: HTMLElement[] = [document.documentElement, document.body,
+    ...Array.from(document.querySelectorAll<HTMLElement>('.app, .content, .main'))];
+  for (const t of targets) {
+    const st = t.style;
+    st.setProperty('background-image', image, 'important');
+    st.setProperty('background-size', 'cover', 'important');
+    st.setProperty('background-position', 'center', 'important');
+    st.setProperty('background-repeat', 'no-repeat', 'important');
+    st.setProperty('background-attachment', 'fixed', 'important');
+  }
+  // 给后续动态插入的容器也带上（React 重建 .content 时不会丢）
+  document.documentElement.style.setProperty('--wallpaper-image', image);
+  void isVideo;
   // 同一变量铺到 :root，CSS 会给 html / body / .app / .content 都铺上这层
   document.documentElement.style.setProperty('--wallpaper-image',
     !isVideo && url ? `url("${url}")` : 'none');
@@ -56,7 +65,7 @@ function apply(kind: string, file: string) {
     const probe = new Image();
     probe.onerror = () => {
       document.documentElement.style.setProperty('--wallpaper-image', 'none');
-      bd.backgroundImage = 'none';
+      document.body.style.backgroundImage = 'none';
       window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
         detail: '图片加载失败（file:// 受限或文件不存在）：' + (url || '(空)'),
       }));

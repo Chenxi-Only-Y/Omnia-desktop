@@ -83,9 +83,13 @@ export default function SettingsPage({ info }: Props) {
 
       <div className="card">
         <h3>战斗组（可新增）</h3>
-        <div className="toolbar">
-          <input className="input" style={{ width: 160 }} placeholder="新战斗组名称，如 演练组"
-                 value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} />
+        {/* 名称与类别都用 .field 包一层：原来名称是裸 input、只有「类别」带标签，
+            两者顶边不在一条线上，按钮也吊在半空 —— 用户反馈「对齐一下」。 */}
+        <div className="toolbar toolbar--fields">
+          <label className="field"><span>战斗组名称</span>
+            <input className="input" style={{ width: 180 }} placeholder="如 演练组"
+                   value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} />
+          </label>
           <label className="field"><span>类别</span>
             <select className="select" value={newGroup.kind}
                     onChange={(e) => setNewGroup({ ...newGroup, kind: e.target.value as 'attack' | 'defend' })}>

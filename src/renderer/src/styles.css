@@ -332,6 +332,10 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 /* ── 表单字段（标签在上，控件在下） ─────────────────────────── */
 .field { display: inline-flex; flex-direction: column; gap: 3px; }
 .field > span { color: var(--text-faint); font-size: 11px; }
+/* 一行里全是 .field（带小标签的字段）时：顶边对齐、按钮与输入框底线齐平。
+   否则带标签的字段比裸控件高一截，看着就是"没对齐"。 */
+.toolbar--fields { align-items: flex-end; }
+.toolbar--fields > .hint { align-self: flex-end; padding-bottom: 4px; }
 
 /* ── 页签 ─────────────────────────────────────────────────── */
 .tabs {

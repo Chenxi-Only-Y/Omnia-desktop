@@ -1865,9 +1865,9 @@ table.grid img, .roster-card img, .stat img, .card img,
   color: #0B0B0D !important;
   border: 1px solid rgba(11, 11, 13, .18) !important;
   border-radius: 10px !important;
-  padding: 5px 9px !important;
+  padding: 0 9px !important;      /* 与 .input 完全一致（实测差异只剩这一项） */
   font-size: 13px !important;
-  min-height: 30px; box-sizing: border-box;
+  height: 30px; box-sizing: border-box;
   justify-content: space-between;
 }
 .sel__btn:hover { border-color: rgba(11, 11, 13, .28) !important; }

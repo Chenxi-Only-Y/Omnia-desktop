@@ -101,13 +101,10 @@
     linear-gradient(178deg, #0B0B0D 0%, #15151B 52%, #0B0B0D 100%);
 }
 html { background: var(--bg); }
-body {
-  background: var(--wallpaper-image), var(--wallpaper-fallback);
-  background-size: cover, cover;
-  background-position: center, center;
-  background-repeat: no-repeat;
-  background-attachment: fixed, fixed;
-}
+/* body 必须透明：CSS 绘制顺序是「根背景 → 负 z-index 子元素 → 普通块盒背景」，
+   body 一旦有自己的背景就会画在 z-index:-1 的壁纸层之上，把壁纸整个盖掉
+   （这就是「点了壁纸没反应」的根因）。 */
+body { background: transparent; }
 /* 壳与内容区透明 → 露出壁纸 */
 .app, .main, .content, .topbar, .sidebar { background: transparent; }
 /* 卡片仍是不透明面，浮在壁纸上（保持可读） */
@@ -493,8 +490,10 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 }
 .home-wallpaper {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background-image: var(--wall, none);
-  background-size: cover; background-position: center; background-repeat: no-repeat;
+  background-image: var(--wall, none), var(--wallpaper-fallback);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
 }
 .home-wallpaper video {
   position: absolute; inset: 0;
@@ -527,8 +526,10 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 }
 @media (prefers-reduced-motion: reduce) { .home-wallpaper {
   position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background-image: var(--wall, none);
-  background-size: cover; background-position: center; background-repeat: no-repeat;
+  background-image: var(--wall, none), var(--wallpaper-fallback);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
 }
 .home-wallpaper video {
   position: absolute; inset: 0;

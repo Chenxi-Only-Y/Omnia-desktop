@@ -13,6 +13,9 @@ let host: HTMLDivElement | null = null;
 let video: HTMLVideoElement | null = null;
 let lastTime = 0;
 let current = '';
+// 渲染模式：dynamic=动态 / static=静态帧 / off=关闭壁纸；适应方式决定 background-size
+let mode: string = 'dynamic';
+let fit: string = 'cover';
 
 function apply(kind: string, file: string) {
   if (!host) return;
@@ -24,7 +27,7 @@ function apply(kind: string, file: string) {
   // 图永远加载不出来（CDP 实测确认，见诊断【5】）。
   const norm = String(file ?? '').split(/[\\\/]+/).filter(Boolean).join('/');
   const url = norm ? 'file:///' + norm : '';
-  if (kind === 'video' && url) {
+  if (kind === 'video' && url && mode === 'dynamic') {
     // 记住当前播放进度，换源后接着播（保证「不重置」）
     const t = video && video.src === url ? video.currentTime : lastTime;
     if (!video) {
@@ -50,19 +53,32 @@ function apply(kind: string, file: string) {
   // 动态壁纸（.mp4 等）当 CSS 背景必然加载失败 → 改用同目录 preview 图当背景：
   // WE 创意工坊每个作品都带 preview.jpg/gif，实测能正常加载（诊断：18 张缩略图全 complete）。
   // <video> 仍叠在上面播：能解码就动起来，解不了也至少是张图，绝不再是黑。
-  let bgUrl = url;
+  // 动态壁纸：背景用同目录 preview 的**多层兜底**（gif 是动图 → 不解码视频也能动）：
+  //   url(preview.gif)  ← 动图，能加载就显示它（保证「动态」）
+  //   url(preview.jpg)  ← gif 没有就用 jpg（保证「不黑」）
+  //   url(preview.png)  ← 再兜一层
+  //   + CSS 里的渐变兜底（最后一层）
+  // 加载成功的层会盖住下面的，失败的层不绘制 —— 缺哪个都不黑。
+  let bgLayers = url ? 'url("' + url + '")' : '';
   if (isVideo && url) {
     const dir = url.slice(0, url.lastIndexOf('/'));
-    bgUrl = dir + '/preview.jpg';
+    bgLayers = ['preview.gif', 'preview.jpg', 'preview.png']
+      .map(nm => 'url("file:///' + dir + '/' + nm + '")').join(', ');
   }
-  const image = bgUrl ? `url("${bgUrl}")` : 'none';
+  // 渲染模式：关闭壁纸 → 全清；静态帧 → 只用静态图（gif 换成 jpg、视频不播）
+  let image = bgLayers || 'none';
+  if (mode === 'off') { image = 'none'; }
+  else if (mode === 'static' && isVideo && url) {
+    const dir = url.slice(0, url.lastIndexOf('/'));
+    image = ['preview.jpg', 'preview.png'].map(nm => 'url("file:///' + dir + '/' + nm + '")').join(', ');
+  }
   // 内联样式优先级最高：逐个元素写死，任何 CSS 规则都压不过它
   const targets: HTMLElement[] = [document.documentElement, document.body,
     ...Array.from(document.querySelectorAll<HTMLElement>('.app, .content, .main'))];
   for (const t of targets) {
     const st = t.style;
     st.setProperty('background-image', image, 'important');
-    st.setProperty('background-size', 'cover', 'important');
+    st.setProperty('background-size', fit, 'important');
     st.setProperty('background-position', 'center', 'important');
     st.setProperty('background-repeat', 'no-repeat', 'important');
     st.setProperty('background-attachment', 'fixed', 'important');
@@ -74,7 +90,7 @@ function apply(kind: string, file: string) {
   document.documentElement.style.setProperty('--wallpaper-image',
     !isVideo && url ? `url("${url}")` : 'none');
   // 加载自检：file:// 受限或文件不在时，把原因送出去（不再静默）
-  if (bgUrl && !isVideo) {
+  if (url && !isVideo) {
     const probe = new Image();
     probe.onerror = () => {
       // 清掉内联写法即可 —— CSS 的 .home-wallpaper 上还有一层渐变兜底，不会纯黑
@@ -86,7 +102,7 @@ function apply(kind: string, file: string) {
         detail: '图片加载失败（file:// 受限或文件不存在）：' + (url || '(空)'),
       }));
     };
-    probe.src = bgUrl;
+    probe.src = url;
   }
   if (url && isVideo) {
     // 视频用 <video> 探测：能读到 duration 就算加载成功（<img> 加载 mp4 必然失败）
@@ -130,6 +146,19 @@ export function installWallpaper(): void {
   window.addEventListener('omnia:wallpaper', (e) => {
     const d = (e as CustomEvent<{ kind: string; file: string }>).detail;
     if (d) apply(d.kind, d.file);
+  });
+  // 渲染模式 / 适应方式改动后用记住的那张壁纸重新应用
+  window.addEventListener('omnia:wallpaper-mode', (e) => {
+    mode = (e as CustomEvent<string>).detail || 'dynamic';
+    const [k, f] = current.split('|');
+    current = '';
+    if (f) apply(k || 'image', f);
+  });
+  window.addEventListener('omnia:wallpaper-fit', (e) => {
+    fit = (e as CustomEvent<string>).detail || 'cover';
+    const [k, f] = current.split('|');
+    current = '';
+    if (f) apply(k || 'image', f);
   });
 }
 

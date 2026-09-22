@@ -43,6 +43,21 @@ export default function SettingsPage({ info }: Props) {
     setNotice('已切换壁纸：' + w.name + '（' + (w.kind === 'video' ? '动态' : '静态') + '）'
       + (saved ? '' : ' —— 但设置没保存成功，重启后会回到默认'));
   }
+  // 渲染模式 / 适应方式（照 Wallpaper Engine 的设置面板）
+  const [wallMode, setWallMode] = useState('dynamic');
+  const [wallFit, setWallFit] = useState('cover');
+  async function pickMode(m: string): Promise<void> {
+    setWallMode(m);
+    try { await api.meta.setSetting('wallpaperRenderMode', m); } catch { /* IPC 偶发丢参数 */ }
+    window.dispatchEvent(new CustomEvent('omnia:wallpaper-mode', { detail: m }));
+    setNotice('渲染模式：' + (m === 'dynamic' ? '动态' : m === 'static' ? '静态帧' : '关闭壁纸'));
+  }
+  async function pickFit(f: string): Promise<void> {
+    setWallFit(f);
+    try { await api.meta.setSetting('wallpaperFit', f); } catch { /* IPC 偶发丢参数 */ }
+    window.dispatchEvent(new CustomEvent('omnia:wallpaper-fit', { detail: f }));
+    setNotice('适应方式：' + (f === 'cover' ? '铺满裁剪' : f === 'contain' ? '完整缩放' : '拉伸铺满'));
+  }
   // 壁纸图加载不出来时的回声（file:// 受限 / 文件不存在）
   useEffect(() => {
     const onErr = (e: Event) => setNotice(String((e as CustomEvent<string>).detail ?? '壁纸加载失败'));
@@ -246,6 +261,18 @@ export default function SettingsPage({ info }: Props) {
               <span className="wall-item__tag">{w.kind === 'video' ? '动态' : '静态'}</span>
             </button>
           ))}
+          <div className="wall-seg">
+            <span className="wall-seg__k">渲染模式</span>
+            {([['dynamic', '动态'], ['static', '静态帧'], ['off', '关闭壁纸']] as const).map(([v, label]) => (
+              <button key={v} className={'wall-seg__b' + (wallMode === v ? ' on' : '')}
+                      onClick={() => void pickMode(v)}>{label}</button>
+            ))}
+            <span className="wall-seg__k" style={{ marginLeft: 22 }}>适应方式</span>
+            {([['cover', '铺满裁剪'], ['contain', '完整缩放'], ['stretch', '拉伸铺满']] as const).map(([v, label]) => (
+              <button key={v} className={'wall-seg__b' + (wallFit === v ? ' on' : '')}
+                      onClick={() => void pickFit(v)}>{label}</button>
+            ))}
+          </div>
           {!wallList.length && !wallErr && (
             <div className="hint">默认找 Wallpaper Engine 创意工坊（431960）。没找到就把自己存壁纸的文件夹填到上面，点「扫描」。</div>
           )}

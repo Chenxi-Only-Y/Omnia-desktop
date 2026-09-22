@@ -106,6 +106,10 @@ function apply(kind: string, file: string) {
   }
   // 渲染模式：关闭壁纸 → 全清；静态帧 → 只用静态图（gif 换成 jpg、视频不播）
   let image = bgLayers || 'none';
+  // 页面层（html/body/.app/.content）**绝不能**铺 preview 图 —— 它们在 z-index:-1 的
+  // 视频层之上，会把正在播放的视频整个盖成一张静止的模糊 preview（用户看到的「黑」+「糊」）。
+  // 动态壁纸时页面层留 none，视频才露得出来；preview 只做 --wall 的兜底层。
+  const pageImage = isVideo ? 'none' : image;
   if (mode === 'off') { image = 'none'; }
   else if (mode === 'static' && isVideo && url) {
     const dir = url.slice(0, url.lastIndexOf('/'));
@@ -116,14 +120,14 @@ function apply(kind: string, file: string) {
     ...Array.from(document.querySelectorAll<HTMLElement>('.app, .content, .main'))];
   for (const t of targets) {
     const st = t.style;
-    st.setProperty('background-image', image, 'important');
+    st.setProperty('background-image', pageImage, 'important');
     st.setProperty('background-size', fit, 'important');
     st.setProperty('background-position', 'center', 'important');
     st.setProperty('background-repeat', 'no-repeat', 'important');
     st.setProperty('background-attachment', 'fixed', 'important');
   }
   // 给后续动态插入的容器也带上（React 重建 .content 时不会丢）
-  document.documentElement.style.setProperty('--wallpaper-image', image);
+  document.documentElement.style.setProperty('--wallpaper-image', pageImage);
   void isVideo;
   // 同一变量铺到 :root，CSS 会给 html / body / .app / .content 都铺上这层
   document.documentElement.style.setProperty('--wallpaper-image',

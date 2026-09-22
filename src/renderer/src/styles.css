@@ -1948,3 +1948,21 @@ table.grid img, .roster-card img, .stat img, .card img,
   color: #0B0B0D; }
 .cfm__msg { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
 .cfm__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+
+/* ═══ 兜底：自绘控件的外层容器一律不画框（用户口径：所有 UI 都不要双框）═══
+   盒子统一由内部的 .sel__btn / .dp__btn 提供；外层只负责定位与抬层级。
+   这里用 !important 兜住，避免以后某个调用点又传了 .input/.select 之类的类名
+   导致"外围一个框 + 内层一个框"。
+   ═══════════════════════════════════════════════════════════════ */
+.sel, .dp {
+  background: none !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+/* 外层若同时带 .input/.select，其伪元素与指示器也一并清掉 */
+.sel.input::before, .sel.select::before, .dp.input::before { display: none !important; }

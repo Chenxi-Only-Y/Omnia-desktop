@@ -24,6 +24,12 @@ export default function DatePicker({
   style?: CSSProperties;
   title?: string;
 }) {
+  // 与 Select 同理：过滤掉 input / select 这类**原生控件类名**，
+  // 否则外层 <div> 会拿到 .input 的底色+描边，和里面的 .dp__btn 形成双框（用户截图）。
+  const cls = String(className ?? '')
+    .split(/\s+/)
+    .filter((c) => c && c !== 'input' && c !== 'select')
+    .join(' ');
   const v = String(value ?? '');
   const [open, setOpen] = useState(false);
   const [ym, setYm] = useState(() => {
@@ -60,7 +66,7 @@ export default function DatePicker({
   const todayStr = toStr(now.getFullYear(), now.getMonth(), now.getDate());
 
   return (
-    <div className={'dp' + (className ? ' ' + className : '')} style={style} ref={box}>
+    <div className={'dp' + (cls ? ' ' + cls : '')} style={style} ref={box}>
       <button type="button" className="dp__btn" title={title} onClick={() => setOpen((o) => !o)}>
         <span className="dp__txt">{v ? v.replace(/-/g, '/') : '选择日期'}</span>
       </button>

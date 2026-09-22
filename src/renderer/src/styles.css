@@ -643,8 +643,16 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
    和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
 .hero-cover.home-cover {
   /* 白底降为叠层（约 88% 不透明）→ 壁纸透得出来，但仍读作「白底」 */
-  /* 用户口径：首页下滑区**纯白**（不透壁纸） */
-  background: #FFFFFF;
+  /* 用户口径（更新）：首页下滑区与上面**一致** —— 也透出壁纸。
+     上面首屏是「壁纸 + 压暗蒙层」，这里就是「壁纸 + 白蒙层」：
+     白纱 72% 叠在壁纸上，既透出画面，文字也仍然可读。
+     其余页顶栏保持透明，不受影响。 */
+  background-color: rgba(255, 255, 255, .72);
+  background-image: var(--wallpaper-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F4F4F6;

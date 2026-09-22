@@ -1989,3 +1989,9 @@ table.grid img, .roster-card img, .stat img, .card img,
 .pcard .sel__ico { width: 22px; height: 22px; }
 /* 展开的列表里才用深色文字，保证在白底列表上可读 */
 .pcard .sel__list .sel__opt { color: #0B0B0D !important; }
+
+/* 用户口径：所有下拉不要三角标 */
+.sel__btn::after, .dp__btn::after { display: none !important; content: none !important; }
+.sel__btn, .dp__btn { padding-right: 9px !important; }
+/* 卡片上的职业已改回纯文字，相关的下拉按钮样式一并撤掉 */
+.pcard .sel__btn { background: none !important; border: none !important; }

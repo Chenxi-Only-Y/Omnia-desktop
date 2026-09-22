@@ -425,19 +425,11 @@ function PlayerCard({
       {onChangeClass && (row.mainClass || row.subClass) ? (
         /* 不用原生 <Select>：展开列表由操作系统绘制，<option> 的样式一律无效
            （那个蓝色高亮改不掉）。改成 <details> 自绘下拉，无需额外状态。 */
-        <Select
-          className="pcard__cls"
-          value={cls || row.mainClass || row.subClass}
-          title="选择本场使用职业"
-          icon={icon ?? undefined}
-          /* 不要在这里传职业色：卡片底色就是职业色，同色文字会隐形（只剩箭头） */
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => onChangeClass(row.playerId, e.target.value)}
-        >
-          {row.mainClass && <option value={row.mainClass}>{row.mainClass}</option>}
-          {row.subClass && row.subClass !== row.mainClass
-            && <option value={row.subClass}>{row.subClass}</option>}
-        </Select>
+        <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
+             title="点击换人 / 放入队员">
+          {icon && <img className="pcard__icon" src={icon} alt="" />}
+          {cls || '未登记职业'}
+        </div>
       ) : (
         <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
              title="点击换人 / 放入队员">

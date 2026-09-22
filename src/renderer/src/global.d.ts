@@ -21,6 +21,7 @@ declare global {
         export(): Promise<IpcResult<PlayerInput[]>>;
         reorder(playerIds: number[]): Promise<IpcResult<true>>;
         listWallpapers(dir?: string): Promise<IpcResult<WallpaperItem[]>>;
+        wallpaperTranscode(): Promise<IpcResult<string>>;
         detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
       };
       meta: {

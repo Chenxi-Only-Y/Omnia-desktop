@@ -44,8 +44,26 @@ function apply(kind: string, file: string) {
         if (!video!.videoWidth) {
           video!.style.display = 'none';
           window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-            detail: '该视频本机解不了码（多半是 HEVC/H.265），已改用预览动图：' + url.split('/').pop(),
+            detail: '该视频解不了码（多半是 HEVC/H.265），正在转码为 H.264…',
           }));
+          // 转成 H.264 再播（一次转、缓存到 userData/wallpaper-cache）
+          void (async () => {
+            try {
+              const out = await api.player.wallpaperTranscode();
+              video!.src = 'file:///' + out.replace(/[\\/]+/g, '/');
+              video!.style.display = '';
+              video!.onloadeddata = null;
+              video!.onerror = null;
+              void video!.play();
+              window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+                detail: '转码完成，已用 H.264 播放（已缓存，下次秒开）',
+              }));
+            } catch (err) {
+              window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+                detail: '转码失败，保持预览动图：' + String(err).slice(0, 80),
+              }));
+            }
+          })();
         }
       };
       video.onerror = () => {

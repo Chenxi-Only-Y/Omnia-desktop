@@ -162,6 +162,27 @@ export function registerIpc(ctx: IpcContext): void {
     out.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'video' ? -1 : 1));
     return out;
   }));
+  // 视频壁纸转码：HEVC/H.265 Chromium 解不了 → 转成 H.264 并缓存（一次转、之后秒开）
+  ipcMain.handle('meta:wallpaper-transcode', safe(() => {
+    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+      .get('wallpaperImage') as { value: string } | undefined;
+    const src = String(row?.value ?? '');
+    if (!src) throw new Error('没有选中的壁纸');
+    const fsp = require('node:fs') as typeof import('node:fs');
+    const pth = require('node:path') as typeof import('node:path');
+    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+    const ffmpeg = require('ffmpeg-static') as unknown as string;
+    const dir = pth.join(app.getPath('userData'), 'wallpaper-cache');
+    fsp.mkdirSync(dir, { recursive: true });
+    let key = pth.basename(src, pth.extname(src));
+    try { key += '-' + Math.floor(fsp.statSync(src).mtimeMs); } catch { /* 文件可能已删 */ }
+    const out = pth.join(dir, key + '.mp4');
+    if (!fsp.existsSync(out)) {
+      execFileSync(ffmpeg, ['-y', '-i', src, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+        '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', out], { timeout: 600000 });
+    }
+    return out;
+  }));
   ipcMain.handle(IPC.playerImport, safe((rows: PlayerInput[]) => players.importMany(rows)));
   // 拖拽换位后整批写回「序」
   ipcMain.handle(IPC.playerReorder, safe((playerIds: number[]) => {

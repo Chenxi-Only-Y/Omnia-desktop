@@ -60,6 +60,14 @@ export default function SettingsPage({ info }: Props) {
     window.dispatchEvent(new CustomEvent('omnia:wallpaper-fit', { detail: f }));
     setNotice('适应方式：' + (f === 'cover' ? '铺满裁剪' : f === 'contain' ? '完整缩放' : '拉伸铺满'));
   }
+  // 声音：默认静音（用户口径），可取消
+  const [wallMuted, setWallMuted] = useState(true);
+  async function pickMuted(m: boolean): Promise<void> {
+    setWallMuted(m);
+    try { await api.meta.setSetting('wallpaperMuted', m ? '1' : '0'); } catch { /* IPC 偶发丢参数 */ }
+    window.dispatchEvent(new CustomEvent('omnia:wallpaper-muted', { detail: m }));
+    setNotice(m ? '壁纸已静音' : '壁纸已取消静音（有声音）');
+  }
   // 壁纸图加载不出来时的回声（file:// 受限 / 文件不存在）
   useEffect(() => {
     const onErr = (e: Event) => setNotice(String((e as CustomEvent<string>).detail ?? '壁纸加载失败'));
@@ -268,6 +276,11 @@ export default function SettingsPage({ info }: Props) {
             {([['dynamic', '动态'], ['static', '静态帧'], ['off', '关闭壁纸']] as const).map(([v, label]) => (
               <button key={v} className={'wall-seg__b' + (wallMode === v ? ' on' : '')}
                       onClick={() => void pickMode(v)}>{label}</button>
+            ))}
+            <span className="wall-seg__k" style={{ marginLeft: 22 }}>声音</span>
+            {([[true, '静音'], [false, '取消静音']] as const).map(([v, label]) => (
+              <button key={String(v)} className={'wall-seg__b' + (wallMuted === v ? ' on' : '')}
+                      onClick={() => void pickMuted(v)}>{label}</button>
             ))}
             <span className="wall-seg__k" style={{ marginLeft: 22 }}>适应方式</span>
             {([['cover', '铺满裁剪'], ['contain', '完整缩放'], ['stretch', '拉伸铺满']] as const).map(([v, label]) => (

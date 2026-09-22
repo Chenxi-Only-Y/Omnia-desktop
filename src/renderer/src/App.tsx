@@ -99,7 +99,7 @@ export default function App() {
       </aside>
 
       <main className="main">
-        <header className="topbar">
+        <header className={`topbar${page === 'overview' ? ' topbar--home' : ''}`}>
           <button
             className="btn ghost icon-btn nav-toggle"
             onClick={toggleNav}

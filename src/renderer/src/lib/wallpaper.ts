@@ -15,6 +15,8 @@ let lastTime = 0;
 let current = '';
 // 渲染模式：dynamic=动态 / static=静态帧 / off=关闭壁纸；适应方式决定 background-size
 let mode: string = 'dynamic';
+// 用户口径：壁纸默认**静音**，设置里可取消静音
+let muted = true;
 let fit: string = 'cover';
 
 function apply(kind: string, file: string) {
@@ -32,6 +34,7 @@ function apply(kind: string, file: string) {
     const t = video && video.src === url ? video.currentTime : lastTime;
     if (!video) {
       video = document.createElement('video');
+      video.muted = muted;
       video.muted = true; video.loop = true; video.autoplay = true; video.playsInline = true;
       host.appendChild(video);
     }
@@ -175,11 +178,13 @@ export function installWallpaper(): void {
     host.className = 'home-wallpaper';
     document.body.appendChild(host);
     video = document.createElement('video');
+      video.muted = muted;
     video.muted = true; video.loop = true; video.autoplay = true; video.playsInline = true;
     video.style.display = 'none';
     host.appendChild(video);
     // 先试 localStorage（渲染层，一定能存住）—— app_setting 那条 IPC 会丢参数、
     // 落库可能失败，实测真实库里就是空的，导致每次启动都回到默认渐变（看着就是黑）。
+    try { muted = window.localStorage.getItem('omnia:wallpaperMuted') !== '0'; } catch { /* 默认静音 */ }
     let booted = false;
     try {
       const raw = window.localStorage.getItem('omnia:wallpaper');
@@ -206,6 +211,12 @@ export function installWallpaper(): void {
     }
   });
   // 渲染模式 / 适应方式改动后用记住的那张壁纸重新应用
+  // 静音开关：立即作用到正在播的视频上
+  window.addEventListener('omnia:wallpaper-muted', (e) => {
+    muted = !!(e as CustomEvent<boolean>).detail;
+    try { window.localStorage.setItem('omnia:wallpaperMuted', muted ? '1' : '0'); } catch { /* 存不了就算 */ }
+    if (video) { video.muted = muted; if (!muted) void video.play().catch(() => {}); }
+  });
   window.addEventListener('omnia:wallpaper-mode', (e) => {
     mode = (e as CustomEvent<string>).detail || 'dynamic';
     const [k, f] = current.split('|');

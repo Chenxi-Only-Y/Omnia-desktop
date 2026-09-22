@@ -198,10 +198,7 @@ export default function StatImportPanel({
           </div>
         </>
       )}
-      <div className="hint">
-        写入会把战报挂到本场对应队员身上；若该队员还没在本场名单里，会自动加入（未分配小队）。
-        直接粘贴 Excel 区域时默认是 Tab 分隔，无需另存 CSV。
-      </div>
+      
     </div>
   );
 }

@@ -220,10 +220,7 @@ export default function RulesPage({ classes }: PageProps) {
             </tbody>
           </table>
         </div>
-        <div className="hint">
-          规则集版本化：改动会保留历史版本，可随时切回。<strong>评分算法本身还没定</strong>，
-          所以这里只管参数；算法落定后这些参数会被评分引擎直接读取。
-        </div>
+        
       </div>
 
       {editing && (
@@ -336,10 +333,7 @@ export default function RulesPage({ classes }: PageProps) {
                 </tbody>
               </table>
             </div>
-            <div className="hint">
-              空白格表示该定位不使用该项（例如治疗不参与清泉/焚骨）。清空某项请把值设为 0 而不是删除键，
-              以免与「不使用」混淆。
-            </div>
+            
           </div>
 
           <div className="card">
@@ -403,9 +397,7 @@ export default function RulesPage({ classes }: PageProps) {
                 </label>
               ))}
             </div>
-            <div className="hint">
-              个人换算分 = 个人比例 × 个人刻度 × 职业系数。系数大于 1 表示该职业更难拿分、给予补偿。
-            </div>
+            
           </div>
 
           <div className="card">
@@ -426,11 +418,7 @@ export default function RulesPage({ classes }: PageProps) {
       )}
 
       <div className="card">
-        <div className="hint" style={{ margin: 0 }}>
-          默认值来源：原表「数据处理1」第 4 行的权重与系数 + 设计基准 v2 的战术权重推导
-          （推塔 60%、其中塔进度 7/9、大旗 2/9）。<b>评分算法尚未确定</b>，
-          所以本页只负责参数与版本管理；等算法落定，评分引擎会读「使用中」的那套规则。
-        </div>
+        
       </div>
     </>
   );

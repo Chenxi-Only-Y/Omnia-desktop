@@ -90,7 +90,6 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
       <div className="hint">
         引擎 <code>{engine || '未运行'}</code>
         {computedAt && <> · 上次计算 {computedAt}</>}
-        {' · '}该口径为可标定实现，参数改动后点「重算」即可，历史分数按规则集分开保存。
       </div>
 
       {summary && (
@@ -174,13 +173,6 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {scores.length === 0 && (
-        <div className="hint" style={{ marginTop: 8 }}>
-          这场还没有算过分。点「计算本场分数」会：排除请假/替补 → 按小队与战术类型算执行分 →
-          按定位算个人加权 → Min-Max 归一 → 乘刻度与职业系数 → 加附加分、扣超均死亡 → 封顶。
         </div>
       )}
     </div>

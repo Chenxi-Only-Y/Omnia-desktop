@@ -161,10 +161,7 @@ export default function MatchPage({ classes, classMap }: Props) {
           </label>
           <button className="btn primary" onClick={handleCreate}>创建并继承上场阵容</button>
         </div>
-        <div className="hint">
-          每方 {TOTAL_TOWERS_PER_SIDE} 座塔（含高地塔）；拆掉大旗判定为胜，大旗不单独录入。
-          同日多场自动按 -1 / -2 编号。创建后会自动把上一场我方阵容带过来，不用重新排表。
-        </div>
+        
       </div>
 
       <div className="card">

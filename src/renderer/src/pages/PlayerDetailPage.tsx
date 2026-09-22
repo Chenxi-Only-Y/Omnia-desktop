@@ -110,7 +110,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
           <div className="v" style={{ color: totals.statFilled === totals.plays ? 'var(--ok)' : 'var(--warn)' }}>
             {totals.statFilled}<small> / {totals.plays} 场</small>
           </div>
-          <div className="hint" style={{ marginTop: 4 }}>只有填了战报的场次才计入下方数值</div>
+          
         </div>
         <div className="stat"><div className="k">有效击杀（含清泉）</div><div className="v">{num(totals.effKills)}</div></div>
         <div className="stat"><div className="k">有效人伤</div>
@@ -310,10 +310,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
               </tbody>
             </table>
           </div>
-          <div className="hint">
-            有效人伤 = 对玩家伤害 + 人伤卸甲；有效塔伤 = 对建筑伤害 + 破塔卸甲；
-            「有效击杀」含清泉（对应原表「击败/清泉」）。替补与请假场次不参与数值汇总。
-          </div>
+          
         </div>
       )}
     </>

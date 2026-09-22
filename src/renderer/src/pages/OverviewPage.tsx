@@ -33,7 +33,6 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const [latestMatchLabel, setLatestMatchLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-
   const load = useCallback(async () => {
     try {
       const [rows, cat, matches] = await Promise.all([
@@ -137,12 +136,12 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
         <div className="stat">
           <div className="k">每方塔数</div>
           <div className="v">{TOTAL_TOWERS_PER_SIDE}<small> 座（含高地塔）</small></div>
-          <div className="hint" style={{ marginTop: 4 }}>拆高地塔 → 大旗；大旗由胜负代替</div>
+          
         </div>
         <div className="stat">
           <div className="k">分制</div>
           <div className="v">60<small> 基础 · 封顶 100</small></div>
-          <div className="hint" style={{ marginTop: 4 }}>团队分 0–20 · 个人分 0–40（算法待定）</div>
+          
         </div>
       </div>
 
@@ -177,7 +176,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
             })}
           </div>
         )}
-        <div className="hint">职业不再存在成员主档里 —— 它来自各场次的报名表，因此这里统计的是最有参考价值的「本场报名」分布。12 职业口径与平衡系数来自原表「下滑预选」。</div>
+        
       </div>
 
       <div className="card">
@@ -203,10 +202,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
         ) : (
           <div className="hint">读取中…</div>
         )}
-        <div className="hint">
-          首屏用的是主题渐变（原表「首页」的大图实测是空图，作者原画已丢失）。
-          首屏钉住不动，向下滚动时数据层会从下往上盖住它。
-        </div>
+        
       </div>
       </div>
     </>

@@ -218,7 +218,6 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
     );
   }
 
-  const missingSlots = our.filter((r) => r.state === 'PLAY' && !r.squad).length;
   /** 建制容量与下拉选项全部来自数据库，不硬编码 */
   const squadOptions = [...(catalog?.squads ?? []).map((s) => s.name), ...BENCH_SQUADS];
   const capacityHint = catalog?.capacity ?? 0;
@@ -287,7 +286,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       </div>
 
       <div className="tabs">
-        {([['lineup', `阵容编排（${stats.assigned}/60）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['signup', '报名 / 请假'], ['score', '本场评分'], ['import', '批量导入战报']] as const)
+        {([['lineup', `阵容编排（${stats.assigned}/${capacityHint}）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['signup', '报名 / 请假'], ['score', '本场评分'], ['import', '批量导入战报']] as const)
           .map(([k, label]) => (
             <button key={k} className={`tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{label}</button>
           ))}
@@ -383,10 +382,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                 }
               }}
             />
-            <div className="hint" style={{ marginTop: 8 }}>
-              拖动姓名可换小队、拖到下方「未分配」区可移出小队；点击职业色块也能选人入队，点击姓名移出本场。
-              版式对齐原表「排表」页：每小队 6 人 × 5 行（职业 / 备注 / 姓名 / 战术 / 角色 ID）。
-            </div>
+            
           </div>
 
           {cellPick && (
@@ -415,10 +411,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
               <button className="btn primary" onClick={() => setShowAdd(!showAdd)}>
                 {showAdd ? '收起' : '添加队员'}
               </button>
-              <span className="hint" style={{ margin: 0 }}>
-                也可用下方表格逐项调整（小队共 {capacityHint} 个上场槽位）
-                {missingSlots > 0 ? ` · 还空 ${missingSlots} 个` : ' · 已排满'}
-              </span>
+              
             </div>
             {showAdd && (
               <AddPlayerPicker
@@ -497,10 +490,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
             <button className="btn primary" onClick={() => void saveAll()} disabled={saving || dirty.size === 0}>
               保存全部改动{dirty.size ? `（${dirty.size}）` : ''}
             </button>
-            <span className="hint" style={{ margin: 0 }}>
-              有效人伤 = 对玩家伤害 + 人伤卸甲；有效塔伤 = 对建筑伤害 + 破塔卸甲；
-              「清泉」单列（潮光计入个人分），「复活」仅素问/妙音计入。
-            </span>
+            
           </div>
           <div className="table-wrap" style={{ maxHeight: '56vh' }}>
             <table className="grid">
@@ -548,9 +538,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
               </tbody>
             </table>
           </div>
-          <div className="hint">
-            数字留空按 0 处理。提示：原表里「击败/清泉」是复合列，这里已拆成两列 —— 治疗职业的「击败」若不为 0，多半是把清泉填错了位置。
-          </div>
+          
         </div>
       )}
 

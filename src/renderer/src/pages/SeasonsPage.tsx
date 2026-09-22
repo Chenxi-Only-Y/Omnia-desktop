@@ -96,9 +96,7 @@ export default function SeasonsPage({ onSeasonChanged }: Props) {
             </div>
           </div>
         ) : <div className="empty">还没有赛季</div>}
-        <div className="hint">
-          赛季只给「对局」和「规则集」打标；成员主档与战斗组建制是跨赛季的长期资产，不随赛季切换。
-        </div>
+        
       </div>
 
       <div className="card">
@@ -256,11 +254,7 @@ export default function SeasonsPage({ onSeasonChanged }: Props) {
             </table>
           </div>
         )}
-        <div className="hint">
-          新建对局会自动登记到「当前赛季」，所以正常情况下这里扫不出东西；真正的用途是把旧表导进来的历史对局补上赛季归属。
-          归档只改对局归属，不动已算出的分数 —— 同一场对局的分数永远属于创建它的那个赛季，避免历史成绩被后来的口径改写。
-          删除赛季时该赛季的对局不会被删，只会变回「无赛季归属」，可以在这里重新归档。
-        </div>
+        
       </div>
     </>
   );

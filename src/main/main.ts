@@ -891,15 +891,17 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const modal = await waitFor(() => document.querySelector('.modal'), '导入向导弹窗');
         const title = modal.querySelector('h3')?.textContent || '';
         const hasFileBtn = !!([...modal.querySelectorAll('button')].find(b => b.textContent.includes('选择 xlsx 文件')));
-        const hasHint = (modal.textContent || '').includes('表头');
-        steps.push('弹窗标题=' + JSON.stringify(title) + ' 有选文件按钮=' + hasFileBtn + ' 有表头说明=' + hasHint);
+        // 原来这里断言弹窗文案里有「表头」二字，但那句是说明性小字、已按用户口径删除。
+        // 改成结构性断言：弹窗里确实有文件输入框（不依赖任何文案）。
+        const hasInput = !!modal.querySelector('input[type=file]');
+        steps.push('弹窗标题=' + JSON.stringify(title) + ' 有选文件按钮=' + hasFileBtn + ' 有文件输入框=' + hasInput);
         // 关掉弹窗
         const closeBtn = [...modal.querySelectorAll('button')].find(b => b.textContent.trim() === '关闭');
         if (closeBtn) closeBtn.click();
         await new Promise(r => setTimeout(r, 200));
         const closed = !document.querySelector('.modal');
         steps.push('点击关闭后弹窗已消失=' + closed);
-        return { ok: title.includes('导入成员主档') && hasFileBtn && hasHint && closed, steps };
+        return { ok: title.includes('导入成员主档') && hasFileBtn && hasInput && closed, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针6');
     for (const s of wizard.steps) log('[smoke] 向导:', s);

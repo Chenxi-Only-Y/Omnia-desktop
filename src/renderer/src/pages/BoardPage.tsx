@@ -130,9 +130,7 @@ export default function BoardPage(_props: PageProps) {
               </tbody>
             </table>
           </div>
-          <div className="hint">
-            出勤率 = 上场次数 / 有记录的场次。请假次数偏高的人可在排表时优先错开。
-          </div>
+          
         </div>
       )}
 
@@ -199,10 +197,7 @@ export default function BoardPage(_props: PageProps) {
                 );
               })}
             </div>
-            <div className="hint">
-              某维度覆盖极低通常意味着「这一列整列没填」或「该职业本就不产生该指标」（如治疗职业的击败、非潮光的清泉），
-              可据此判断原始战报是否录全。
-            </div>
+            
           </div>
         </>
       )}
@@ -253,10 +248,7 @@ export default function BoardPage(_props: PageProps) {
       )}
 
       <div className="card">
-        <div className="hint" style={{ margin: 0 }}>
-          本页只统计「录入了什么」，不含评分。战绩榜、贡献雷达、胜率与对位差等需要评分口径的指标，
-          等你定下算法（M1/M4）后会加到这一页。
-        </div>
+        
       </div>
     </>
   );

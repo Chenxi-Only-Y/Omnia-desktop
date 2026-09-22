@@ -44,10 +44,7 @@ export default function CellPicker({
             }}
           />
         </div>
-        <div className="hint" style={{ marginTop: 8 }}>
-          只列出本场已报名的人；已经在别的小队里的人会被移动过来（同一场里一人只能在一个小队）。
-          点<b>职业标签</b>即按该职业放入；只点名字则默认用主职。
-        </div>
+        
       </div>
     </div>
   );

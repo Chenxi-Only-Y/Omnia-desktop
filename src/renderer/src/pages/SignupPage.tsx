@@ -383,10 +383,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
             </tbody>
           </table>
         </div>
-        <div className="hint">
-          「报名」是意愿，「上场名单」是排表结果 —— 两者允许不一致（人工调阵容时会出现差异）。
-          「按报名更新上场名单」只改状态：参加的人保留已排的小队，替补/请假会清空小队。
-        </div>
+        
       </div>
 
       {/* 报名表导入预览：**每一行都可直接修改**，改完再入库 */}
@@ -550,9 +547,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                     <button className="btn" disabled={busy} onClick={() => void createMissing()}>
                       补建为成员主档（{review.signedNotInRoster.length} 个）
                     </button>
-                    <span className="hint" style={{ margin: 0 }}>
-                      补建只写 ID 与麦克风，职业仍从报名表来
-                    </span>
+                    
                   </div>
                 </>
               )

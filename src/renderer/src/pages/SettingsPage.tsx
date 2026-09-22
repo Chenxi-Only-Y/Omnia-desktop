@@ -3,7 +3,6 @@ import { useToastAutoClear } from '../lib/useToast';
 import type { AppInfo, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
-import { TACTICS } from '@shared/domain';
 
 /** 中缝图片上限：会存成 dataURL 进 app_setting，太大既慢又占库，这里挡一下 */
 const DIVIDER_IMAGE_MAX_MB = 3;
@@ -104,9 +103,7 @@ export default function SettingsPage({ info }: Props) {
                   ).then(() => setNewGroup({ name: '', kind: newGroup.kind }))}>
             新增战斗组
           </button>
-          <span className="hint" style={{ margin: 0 }}>
-            组内第 N 支小队会自动命名为「组名-N」（如 防守二-3）
-          </span>
+          
         </div>
 
         <div className="table-wrap">
@@ -190,9 +187,7 @@ export default function SettingsPage({ info }: Props) {
             </tbody>
           </table>
         </div>
-        <div className="hint">
-          战术可选：{TACTICS.join(' / ')}。删除小队不会影响已录入的历史战报（历史数据保留小队名文本）。
-        </div>
+        
       </div>
 
       <div className="card">
@@ -211,10 +206,7 @@ export default function SettingsPage({ info }: Props) {
             <div className="v">v{info?.schemaVersion ?? '—'}<small> schema 迁移</small></div>
           </div>
         </div>
-        <div className="hint">
-          与旧表互通：成员主档在「成员主档 → 导入 CSV / JSON」，战报在「对局与战报 → 批量导入战报」里粘贴 Excel 区域或选文件。
-          旧表 xlsx 可直接读取（表头不在第一行时用 headerRow 指定，命令行见 README）。
-        </div>
+        
       </div>
 
       <div className="card">
@@ -237,17 +229,12 @@ export default function SettingsPage({ info }: Props) {
               清除图片
             </button>
           )}
-          <span className="hint" style={{ margin: 0 }}>
-            中缝固定 344px 宽，图片**居中占 172px 宽**（两侧各 86px 由底色补），
-            高度按图片自身比例，竖向不足也由底色补。
-            建议图片宽高比 ≈ 172:778 或更窄，正好铺满中间。
-            上限 {DIVIDER_IMAGE_MAX_MB}MB。
-          </span>
+          
         </div>
         {dividerImage && (
           <div className="divider-preview">
             <img src={dividerImage} alt="中缝预览" />
-            <span className="hint">预览（实际按 344px 宽横向铺满裁剪）</span>
+            
           </div>
         )}
       </div>

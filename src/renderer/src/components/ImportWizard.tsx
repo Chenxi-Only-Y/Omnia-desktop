@@ -202,10 +202,6 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
                 </tbody>
               </table>
             </div>
-            <div className="hint">
-              浅色行是表头之前的行（用来确认表头选对了）。下方只预览前 40 条有效数据，
-              导入时会处理整张表。列名映射沿用旧表口径：角色ID / 玩家名字 / 主职业 / 副职 / 麦 / 备注 等。
-            </div>
 
             {statPreview && (
               <div style={{ marginTop: 10 }}>
@@ -241,12 +237,6 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
               </div>
             )}
           </>
-        )}
-
-        {!grid && !busy && (
-          <div className="hint" style={{ marginTop: 8 }}>
-            选一个 xlsx 文件后会自动列出工作表并探测表头行。支持旧表这种「表头不在第一行」的结构。
-          </div>
         )}
       </div>
     </div>

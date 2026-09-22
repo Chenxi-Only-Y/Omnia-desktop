@@ -524,11 +524,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
           <button className="btn" onClick={handleExport} disabled={!players.length}>导出 CSV</button>
           <button className="btn ghost" onClick={() => void load()}>刷新</button>
         </div>
-        <div className="hint">
-          导入按「角色 ID」幂等合并：新 ID 新增，已有 ID 只覆盖非空字段。
-          xlsx 导入会自动列出工作表并探测表头行（旧表的表头在第 5~6 行也能认）；
-          CSV 需带表头，支持列名：角色ID / 玩家名字 / 主职业 / 副职 / 入帮排序 / 麦克风 / 备注 等。
-        </div>
+        
       </div>
 
       {wizard && (
@@ -564,9 +560,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
               {locateMsg}
             </span>
           )}
-          <span className="hint" style={{ margin: 0 }}>
-            拖动卡片可换位；「序」也可直接改，列表按序排列
-          </span>
+          
         </div>
 
         <div className="roster-cards" ref={listRef} onDragOver={autoScroll}>

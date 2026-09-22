@@ -1857,3 +1857,31 @@ table.grid img, .roster-card img, .stat img, .card img,
 .roster-cards__head:has(.sel[open]),
 .home-card:has(.sel[open]),
 .field:has(.sel[open]) { position: relative; z-index: 75; }
+
+/* ① 下拉按钮与输入框统一外观（用户口径：为啥颜色不一样）——
+   .input / .select 与 .sel__btn 用完全相同的一组值，放在一起看不出差别。 */
+.sel__btn {
+  background: rgba(255, 255, 255, .80) !important;
+  color: #0B0B0D !important;
+  border: 1px solid rgba(11, 11, 13, .18) !important;
+  border-radius: 10px !important;
+  padding: 5px 9px !important;
+  font-size: 13px !important;
+  min-height: 30px; box-sizing: border-box;
+  justify-content: space-between;
+}
+.sel__btn:hover { border-color: rgba(11, 11, 13, .28) !important; }
+/* 展开态：同一底色的加深版（不是换色系） */
+.sel[open] > .sel__btn {
+  background: rgba(255, 255, 255, .92) !important;
+  border-color: rgba(11, 11, 13, .34) !important;
+}
+/* 日期框也纳入同一套外观（原生 picker 的日历弹层无法自绘，见说明） */
+.input[type="date"] {
+  background: rgba(255, 255, 255, .80) !important;
+  color: #0B0B0D !important;
+  border: 1px solid rgba(11, 11, 13, .18) !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+}
+.input[type="date"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }

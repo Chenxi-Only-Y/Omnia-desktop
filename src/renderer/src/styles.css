@@ -1576,3 +1576,61 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
   border-radius: 6px;
   white-space: nowrap;
 }
+
+
+/* ═══ 表格 / 页签 / 输入框也走白色三级方案（用户口径：不要黑色卡片）═══
+   上一版只覆盖了 .card/.stat/.roster-card 这类容器，
+   报名页的 table.grid、筛选页签、搜索框都不在 .card 里，
+   拿不到浅色令牌，于是还是深色 → 看起来仍是黑卡片。
+   这里给它们单独的浅色令牌与白底，规则与三级一致：
+     表格本体 = 一级磨砂（.50）  表头 = 二级（.78）  行 = 二级偏透（.66）
+   ═══════════════════════════════════════════════════════════════ */
+table.grid, table.grid * {
+  --text: #0B0B0D;
+  --text-dim: #4A4A55;
+  --text-faint: #7C7C88;
+  --fg: #0B0B0D;
+  --line: rgba(11, 11, 13, .12);
+  --line-strong: rgba(11, 11, 13, .24);
+  --border: rgba(11, 11, 13, .12);
+  --border-strong: rgba(11, 11, 13, .24);
+  --surface: #FFFFFF;
+  --surface-2: rgba(255, 255, 255, .55);
+  --hover: rgba(11, 11, 13, .06);
+  --bg-hover: rgba(11, 11, 13, .06);
+}
+table.grid {
+  background-color: rgba(255, 255, 255, .50) !important;
+  color: #0B0B0D !important;
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+table.grid thead th {
+  background-color: rgba(255, 255, 255, .78) !important;
+  color: #4A4A55 !important;
+}
+table.grid tbody tr { background-color: rgba(255, 255, 255, .62) !important; }
+table.grid tbody tr:nth-child(even) { background-color: rgba(255, 255, 255, .55) !important; }
+table.grid tbody tr:hover { background-color: rgba(255, 255, 255, .85) !important; }
+table.grid tbody td, table.grid tbody th { color: #0B0B0D !important; }
+
+/* 筛选页签 / 工具栏 / 输入框：深色页上也不要黑块 */
+.tab {
+  background: rgba(255, 255, 255, .50) !important;
+  color: #0B0B0D !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, .40) !important;
+}
+.tab.active {
+  background: rgba(255, 255, 255, .88) !important;
+  color: #0B0B0D !important;
+  border-color: rgba(255, 255, 255, .70) !important;
+}
+.toolbar .input, .toolbar .select, .input, .select {
+  background-color: rgba(255, 255, 255, .80) !important;
+  color: #0B0B0D !important;
+  border-color: rgba(11, 11, 13, .18) !important;
+}
+.input::placeholder { color: #7C7C88 !important; }

@@ -625,7 +625,19 @@ tr.row--leave > td { background: var(--surface-3); }
 }
 .roster-card:hover { border-color: var(--line-strong); background: var(--bg-hover); }
 .roster-card--dragging { opacity: .4; }
-.roster-card--over { border-color: var(--fg); box-shadow: 0 0 0 2px var(--accent-soft); }
+/* 拖动换位时的**插入细线**：在两张卡片之间的缝隙里画一条线，
+   用户口径「在俩人之间的时候出现一条细线，能够辅助我知道放在哪个位置」。
+   线画在缝隙正中（卡片间距 4px，所以用 -3px 偏移）。 */
+.roster-card { position: relative; }
+.roster-card--drop-above::before,
+.roster-card--drop-below::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 2px;
+  background: var(--fg); border-radius: 1px; z-index: 3;
+  /* 线头加一个小圆点，更像"插入点" */
+  box-shadow: 0 0 0 1px var(--surface);
+}
+.roster-card--drop-above::before { top: -3px; }
+.roster-card--drop-below::after { bottom: -3px; }
 .roster-card__handle {
   cursor: grab; color: var(--text-faint); font-size: 13px; user-select: none;
   padding: 0 1px; line-height: 1;

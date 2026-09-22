@@ -68,7 +68,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const fileRef = useRef<HTMLInputElement>(null);
   /** 拖拽换位：正在拖的、以及当前悬停的目标 */
   const [dragId, setDragId] = useState<number | null>(null);
-  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  /** 拖动时的插入位置：目标卡片 + 插在它上面还是下面（决定细线画在哪条缝里） */
+  const [dropAt, setDropAt] = useState<{ id: number; below: boolean } | null>(null);
   /** 正在编辑「序」的那一行（null = 全部按纯文字显示，没有白框） */
   const [orderEditId, setOrderEditId] = useState<number | null>(null);
   /** 「序」输入中的草稿（失焦/回车才提交，避免边打字边存导致光标跳） */
@@ -249,12 +250,18 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
    * 拖拽换位：把 fromId 挪到 toId 的位置，然后整批写回「序」。
    * 只用当前**列表顺序**（sorted）算新顺序，所以拖完立即与界面一致。
    */
-  async function moveTo(fromId: number, toId: number) {
+  async function moveTo(fromId: number, toId: number, below = false) {
     const ids = sorted.map((x) => x.id);
     const from = ids.indexOf(fromId);
-    const to = ids.indexOf(toId);
-    if (from < 0 || to < 0) return;
-    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    const target = ids.indexOf(toId);
+    if (from < 0 || target < 0) return;
+    // 先把人抽出来，再按"插在目标上面还是下面"决定插入点 ——
+    // 抽走之后目标的下标可能前移，所以上面那种情况要减 1。
+    ids.splice(from, 1);
+    let to = below ? target + 1 : target;
+    if (from < to) to -= 1;
+    to = Math.min(Math.max(0, to), ids.length);
+    ids.splice(to, 0, fromId);
     try {
       await api.player.reorder(ids);
       setError(null);
@@ -522,11 +529,13 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
           )}
           {!loading && sorted.map((p, idx) => {
             const st = statusOf(p);
-            const dragOver = dragOverId === p.id && dragId !== null && dragId !== p.id;
+            const dropLine = dropAt && dropAt.id === p.id && dragId !== null && dragId !== p.id
+              ? (dropAt.below ? ' roster-card--drop-below' : ' roster-card--drop-above')
+              : '';
             return (
               <div
                 key={p.id}
-                className={`roster-card${dragId === p.id ? ' roster-card--dragging' : ''}${dragOver ? ' roster-card--over' : ''}`}
+                className={`roster-card${dragId === p.id ? ' roster-card--dragging' : ''}${dropLine}`}
                 draggable
                 onDragStart={(e) => {
                   setDragId(p.id);
@@ -534,15 +543,21 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                   // 某些环境必须 setData 才会触发后续 dragOver
                   e.dataTransfer.setData('text/plain', String(p.id));
                 }}
-                onDragOver={(e) => { e.preventDefault(); setDragOverId(p.id); }}
-                onDragLeave={() => setDragOverId((cur) => (cur === p.id ? null : cur))}
-                onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  // 指针在卡片上半 → 插到它上面；下半 → 插到它下面
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setDropAt({ id: p.id, below: e.clientY > r.top + r.height / 2 });
+                }}
+                onDragLeave={() => setDropAt((cur) => (cur && cur.id === p.id ? null : cur))}
+                onDragEnd={() => { setDragId(null); setDropAt(null); }}
                 onDrop={(e) => {
                   e.preventDefault();
                   const fromId = Number(e.dataTransfer.getData('text/plain')) || dragId;
+                  const below = dropAt && dropAt.id === p.id ? dropAt.below : false;
                   setDragId(null);
-                  setDragOverId(null);
-                  if (fromId && fromId !== p.id) void moveTo(fromId, p.id);
+                  setDropAt(null);
+                  if (fromId && fromId !== p.id) void moveTo(fromId, p.id, below);
                 }}
               >
                 <span className="roster-card__handle" title="拖动换位">⠿</span>

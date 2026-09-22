@@ -29,6 +29,17 @@ const env = (...names: string[]): string => {
 
 const DEV_SERVER_URL = env('OMNIA_DEV_SERVER_URL', 'LIS_DEV_SERVER_URL');
 
+/**
+ * 把数据目录钉死成 %APPDATA%\omnia-desktop，开发态与打包态永远同一个。
+ *
+ * 为什么必须显式设置：Electron 的 app.getName() **优先取 package.json 的
+ * productName**，而本项目打包配置里的 productName 是「万象Omnia」、
+ * 开发态的 name 是 omnia-desktop。不钉的话，装完之后数据目录会变成
+ * %APPDATA%\万象Omnia\，用户此前所有数据在新包里就"看不见"了
+ * （不是丢失，而是去了另一个目录）。必须在 app ready 之前调用。
+ */
+app.setPath('userData', path.join(app.getPath('appData'), 'omnia-desktop'));
+
 let mainWindow: BrowserWindow | null = null;
 let dbHandle: DbHandle | null = null;
 

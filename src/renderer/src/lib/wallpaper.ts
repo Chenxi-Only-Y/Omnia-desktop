@@ -170,17 +170,32 @@ export function installWallpaper(): void {
     video.muted = true; video.loop = true; video.autoplay = true; video.playsInline = true;
     video.style.display = 'none';
     host.appendChild(video);
-    void api.meta.settings().then((s) => {
-      apply((s as Record<string, unknown>).wallpaperKind === 'video' ? 'video' : 'image',
-        String((s as Record<string, unknown>).wallpaperImage ?? ''));
-    }).catch(() => { /* 没设置就用默认渐变 */ });
+    // 先试 localStorage（渲染层，一定能存住）—— app_setting 那条 IPC 会丢参数、
+    // 落库可能失败，实测真实库里就是空的，导致每次启动都回到默认渐变（看着就是黑）。
+    let booted = false;
+    try {
+      const raw = window.localStorage.getItem('omnia:wallpaper');
+      if (raw) {
+        const w = JSON.parse(raw) as { kind?: string; file?: string };
+        if (w && w.file) { apply(w.kind === 'video' ? 'video' : 'image', String(w.file)); booted = true; }
+      }
+    } catch { /* localStorage 不可用就算了 */ }
+    if (!booted) {
+      void api.meta.settings().then((s) => {
+        apply((s as Record<string, unknown>).wallpaperKind === 'video' ? 'video' : 'image',
+          String((s as Record<string, unknown>).wallpaperImage ?? ''));
+      }).catch(() => { /* 没设置就用默认渐变 */ });
+    }
   };
   if (document.body) boot();
   else document.addEventListener('DOMContentLoaded', boot, { once: true });
   // 设置页改壁纸后广播过来（同一个 video 节点只换 src）
   window.addEventListener('omnia:wallpaper', (e) => {
     const d = (e as CustomEvent<{ kind: string; file: string }>).detail;
-    if (d) apply(d.kind, d.file);
+    if (d) {
+      try { window.localStorage.setItem('omnia:wallpaper', JSON.stringify(d)); } catch { /* 存不了就算了 */ }
+      apply(d.kind, d.file);
+    }
   });
   // 渲染模式 / 适应方式改动后用记住的那张壁纸重新应用
   window.addEventListener('omnia:wallpaper-mode', (e) => {

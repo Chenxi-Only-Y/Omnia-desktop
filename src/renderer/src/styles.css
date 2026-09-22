@@ -392,23 +392,35 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 }
 
 /* ── 首屏 ───────────────────────────────────────────────────── */
-.home-hero {
-  position: relative; overflow: hidden;
-  /* 壁纸铺最底（与 .home-wallpaper 同一张，保证首屏也是它），
-     渐变改成半透明叠层 —— 不再用不透明的 var(--bg) 盖死壁纸。 */
+/* 注意：必须写成 .hero.home-hero（双类）—— .hero 在本文件更靠后，
+   同权重会覆盖单类的 .home-hero，导致这里写什么都不生效（踩过）。 */
+.hero.home-hero {
+  /* 这里**不能**写 position: relative —— 双类权重会盖掉 .hero--pinned 的
+     position: sticky，首屏「钉住不动」就失效了（自检量到滚动后 top=-456）。 */
+  overflow: hidden;
+  border: none; border-radius: 0; padding: 0 34px;
+  min-height: 0;
+  /* 暗罩改成**横向渐变**：左侧压暗保品牌字可读，中右几乎透明让视频/壁纸明显露出来。
+     （之前是满幅 .55 黑罩，把正在播放的视频整个盖住了 —— 自己截图确认过。） */
   background:
-    radial-gradient(1100px 520px at 88% -8%,  rgba(110, 123, 255, .18), transparent 62%),
-    radial-gradient(760px 420px at 4% 108%,  rgba(192, 132, 252, .14), transparent 60%),
-    radial-gradient(520px 320px at 50% 118%, rgba(34, 211, 238, .10), transparent 62%),
-    linear-gradient(178deg, rgba(11, 11, 13, .55) 0%, rgba(21, 21, 27, .35) 52%, rgba(11, 11, 13, .55) 100%),
-    var(--wallpaper-image, none), var(--wallpaper-fallback);
-  background-size: auto, auto, auto, auto, cover, cover;
-  background-position: center, center, center, center, center, center;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
-  background-attachment: scroll, scroll, scroll, scroll, fixed, fixed;
+    radial-gradient(900px 460px at 88% 0%, rgba(110, 123, 255, .10), transparent 62%),
+    linear-gradient(90deg,
+      rgba(11, 11, 13, .90) 0%,
+      rgba(11, 11, 13, .72) 30%,
+      rgba(11, 11, 13, .34) 52%,
+      rgba(11, 11, 13, .12) 72%,
+      rgba(11, 11, 13, .40) 100%),
+    var(--wallpaper-image, none);
+  /* 注意：这里**不能**再铺 var(--wallpaper-fallback) —— 那是不透明的深色渐变，
+     会把 z-index:-1 的壁纸层（含正在播放的视频）整个挡死（自己截图确认过）。
+     没有壁纸时由 html/body 的 --bg 兜底。 */
+  background-size: auto, auto, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-attachment: scroll, scroll, fixed;
 }
 /* 柔光呼吸（极缓，克制；减少动效偏好时关闭） */
-.home-hero::after {
+.hero.home-hero::after {
   content: ''; position: absolute; inset: -20%;
   background: radial-gradient(600px 320px at 78% 22%, rgba(110, 123, 255, .12), transparent 60%);
   animation: home-breathe 7.5s ease-in-out infinite;
@@ -418,7 +430,7 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   0%, 100% { opacity: .55; transform: translate3d(0, 0, 0); }
   50%      { opacity: .95; transform: translate3d(-10px, 8px, 0); }
 }
-@media (prefers-reduced-motion: reduce) { .home-hero::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .hero.home-hero::after { animation: none; } }
 
 /* 眉题：小、灰、宽字距，前置一条短横线 */
 .home-eyebrow {
@@ -618,9 +630,9 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 /* ── 首页下滑区：白底（照 seedance2_0 的滚动区）——
    首屏仍是深色剧场，下滑上来的内容层改为**白底黑字**，
    和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
-.home-cover {
+.hero-cover.home-cover {
   /* 白底降为叠层（约 88% 不透明）→ 壁纸透得出来，但仍读作「白底」 */
-  background-color: rgba(255, 255, 255, .88);
+  background-color: rgba(255, 255, 255, .78);
   background-image: var(--wallpaper-image, none);
   background-size: cover; background-position: center;
   background-repeat: no-repeat; background-attachment: fixed;
@@ -645,16 +657,16 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   color: var(--text);
   font-family: Inter, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
 }
-.home-cover .home-h2,
-.home-cover .home-card__v { color: var(--text); }
-.home-cover .home-card {
+.hero-cover.home-cover .home-h2,
+.hero-cover.home-cover .home-card__v { color: var(--text); }
+.hero-cover.home-cover .home-card {
   background: var(--surface-2);
   border-color: var(--line);
 }
 /* 卡片一律不透明：壁纸只在非卡片区域露出 */
-.home-cover .stat, .home-cover .card { background-color: #FFFFFF; }
-.home-cover .home-eyebrow { color: var(--text-faint); }
-.home-cover .home-eyebrow::before { background: var(--line-strong); }
+.hero-cover.home-cover .stat, .hero-cover.home-cover .card { background-color: #FFFFFF; }
+.hero-cover.home-cover .home-eyebrow { color: var(--text-faint); }
+.hero-cover.home-cover .home-eyebrow::before { background: var(--line-strong); }
 
 /* 媒体卡（视频/图占位，照参考站的圆角视频卡） */
 .home-media {

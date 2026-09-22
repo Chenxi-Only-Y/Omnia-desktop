@@ -1377,7 +1377,8 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('导航里仍有「攻略」=' + stillThere);
 
         // 主题令牌必须已切到单色稿：背景主色 = 第 3 个色 #E6E1E6
-        const bgComputed = getComputedStyle(document.body).backgroundColor;
+        // 注意查 html 而不是 body：body 被设成 transparent（否则会盖住 z-index:-1 的壁纸层），深色底在 html 上
+        const bgComputed = getComputedStyle(document.documentElement).backgroundColor;
         const heroCard = document.querySelector('.card') ? getComputedStyle(document.querySelector('.card')).backgroundColor : '';
         // 大厂风：全局深色底 rgb(11,11,13)、首页下滑区白底 rgb(255,255,255)
         steps.push('主题 页面背景=' + bgComputed + '（应 rgb(11, 11, 13)） 首页卡片=' + heroCard + '（应 rgb(255, 255, 255)）');

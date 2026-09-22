@@ -33,6 +33,8 @@ export default function SettingsPage({ info }: Props) {
   async function useWall(w: import('@shared/types').WallpaperItem): Promise<void> {
     // 落库失败也不挡切换：本项目部分 IPC 会丢参数，不能让 setSetting 的异常
     // 把「切换壁纸」这件事一起带没。
+    // 双保险：先写渲染层（一定成功），再尽量落库
+    try { window.localStorage.setItem('omnia:wallpaper', JSON.stringify({ kind: w.kind, file: w.file })); } catch { /* 存不了就算了 */ }
     let saved = true;
     try {
       await api.meta.setSetting('wallpaperImage', w.file);

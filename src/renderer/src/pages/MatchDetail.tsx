@@ -12,6 +12,7 @@ import AddPlayerPicker from '../components/AddPlayerPicker';
 import StatImportPanel from '../components/StatImportPanel';
 import ScoringPanel from '../components/ScoringPanel';
 import SignupPage from './SignupPage';
+import Select from '../components/Select';
 import {
   BENCH_SQUADS, TOTAL_TOWERS_PER_SIDE, deriveEffective,
 } from '@shared/domain';
@@ -252,10 +253,10 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                    onChange={(e) => void patchMatch({ indexInDay: Math.max(1, Number(e.target.value) || 1) })} />
           </label>
           <label className="field"><span>胜负</span>
-            <select className="select" value={match.result}
+            <Select className="select" value={match.result}
                     onChange={(e) => void patchMatch({ result: e.target.value as Match['result'] })}>
               <option value="WIN">胜</option><option value="LOSE">负</option><option value="DRAW">平</option>
-            </select>
+            </Select>
           </label>
           <label className="field"><span>我方剩余塔</span>
             <input className="input" style={{ width: 64 }} type="number" min={0} max={TOTAL_TOWERS_PER_SIDE}
@@ -276,11 +277,11 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                    onBlur={(e) => void patchMatch({ oppSide: e.target.value })} />
           </label>
           <label className="field"><span>状态</span>
-            <select className="select" value={match.state} onChange={(e) => void patchMatch({ state: e.target.value })}>
+            <Select className="select" value={match.state} onChange={(e) => void patchMatch({ state: e.target.value })}>
               <option value="draft">草稿</option>
               <option value="playing">进行中</option>
               <option value="settled">已结算</option>
-            </select>
+            </Select>
           </label>
         </div>
       </div>
@@ -447,14 +448,14 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                     <tr key={r.id}>
                       <td>{r.name}<span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>{r.gameId !== r.name ? r.gameId : ''}</span></td>
                       <td>
-                        <select className="select" value={r.classUsed}
+                        <Select className="select" value={r.classUsed}
                                 onChange={(e) => void setClass(r, e.target.value)}>
                           <option value="">未定</option>
                           {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                        </select>
+                        </Select>
                       </td>
                       <td>
-                        <select className="select" value={r.squad}
+                        <Select className="select" value={r.squad}
                                 onChange={(e) => void setSquad(r, e.target.value)}>
                           <option value="">未分配</option>
                           {squadOptions.map((s) => (
@@ -462,7 +463,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                               {s}{stats.squadCounts.get(s) ? `（${stats.squadCounts.get(s)}）` : ''}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </td>
                       <td style={{ color: 'var(--text-dim)' }}>{r.tactic || '—'}</td>
                       <td>

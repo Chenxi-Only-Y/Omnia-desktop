@@ -27,6 +27,7 @@ import type { PageProps } from '../App';
 import { classIconSrc } from '../lib/assets';
 import { TACTICS } from '@shared/domain';
 import { api } from '../api';
+import Select from './Select';
 
 interface Props extends PageProps {
   rows: ParticipationRow[];
@@ -330,7 +331,7 @@ function SquadRowView({
         <span className="squadrow__count">{members.length}/{squad.size}</span>
         {/* 战术直接就地可改：看起来就是一行字，点开才出现选项，不加额外控件 */}
         {onChangeTactic ? (
-          <select
+          <Select
             className="squadrow__tactic squadrow__tactic--edit"
             value={squad.tactic || ''}
             title="点击可直接改战术"
@@ -339,7 +340,7 @@ function SquadRowView({
           >
             <option value="">未定</option>
             {TACTICS.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          </Select>
         ) : (
           squad.tactic && <span className="squadrow__tactic">{squad.tactic}</span>
         )}
@@ -422,25 +423,21 @@ function PlayerCard({
           排表时可以选择职业）。没有报名数据时退化为纯文字。
           两栏填同一个职业时（样本里确实有）只出现一个选项，不重复。 */}
       {onChangeClass && (row.mainClass || row.subClass) ? (
-        /* 不用原生 <select>：展开列表由操作系统绘制，<option> 的样式一律无效
+        /* 不用原生 <Select>：展开列表由操作系统绘制，<option> 的样式一律无效
            （那个蓝色高亮改不掉）。改成 <details> 自绘下拉，无需额外状态。 */
-        <details className="pcard__cls cs" onClick={(e) => e.stopPropagation()}>
-          <summary className="cs__btn" title="选择本场使用职业">
-            {cls || row.mainClass || row.subClass}
-          </summary>
-          <div className="cs__list">
-            {row.mainClass && (
-              <button type="button"
-                      className={'cs__opt' + ((cls || row.mainClass) === row.mainClass ? ' on' : '')}
-                      onClick={() => onChangeClass(row.playerId, row.mainClass)}>{row.mainClass}</button>
-            )}
-            {row.subClass && row.subClass !== row.mainClass && (
-              <button type="button"
-                      className={'cs__opt' + (cls === row.subClass ? ' on' : '')}
-                      onClick={() => onChangeClass(row.playerId, row.subClass)}>{row.subClass}</button>
-            )}
-          </div>
-        </details>
+        <Select
+          className="pcard__cls"
+          value={cls || row.mainClass || row.subClass}
+          title="选择本场使用职业"
+          icon={icon ?? undefined}
+          color={def ? def.color : undefined}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => onChangeClass(row.playerId, e.target.value)}
+        >
+          {row.mainClass && <option value={row.mainClass}>{row.mainClass}</option>}
+          {row.subClass && row.subClass !== row.mainClass
+            && <option value={row.subClass}>{row.subClass}</option>}
+        </Select>
       ) : (
         <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
              title="点击换人 / 放入队员">

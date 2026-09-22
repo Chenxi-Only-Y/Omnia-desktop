@@ -7,6 +7,7 @@ import { BENCH_SQUADS } from '@shared/domain';
 import LineupBoard from '../components/LineupBoard';
 import CellPicker from '../components/CellPicker';
 import AddPlayerPicker from '../components/AddPlayerPicker';
+import Select from '../components/Select';
 
 interface Props extends PageProps {
   /** 从别处跳过来时预选的对局（如对局列表点「排表」） */
@@ -240,7 +241,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
         <div className="toolbar" style={{ marginBottom: 0 }}>
           <label className="field">
             <span>选择场次</span>
-            <select className="select" style={{ minWidth: 320 }}
+            <Select className="select" style={{ minWidth: 320 }}
                     value={matchId ?? ''}
                     onChange={(e) => { setNotice(null); setMatchId(Number(e.target.value)); }}>
               {matches.map((m) => (
@@ -248,7 +249,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
                   {m.date} 第 {m.indexInDay} 场 · {m.ourSide} vs {m.oppSide}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <div className="board__stat" style={{ marginLeft: 6 }}>
             已排 <b>{assigned}</b> / {capacity} 槽

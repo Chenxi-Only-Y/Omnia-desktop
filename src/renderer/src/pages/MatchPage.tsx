@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { MATCH_RESULT_LABEL, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import MatchDetail from './MatchDetail';
+import Select from '../components/Select';
 
 interface Props extends PageProps {
   onCount?: (n: number) => void;
@@ -140,12 +141,12 @@ export default function MatchPage({ classes, classMap }: Props) {
           </label>
           <label className="field">
             <span>胜负</span>
-            <select className="select" value={form.result}
+            <Select className="select" value={form.result}
                     onChange={(e) => setForm({ ...form, result: e.target.value as MatchSummary['result'] })}>
               <option value="WIN">胜</option>
               <option value="LOSE">负</option>
               <option value="DRAW">平</option>
-            </select>
+            </Select>
           </label>
           <label className="field">
             <span>我方剩余塔</span>

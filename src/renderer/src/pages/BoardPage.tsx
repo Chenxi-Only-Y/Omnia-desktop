@@ -3,6 +3,7 @@ import type { DashboardData } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { MATCH_RESULT_LABEL } from '@shared/domain';
+import Select from '../components/Select';
 
 type Tab = 'attendance' | 'completeness' | 'lineup';
 
@@ -70,13 +71,13 @@ export default function BoardPage(_props: PageProps) {
             <h3 style={{ margin: 0 }}>出勤明细（{attendance.length} 人）</h3>
             <div className="spacer grow" />
             <label className="field"><span>排序</span>
-              <select className="select" value={sortKey}
+              <Select className="select" value={sortKey}
                       onChange={(e) => setSortKey(e.target.value as typeof sortKey)}>
                 <option value="plays">上场次数</option>
                 <option value="rate">出勤率</option>
                 <option value="leaves">请假次数</option>
                 <option value="filled">战报填写数</option>
-              </select>
+              </Select>
             </label>
             <button className="btn ghost" onClick={() => void load()}>刷新</button>
           </div>

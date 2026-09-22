@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from './ClassChip';
 import ImportWizard from './ImportWizard';
+import Select from './Select';
 
 /**
  * 批量导入战报面板（M3）
@@ -81,10 +82,10 @@ export default function StatImportPanel({
                onChange={(e) => void pickFile(e.target.files?.[0])} />
         <button className="btn" onClick={() => fileRef.current?.click()}>选择 CSV/TSV 文件</button>
         <label className="field"><span>名单模式</span>
-          <select className="select" value={mode} onChange={(e) => setMode(e.target.value as JoinMode)}>
+          <Select className="select" value={mode} onChange={(e) => setMode(e.target.value as JoinMode)}>
             <option value="roster">严格：必须在成员主档里</option>
             <option value="full">完整：不在档的自动建档</option>
-          </select>
+          </Select>
         </label>
         <button className="btn primary" onClick={() => void doPreview()} disabled={busy}>校验预览</button>
         {preview && (

@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import ImportWizard from '../components/ImportWizard';
 import { parseTableText, toCsv } from '../lib/importer';
+import Select from '../components/Select';
 
 interface Props extends PageProps {
   onCount: (n: number) => void;
@@ -471,16 +472,16 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         <div className="toolbar">
           <input className="input" placeholder="ID *" style={{ width: 200 }}
                  value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
-          <select className="select" value={draft.mic}
+          <Select className="select" value={draft.mic}
                   onChange={(e) => setDraft({ ...draft, mic: e.target.value as Player['mic'] })}>
             <option value="">麦克风</option>
             <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
-          </select>
-          <select className="select" value={draft.noteRole}
+          </Select>
+          <Select className="select" value={draft.noteRole}
                   onChange={(e) => setDraft({ ...draft, noteRole: e.target.value as Player['noteRole'] })}>
             <option value="">备注角色</option>
             {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
+          </Select>
           <input className="input" placeholder="入帮序" style={{ width: 76 }}
                  value={draft.joinedOrder} onChange={(e) => setDraft({ ...draft, joinedOrder: e.target.value })} />
           <input className="input" placeholder="备注（技能/装备标签）" style={{ width: 200 }}
@@ -491,7 +492,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         <div className="toolbar" style={{ marginBottom: 0 }}>
 
           {/* 「未填表」是相对某一场的报名表而言，所以这里必须选场次 */}
-          <select className="select" value={matchId ?? ''}
+          <Select className="select" value={matchId ?? ''}
                   onChange={(e) => setMatchId(e.target.value === '' ? null : Number(e.target.value))}
                   title="选择场次：用于判定成员是否已填报名表">
             <option value="">（不比对场次）</option>
@@ -500,11 +501,11 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                 {m.date} 第 {m.indexInDay} 场 · {m.oppSide}
               </option>
             ))}
-          </select>
-          <select className="select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          </Select>
+          <Select className="select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
             <option value="">全部状态</option>
             <option value="active">在队</option><option value="inactive">暂离</option><option value="left">离队</option>
-          </select>
+          </Select>
           <button className="btn" onClick={() => void fillOrder()} disabled={!sorted.length}
                   title="按当前显示顺序把「序」写成 1…N（导入进来的人序都是空的）">
             一键填满序
@@ -675,28 +676,28 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                     <input className="input" value={editDraft.id}
                            onChange={(e) => setEditDraft({ ...editDraft, id: e.target.value })} />
                     <span />
-                    <select className="select" value={editDraft.status}
+                    <Select className="select" value={editDraft.status}
                             onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
                       <option value="active">在队</option>
                       <option value="inactive">暂离</option>
                       <option value="left">离队</option>
-                    </select>
-                    <select className="select" value={editDraft.mic}
+                    </Select>
+                    <Select className="select" value={editDraft.mic}
                             onChange={(e) => setEditDraft({ ...editDraft, mic: e.target.value as Player['mic'] })}>
                       <option value="">—</option>
                       <option value="有">有</option><option value="无">无</option>
                       <option value="无需作答">无需作答</option>
-                    </select>
-                    <select className="select" value={editDraft.noteRole}
+                    </Select>
+                    <Select className="select" value={editDraft.noteRole}
                             onChange={(e) => setEditDraft({ ...editDraft, noteRole: e.target.value as Player['noteRole'] })}>
                       <option value="">—</option>
                       {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                    <select className="select" value={editDraft.orangeWeapon}
+                    </Select>
+                    <Select className="select" value={editDraft.orangeWeapon}
                             onChange={(e) => setEditDraft({ ...editDraft, orangeWeapon: e.target.value })}>
                       <option value="">无</option>
                       <option value="有">有</option>
-                    </select>
+                    </Select>
                     <input className="input" value={editDraft.remark}
                            onChange={(e) => setEditDraft({ ...editDraft, remark: e.target.value })} />
                     <div className="roster-card__edit-actions">

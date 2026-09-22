@@ -5,6 +5,7 @@ import { api, ApiError } from '../api';
 import { parseTableText } from '../lib/importer';
 import { gridToTsv, isEmptyRow } from '../lib/sheet';
 import type { PageProps } from '../App';
+import Select from './Select';
 
 type Mode = 'player' | 'stat';
 
@@ -140,18 +141,18 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
           {fileName && <span className="meta">已选：{fileName}</span>}
           {sheets.length > 0 && (
             <label className="field"><span>工作表</span>
-              <select className="select" value={sheet} onChange={(e) => void changeSheet(e.target.value)}>
+              <Select className="select" value={sheet} onChange={(e) => void changeSheet(e.target.value)}>
                 {sheets.map((s) => <option key={s.index} value={s.name}>{s.name}</option>)}
-              </select>
+              </Select>
             </label>
           )}
           {mode === 'stat' && (
             <label className="field"><span>名单模式</span>
-              <select className="select" value={joinMode}
+              <Select className="select" value={joinMode}
                       onChange={(e) => setJoinMode(e.target.value as 'roster' | 'full')}>
                 <option value="roster">严格：必须在成员主档里</option>
                 <option value="full">完整：不在档的自动建档</option>
-              </select>
+              </Select>
             </label>
           )}
         </div>

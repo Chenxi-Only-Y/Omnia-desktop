@@ -8,6 +8,7 @@ import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
 import { SIGNUP_LABEL } from '@shared/types';
 import { PART_STATE_LABEL } from '@shared/domain';
+import Select from '../components/Select';
 
 interface Props extends PageProps {
   matchId: number;
@@ -442,33 +443,33 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                                onChange={(e) => patchImportRow(i, { gameId: e.target.value })} />
                       </td>
                       <td>
-                        <select className="select" value={r.status}
+                        <Select className="select" value={r.status}
                                 onChange={(e) => patchImportRow(i, { status: e.target.value as 'JOIN' | 'LEAVE' })}>
                           <option value="JOIN">参加</option>
                           <option value="LEAVE">请假</option>
-                        </select>
+                        </Select>
                       </td>
                       <td>
-                        <select className="select" value={r.mic} disabled={r.status === 'LEAVE'}
+                        <Select className="select" value={r.mic} disabled={r.status === 'LEAVE'}
                                 onChange={(e) => patchImportRow(i, { mic: e.target.value })}>
                           <option value="">—</option>
                           <option value="有">有</option>
                           <option value="无">无</option>
-                        </select>
+                        </Select>
                       </td>
                       <td>
-                        <select className="select" value={r.mainClass} disabled={r.status === 'LEAVE'}
+                        <Select className="select" value={r.mainClass} disabled={r.status === 'LEAVE'}
                                 onChange={(e) => patchImportRow(i, { mainClass: e.target.value })}>
                           <option value="">—</option>
                           {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                        </select>
+                        </Select>
                       </td>
                       <td>
-                        <select className="select" value={r.subClass} disabled={r.status === 'LEAVE'}
+                        <Select className="select" value={r.subClass} disabled={r.status === 'LEAVE'}
                                 onChange={(e) => patchImportRow(i, { subClass: e.target.value })}>
                           <option value="">—</option>
                           {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                        </select>
+                        </Select>
                       </td>
                       <td>{rosterIds.has(r.gameId.trim())
                         ? <span style={{ color: 'var(--text-faint)' }}>是</span>

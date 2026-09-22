@@ -1760,3 +1760,85 @@ table.grid img, .roster-card img, .stat img, .card img,
 }
 .pcard .cs__opt:hover { background: rgba(11,11,13,.07); }
 .pcard .cs__opt.on { font-weight: 700; background: rgba(11,11,13,.10); }
+
+/* ═══ 自绘下拉（替换全站原生 select）══════════════════════════
+   原生 <select> 的展开列表由系统绘制，<option> 样式无效；
+   这里用 <details> 自绘，闭合态与展开态都可控。
+   ═══════════════════════════════════════════════════════════════ */
+.sel { position: relative; display: inline-block; min-width: 0; }
+.sel__btn {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 5px 9px; border-radius: 10px;
+  background: rgba(255,255,255,.80); color: #0B0B0D;
+  border: 1px solid rgba(11,11,13,.18);
+  font: inherit; font-size: 13px; line-height: 1.35;
+  min-width: 0;
+}
+.sel__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel__btn::-webkit-details-marker { display: none; }
+.sel__btn::after {
+  content: ""; flex: 0 0 auto; width: 8px; height: 5px;
+  background: currentColor; opacity: .55;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.sel__btn:hover { border-color: rgba(11,11,13,.30); }
+.sel[open] > .sel__btn { border-color: rgba(11,11,13,.42); }
+.sel__list {
+  position: absolute; z-index: 60; left: 0; top: calc(100% + 4px); min-width: 100%;
+  display: flex; flex-direction: column; gap: 1px; padding: 4px;
+  background: #FFFFFF; border: 1px solid rgba(11,11,13,.16); border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.25); max-height: 260px; overflow: auto;
+}
+.sel__opt {
+  appearance: none; border: none; background: transparent; cursor: pointer;
+  text-align: left; padding: 6px 10px; border-radius: 6px; white-space: nowrap;
+  color: #0B0B0D; font-size: 13px; font-family: inherit;
+}
+.sel__opt:hover { background: rgba(11,11,13,.07); }
+.sel__opt.on { font-weight: 700; background: rgba(11,11,13,.10); }
+.sel__opt:disabled { opacity: .45; cursor: not-allowed; }
+/* 排表卡片里的职业下拉跟随卡片字色 */
+.pcard .sel__btn { background: transparent; border: none; padding: 0 16px 0 0; color: inherit; font-size: 15px; }
+.pcard .sel__btn::after { opacity: .8; }
+
+/* 下拉（用户口径）：半透明磨砂 + 弧度 + 文字不超出边框 */
+.sel__native { display: none; }
+.sel__btn {
+  max-width: 100%; overflow: hidden;
+  border-radius: 12px;
+  background: rgba(255,255,255,.55) !important;
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  border: 1px solid rgba(255,255,255,.45) !important;
+}
+.sel__txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel__ico { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; background: transparent; }
+.sel__list {
+  border-radius: 12px;
+  background: rgba(255,255,255,.88) !important;
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,.55) !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.28);
+}
+.sel__opt { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* 排表卡片里的职业下拉：透明、随卡片字色、图标+文字同色 */
+.pcard .sel__btn { background: transparent !important; backdrop-filter: none !important; border: none !important; }
+
+/* 下拉「展开/选中」态 = 深色玻璃（用户口径：下滑选中就深色玻璃） */
+.sel[open] > .sel__btn {
+  background: rgba(19, 19, 23, .78) !important;
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, .22) !important;
+}
+.sel[open] .sel__list {
+  background: rgba(19, 19, 23, .78) !important;
+  backdrop-filter: blur(24px) saturate(1.25);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  border-color: rgba(255, 255, 255, .18) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .45);
+}
+.sel[open] .sel__opt { color: rgba(255, 255, 255, .88); }
+.sel[open] .sel__opt:hover { background: rgba(255, 255, 255, .12); color: #FFFFFF; }
+.sel[open] .sel__opt.on { background: rgba(255, 255, 255, .18); color: #FFFFFF; font-weight: 700; }

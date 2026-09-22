@@ -3,6 +3,7 @@ import { useToastAutoClear } from '../lib/useToast';
 import type { AppInfo, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
+import Select from '../components/Select';
 
 /** 中缝图片上限：会存成 dataURL 进 app_setting，太大既慢又占库，这里挡一下 */
 const DIVIDER_IMAGE_MAX_MB = 3;
@@ -149,11 +150,11 @@ export default function SettingsPage({ info }: Props) {
                    value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} />
           </label>
           <label className="field"><span>类别</span>
-            <select className="select" value={newGroup.kind}
+            <Select className="select" value={newGroup.kind}
                     onChange={(e) => setNewGroup({ ...newGroup, kind: e.target.value as 'attack' | 'defend' })}>
               <option value="attack">进攻</option>
               <option value="defend">防守</option>
-            </select>
+            </Select>
           </label>
           <button className="btn primary" disabled={!newGroup.name.trim()}
                   onClick={() => void run(

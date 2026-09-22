@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { RuleSet, SavedScore, ScoreRunSummary } from '@shared/types';
 import { api, ApiError } from '../api';
 
@@ -17,6 +18,8 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
   const [computedAt, setComputedAt] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -81,8 +84,8 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
         <button className="btn ghost" onClick={() => void load()} disabled={busy}>刷新</button>
       </div>
 
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="hint">
         引擎 <code>{engine || '未运行'}</code>

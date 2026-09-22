@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { ImportPreview, JoinMode } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -24,6 +25,8 @@ export default function StatImportPanel({
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [busy, setBusy] = useState(false);
   const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -111,8 +114,8 @@ export default function StatImportPanel({
         onChange={(e) => setText(e.target.value)}
       />
 
-      {error && <div className="msg error" style={{ marginTop: 10 }}>{error}</div>}
-      {notice && <div className="msg ok" style={{ marginTop: 10 }}>{notice}</div>}
+      {error && <div className="msg msg--toast error" style={{ marginTop: 10 }}>{error}</div>}
+      {notice && <div className="msg msg--toast ok" style={{ marginTop: 10 }}>{notice}</div>}
 
       {preview && (
         <>

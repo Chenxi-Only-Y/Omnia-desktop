@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { AppInfo, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -15,6 +16,8 @@ export default function SettingsPage({ info }: Props) {
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [newGroup, setNewGroup] = useState({ name: '', kind: 'attack' as 'attack' | 'defend' });
   /** 半区中缝图片（dataURL）；空 = 显示默认的竖排「万象」 */
   const [dividerImage, setDividerImage] = useState('');
@@ -75,8 +78,8 @@ export default function SettingsPage({ info }: Props) {
 
   return (
     <>
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="card">
         <h3>战斗组（可新增）</h3>

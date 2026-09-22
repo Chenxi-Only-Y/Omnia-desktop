@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type {
   CombatStat, Match, ParticipationRow, SignupRow, SquadCatalog,
 } from '@shared/types';
@@ -50,6 +51,8 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
   const [tab, setTab] = useState<TabKey>('lineup');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [drafts, setDrafts] = useState<Record<number, CombatStat>>({});
   const [dirty, setDirty] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -222,8 +225,8 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
 
   return (
     <>
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="card">
         <div className="toolbar" style={{ marginBottom: 8 }}>

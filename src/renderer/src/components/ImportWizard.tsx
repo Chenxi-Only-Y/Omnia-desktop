@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { ImportPreview, PlayerInput, SheetGrid } from '@shared/types';
 import { api, ApiError } from '../api';
 import { parseTableText } from '../lib/importer';
@@ -33,6 +34,8 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function pickFile(file: File | undefined) {
@@ -153,8 +156,8 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
           )}
         </div>
 
-        {error && <div className="msg error">{error}</div>}
-        {notice && <div className="msg ok">{notice}</div>}
+        {error && <div className="msg msg--toast error">{error}</div>}
+        {notice && <div className="msg msg--toast ok">{notice}</div>}
         {busy && <div className="hint">处理中…</div>}
 
         {grid && (

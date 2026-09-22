@@ -74,7 +74,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
 
   return (
     <>
-      {error && <div className="msg error">{error}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
 
       {/* ── 首屏：渐变铺满、钉住不动（下滑时下面的数据层盖上来） ── */}
       <section className="hero hero--pinned">

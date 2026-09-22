@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { MatchSummary, SeasonSummary } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -20,6 +21,8 @@ export default function SeasonsPage({ onSeasonChanged }: Props) {
   const [editDraft, setEditDraft] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
 
   const load = useCallback(async () => {
     try {
@@ -60,8 +63,8 @@ export default function SeasonsPage({ onSeasonChanged }: Props) {
 
   return (
     <>
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="card">
         <h3>当前赛季</h3>

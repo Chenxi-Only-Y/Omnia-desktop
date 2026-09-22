@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { Match, PartState, Player, PlayerInput, SignupStatus } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -45,6 +46,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   /** 当前场次：用于判定「未填表」（报名表是分场次的） */
@@ -371,8 +374,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
 
   return (
     <>
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="stat-grid" style={{ marginBottom: 12 }}>
         <div className="stat"><div className="k">成员总数</div><div className="v">{players.length}</div></div>

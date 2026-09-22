@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type {
   SignupBoard, SignupImportPreview, SignupImportRow, SignupReview, SignupStatus,
 } from '@shared/types';
@@ -37,6 +38,8 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
   const [board, setBoard] = useState<SignupBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
   /** 导入预览：**可直接编辑**的行（改完再入库） */
@@ -48,6 +51,8 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
   const [busy, setBusy] = useState(false);
   /** 导入时是否把「不在主档」的 ID 一并建成成员 */
   const [autoCreate, setAutoCreate] = useState(true);
+  /** 导入弹窗内的就地报错：失败原因要留在弹窗里，不能飘到角落让用户看不到 */
+  const [importError, setImportError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -100,6 +105,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       setImportMeta({ headers: pv.headers, headerRow: pv.headerRow, invalid: pv.invalid });
       setError(null);
       setNotice(null);
+      setImportError(null);
     } catch (err) {
       setImportRows(null);
       setImportMeta(null);
@@ -123,14 +129,15 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
   async function commitImport() {
     if (!importRows) return;
     if (importDup.length) {
-      setError('还有重复报名未处理（同 ID 出现多次），请改成唯一后再导入');
+      setImportError('还有重复报名未处理（同 ID 出现多次），请改成唯一后再导入');
       return;
     }
     const bad = importRows.filter((r) => !r.gameId.trim());
     if (bad.length) {
-      setError(`有 ${bad.length} 行 ID 为空，请补上或删除这些行`);
+      setImportError(`有 ${bad.length} 行 ID 为空，请补上或删除这些行`);
       return;
     }
+    setImportError(null);
     setBusy(true);
     try {
       const res = await api.signup.importRows(matchId, importRows.map((r) => ({
@@ -143,6 +150,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       })));
       setImportRows(null);
       setImportMeta(null);
+      setImportError(null);
       // 可选：不在主档的 ID 一并补建（报名表往往就是名单本身，省掉第二步）
       // 注意补建**同时会写入这些人的报名记录**，所以提示里的总数要把两边加起来，
       // 否则会出现「导入 0 条」但名单里其实全进来了这种误导性文案。
@@ -163,7 +171,8 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       await load();
       onChanged?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      // 服务端拒绝（重复报名等）就在弹窗里说清楚，不飘到角落
+      setImportError(err instanceof ApiError ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -251,7 +260,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
 
   return (
     <>
-      {notice && <div className="msg ok">{notice}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="card">
         <div className="toolbar" style={{ marginBottom: 0 }}>
@@ -386,9 +395,10 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
           <div className="modal__box modal__box--wide" onClick={(e) => e.stopPropagation()}>
             <div className="modal__head">
               <h3>报名表预览 · 共 {importRows.length} 条（可直接修改）</h3>
-              <button className="btn sm ghost" onClick={() => setImportRows(null)}>关闭</button>
+              <button className="btn sm ghost" onClick={() => { setImportRows(null); setImportError(null); }}>关闭</button>
             </div>
 
+            {importError && <div className="msg error">{importError}</div>}
             {importDup.length > 0 && (
               <div className="msg error">
                 有 {importDup.length} 个 ID 重复（同 ID 出现多次），就地把 ID 改掉或删掉多余行即可：{' '}

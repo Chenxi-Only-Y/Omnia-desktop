@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { MatchSummary } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -20,6 +21,8 @@ export default function MatchPage({ classes, classMap }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
@@ -103,8 +106,8 @@ export default function MatchPage({ classes, classMap }: Props) {
 
   return (
     <>
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="stat-grid" style={{ marginBottom: 12 }}>
         <div className="stat"><div className="k">对局总数</div><div className="v">{stats.total}</div></div>

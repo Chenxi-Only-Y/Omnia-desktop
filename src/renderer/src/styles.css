@@ -284,6 +284,38 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 .msg.ok { background: var(--ok-soft); border: 1px solid var(--ok); color: var(--ok); }
 .msg.warn { background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn); }
 
+/* ── 浮动小提示（页面级瞬时提示）─────────────────────────────
+   用户口径：这些提示"不要"，但报错不能丢。所以不再用占版面的横幅，
+   改成浮在角落、成功类 2.5 秒自动消失（由 useToastAutoClear 清 state）。
+   弹窗里的 .msg 属于就地提示（关键报错挤进原地），不加 msg--toast，保持原样。 */
+.msg--toast {
+  position: fixed; z-index: 80;
+  margin: 0;
+  max-width: min(560px, 46vw);
+  box-shadow: var(--shadow-lift);
+  animation: msg-toast-in .16s ease-out;
+  /* 不挡鼠标：提示只是提示 */
+  pointer-events: none;
+}
+/* 成功/普通提示：右下角 */
+.msg--toast.ok {
+  right: 20px; bottom: 20px;
+}
+/* 报错：顶部居中，比成功提示更显眼，也避免与右下角的成功提示叠在一起。
+   报错**不自动消失**，必须由下一次操作替换。 */
+.msg--toast.error {
+  top: 62px; left: 50%; transform: translateX(-50%);
+  max-width: min(760px, 80vw);
+}
+@keyframes msg-toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.msg--toast.error { animation: none; }   /* 报错不做位移，translateX 会被动画覆盖 */
+@media (prefers-reduced-motion: reduce) {
+  .msg--toast { animation: none; }
+}
+
 .placeholder {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: 320px; color: var(--text-faint); text-align: center; gap: 8px;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useToastAutoClear } from '../lib/useToast';
 import type { MatchSummary, ParticipationRow, SignupRow, SquadCatalog } from '@shared/types';
 import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
@@ -32,6 +33,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
+  useToastAutoClear(notice, setNotice);
   const [loading, setLoading] = useState(true);
 
   const loadMatches = useCallback(async () => {
@@ -169,8 +172,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   return (
     // page-fill：让排表看板那张卡撑满内容区高度（否则会缩在上半部分）
     <div className="page-fill">
-      {error && <div className="msg error">{error}</div>}
-      {notice && <div className="msg ok">{notice}</div>}
+      {error && <div className="msg msg--toast error">{error}</div>}
+      {notice && <div className="msg msg--toast ok">{notice}</div>}
 
       <div className="card">
         <div className="toolbar" style={{ marginBottom: 0 }}>

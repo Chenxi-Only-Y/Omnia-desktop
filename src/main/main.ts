@@ -1694,10 +1694,24 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('看板实测=' + Math.round(board.width) + 'x' + Math.round(board.height)
           + ' 内容区=' + sc.scrollWidth + 'x' + sc.scrollHeight
           + ' 可视=' + sc.clientWidth + 'x' + sc.clientHeight);
+        // 提示现在是浮动 toast 且 2.5 秒自动消失 —— 等 14 秒后再读 .msg 必然是空的
+        // （改版后本探针就是这么挂的）。用 MutationObserver 把出现过的提示都记下来。
+        // 注意：这里是纯 JS 字符串（executeJavaScript），不能写 TS 语法，
+        // 也不能在注释里用反引号 —— 反引号会终止外层的模板字符串。
+        window.__seenMsgs = [];
+        const seen = window.__seenMsgs;
+        const mo = new MutationObserver(() => {
+          for (const el of document.querySelectorAll('.msg')) {
+            const t = el.textContent.trim();
+            if (t && !seen.includes(t)) seen.push(t);
+          }
+        });
+        mo.observe(document.body, { childList: true, subtree: true, characterData: true });
         btn.click();   // 与用户点按钮完全一致
         // 等拼图 + 落盘（分块截图需要若干轮滚动）
         await new Promise(r => setTimeout(r, 14000));   // 三块截图 + 拼合 + 落盘需要更久
-        const msgs = [...document.querySelectorAll('.msg')].map(x => x.textContent.trim());
+        mo.disconnect();
+        const msgs = seen.slice();
         // 找出**真正**在滚动的是哪个元素（不要再猜容器）
         const scrollers = [...document.querySelectorAll('*')]
           .filter(el => el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 2)

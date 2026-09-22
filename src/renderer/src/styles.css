@@ -335,6 +335,21 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 /* ── 表单字段（标签在上，控件在下） ─────────────────────────── */
 .field { display: inline-flex; flex-direction: column; gap: 3px; }
 .field > span { color: var(--text-faint); font-size: 11px; }
+/* 带标签字段里的控件统一 30px 高。
+   原来 input / select / type=date 各按自己的字体度量撑开：
+   实测同一行里高度是 30 / 28 / 29.33 三种，顶边和底边各差 1px ——
+   于是"标签行对不齐、控件参差"（用户反馈「很多都没对准」）。 */
+.field > .input,
+.field > .select,
+/* 裸控件（没包 .field 的工具栏输入框/下拉）同样统一 —— 实测
+   ID输入 28 / 下拉 29.33 / date 30，底边差 1px，看着就是没对齐 */
+.toolbar > .input,
+.toolbar > .select {
+  height: 30px;
+  box-sizing: border-box;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 /* 一行里全是 .field（带小标签的字段）时：顶边对齐、按钮与输入框底线齐平。
    否则带标签的字段比裸控件高一截，看着就是"没对齐"。 */
 .toolbar--fields { align-items: flex-end; }

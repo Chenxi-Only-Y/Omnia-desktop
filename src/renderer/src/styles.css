@@ -644,10 +644,8 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
    和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
 .hero-cover.home-cover {
   /* 白底降为叠层（约 88% 不透明）→ 壁纸透得出来，但仍读作「白底」 */
-  background-color: rgba(255, 255, 255, .78);
-  background-image: var(--wallpaper-image, none);
-  background-size: cover; background-position: center;
-  background-repeat: no-repeat; background-attachment: fixed;
+  /* 用户口径：首页下滑区**纯白**（不透壁纸） */
+  background: #FFFFFF;
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F4F4F6;
@@ -1376,3 +1374,37 @@ table.grid--sheet th.rownum, table.grid--sheet td.rownum {
 }
 table.grid--sheet tr.sheet-row--before td { background: var(--surface-3); color: var(--text-faint); }
 table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3); }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   半透明磨砂（用户口径）：
+     · 首页下滑区 = 纯白（上面已设）
+     · 其他页（除排表功能区）= 卡片半透明磨砂 + 侧边导航/顶栏同样磨砂
+     · 排表功能区挂 .theme-light → 显式还原成不透明浅色，保持原样
+   ═══════════════════════════════════════════════════════════════ */
+.card, .stat, .home-card, .roster-card, .picker-item, .modal,
+.roster-cards__head, .board {
+  background-color: rgba(19, 19, 23, .52) !important;
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  border-color: rgba(255, 255, 255, .10);
+}
+.sidebar, .topbar {
+  background: rgba(11, 11, 13, .55) !important;
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  border-color: rgba(255, 255, 255, .08);
+}
+/* 首页下滑区是纯白底：卡片在那上面不要磨砂，用不透明白 + 描边 */
+.hero-cover.home-cover .card, .hero-cover.home-cover .stat, .hero-cover.home-cover .home-card {
+  background-color: #FFFFFF !important;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  border: 1px solid var(--line);
+}
+/* 排表功能区（.theme-light）显式还原：不透明浅色、不磨砂 —— 用户要求不做改动 */
+.theme-light .card, .theme-light .stat, .theme-light .roster-card,
+.theme-light .picker-item, .theme-light .modal, .theme-light .board,
+.theme-light .roster-cards__head {
+  background-color: var(--surface) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}

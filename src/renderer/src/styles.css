@@ -1707,7 +1707,11 @@ table.grid img, .roster-card img, .stat img, .card img,
    那会把悬停时的悬浮投影一起干掉（上一版就是被它压住的）。
    只清 outline，投影交给 :hover 规则自己决定。 */
 .picker-group .chip:focus, .chip.class:focus { outline: none !important; }
+/* 注意：**不要**在这里把悬停位移关掉。
+   实测发现：本机 Windows 开了「减少动画」→ 这段媒体查询生效 →
+   悬停的 translateY 被抹成 none，而 box-shadow 不在这条里所以照常生效，
+   表现为「有投影、不上移」。用户明确要这个位移，故此处不抑制；
+   只把过渡时间压到几乎瞬时，避免"动画"本身带来的不适。 */
 @media (prefers-reduced-motion: reduce) {
-  .picker-group .chip:hover, .chip.class:hover,
-  .picker-group .chip:active, .chip.class:active { transform: none; }
+  .picker-group .chip, .chip.class { transition-duration: .01s; }
 }

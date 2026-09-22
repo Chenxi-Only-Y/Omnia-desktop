@@ -218,6 +218,11 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .input::placeholder { color: var(--text-faint); }
 
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+/* 工具栏里有「标签+控件」字段块时，一律**底对齐**：
+   字段块 50px 高（标签 20 + 控件 30），而按钮 30px 高，居中会让按钮
+   比输入框高出 10px（实测 块顶198/控件顶218/按钮顶208）。底对齐后
+   按钮与输入框底边齐平（都落在 248）。 */
+.toolbar:has(.field) { align-items: flex-end; }
 .toolbar .grow { flex: 1; }
 
 /* ── 卡片 / 表格 ──────────────────────────────────────────── */

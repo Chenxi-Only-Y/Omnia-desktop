@@ -20,6 +20,7 @@ declare global {
         import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number; errors: string[] }>>;
         export(): Promise<IpcResult<PlayerInput[]>>;
         reorder(playerIds: number[]): Promise<IpcResult<true>>;
+        listWallpapers(dir?: string): Promise<IpcResult<WallpaperItem[]>>;
         detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
       };
       meta: {

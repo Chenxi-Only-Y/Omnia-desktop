@@ -83,6 +83,77 @@ export function registerIpc(ctx: IpcContext): void {
     if (!players.remove(id)) throw new Error(`成员不存在：id=${id}`);
     return true as const;
   }));
+  // 壁纸库：扫描用户在设置页填入的地址（静态图 + 动态视频都收）
+  ipcMain.handle(IPC.metaListWallpapers, safe((dir?: string) => {
+    const fsp = require('node:fs') as typeof import('node:fs');
+    const pth = require('node:path') as typeof import('node:path');
+    const IMG = new Set(['.jpg', '.jpeg', '.png', '.bmp', '.webp', '.gif']);
+    const VID = new Set(['.mp4', '.webm', '.mov', '.mkv']);
+    const roots = [String(dir ?? '')].filter(Boolean);
+    // 默认壁纸库 = Wallpaper Engine 创意工坊（Steam AppID 431960）。
+    // 没有就退回系统目录，再没有就空 —— 让用户在设置页填地址。
+    const WE = ['C:\\Program Files (x86)\\Steam\\steamapps\\workshop\\content\\431960',
+      'C:\\Program Files\\Steam\\steamapps\\workshop\\content\\431960'];
+    for (const w of WE) { try { if (fsp.statSync(w).isDirectory()) { roots.push(w); break; } } catch { /* 没装 WE */ } }
+    if (!roots.length) {
+      roots.push(
+        'C:\\Windows\\Web\\Wallpaper',
+        pth.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Themes'),
+        pth.join(app.getPath('pictures'), 'Wallpapers'),
+        app.getPath('pictures'),
+        pth.join(app.getPath('videos'), 'Wallpapers'),
+      );
+    }
+    type Wall = { name: string; file: string; kind: 'image' | 'video'; ext: string };
+    const out: Wall[] = [];
+    const seen = new Set<string>();
+    const walk = (d: string, depth: number) => {
+      if (depth > 4 || out.length >= 3000) return;
+      let ents: import('node:fs').Dirent[];
+      try { ents = fsp.readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        const fp = pth.join(d, e.name);
+        if (e.isDirectory()) {
+          // Wallpaper Engine 创意工坊作品：目录里有 project.json，挑一个可用文件
+          // （视频型用 .mp4/.webm；其余用图或 preview.jpg/gif 作静态兜底）
+          const pj = pth.join(fp, 'project.json');
+          if (fsp.existsSync(pj)) {
+            let title = e.name;
+            try { const t = JSON.parse(fsp.readFileSync(pj, 'utf8')); if (t && t.title) title = String(t.title); } catch { /* 坏 json 用目录名 */ }
+            let best: Wall | null = null;
+            let img: Wall | null = null;
+            let prev: Wall | null = null;
+            try {
+              for (const m of fsp.readdirSync(fp, { withFileTypes: true })) {
+                if (!m.isFile()) continue;
+                const ext = pth.extname(m.name).toLowerCase();
+                const full = pth.join(fp, m.name);
+                const item: Wall = { name: title, file: full, kind: VID.has(ext) ? 'video' : 'image', ext: ext.slice(1) };
+                if (VID.has(ext)) { if (!best) best = item; }
+                else if (IMG.has(ext)) {
+                  if (/^preview/i.test(m.name)) { if (!prev) prev = item; }
+                  else if (!img) img = item;
+                }
+              }
+            } catch { /* 读不了就跳过 */ }
+            const pick = best ?? img ?? prev;
+            if (pick) out.push(pick);
+            continue;
+          }
+          walk(fp, depth + 1); continue;
+        }
+        const ext = pth.extname(e.name).toLowerCase();
+        const kind = IMG.has(ext) ? 'image' : VID.has(ext) ? 'video' : null;
+        if (!kind || seen.has(fp)) continue;
+        seen.add(fp);
+        out.push({ name: e.name.replace(/\.[^.]+$/, ''), file: fp, kind, ext: ext.slice(1) });
+      }
+    };
+    for (const r of roots) walk(r, 0);
+    // 动态排前面、其次静态，同组按名排（给设置页一个稳定顺序）
+    out.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'video' ? -1 : 1));
+    return out;
+  }));
   ipcMain.handle(IPC.playerImport, safe((rows: PlayerInput[]) => players.importMany(rows)));
   // 拖拽换位后整批写回「序」
   ipcMain.handle(IPC.playerReorder, safe((playerIds: number[]) => {

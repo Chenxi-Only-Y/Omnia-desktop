@@ -1,0 +1,70 @@
+import { api } from '../api';
+
+/**
+ * 全局壁纸层：body 下挂一个 position:fixed 的容器（.home-wallpaper），
+ * 静态图走容器背景，动态视频用里面的 <video>。
+ *
+ * 「切页/下滑不重置」两条保障：
+ *  1) 容器挂在 body 上、position:fixed → 永远在可视区、不随滚动移动；
+ *  2) <video> 节点**只创建一次**、之后只改 src 不重建 → currentTime 连续。
+ */
+let installed = false;
+let host: HTMLDivElement | null = null;
+let video: HTMLVideoElement | null = null;
+let lastTime = 0;
+let current = '';
+
+function apply(kind: string, file: string) {
+  if (!host) return;
+  const next = kind + '|' + file;
+  if (next === current) return;          // 同一张：什么都不动，绝不打断播放
+  const url = file ? 'file:///' + file.replace(/\\\\/g, '/') : '';
+  if (kind === 'video' && url) {
+    // 记住当前播放进度，换源后接着播（保证「不重置」）
+    const t = video && video.src === url ? video.currentTime : lastTime;
+    if (!video) {
+      video = document.createElement('video');
+      video.muted = true; video.loop = true; video.autoplay = true; video.playsInline = true;
+      host.appendChild(video);
+    }
+    video.style.display = '';
+    if (video.src !== url) {
+      video.onloadedmetadata = () => { try { video!.currentTime = t; void video!.play(); } catch { /* 自动播放策略 */ } };
+      video.src = url;
+    } else if (video.paused) { void video.play().catch(() => {}); }
+  } else if (video) {
+    lastTime = video.currentTime;      // 记住进度，之后切回来还接着放
+    video.pause();
+    video.style.display = 'none';
+  }
+  host.style.setProperty('--wall', url ? `url("${url}")` : 'none');
+  host.classList.toggle('home-wallpaper--on', !!url);
+  current = next;
+}
+
+export function installWallpaper(): void {
+  if (installed) return;
+  installed = true;
+  const boot = () => {
+    host = document.createElement('div');
+    host.className = 'home-wallpaper';
+    document.body.appendChild(host);
+    video = document.createElement('video');
+    video.muted = true; video.loop = true; video.autoplay = true; video.playsInline = true;
+    video.style.display = 'none';
+    host.appendChild(video);
+    void api.meta.settings().then((s) => {
+      apply((s as Record<string, unknown>).wallpaperKind === 'video' ? 'video' : 'image',
+        String((s as Record<string, unknown>).wallpaperImage ?? ''));
+    }).catch(() => { /* 没设置就用默认渐变 */ });
+  };
+  if (document.body) boot();
+  else document.addEventListener('DOMContentLoaded', boot, { once: true });
+  // 设置页改壁纸后广播过来（同一个 video 节点只换 src）
+  window.addEventListener('omnia:wallpaper', (e) => {
+    const d = (e as CustomEvent<{ kind: string; file: string }>).detail;
+    if (d) apply(d.kind, d.file);
+  });
+}
+
+installWallpaper();

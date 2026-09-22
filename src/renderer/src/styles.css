@@ -84,6 +84,39 @@
 
 * { box-sizing: border-box; }
 
+/* ═══════════════════════════════════════════════════════════════
+   全页面壁纸（用户口径：非卡片区域都是壁纸）
+   —— 壁纸铺在最底层、固定不动；卡片保持不透明浮在上面；
+      侧栏/顶栏/内容区一律透明，露出壁纸。
+   壁纸可被 --wallpaper-image 换成真图（dataURL / file:// URL）：
+     :root { --wallpaper-image: url("..."); }
+   未设置时用默认的深色电影感渐变当壁纸。
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --wallpaper-image: none;
+  --wallpaper-fallback:
+    radial-gradient(1200px 800px at 82% -12%, rgba(110, 123, 255, .30), transparent 62%),
+    radial-gradient(900px 720px at 2% 108%,  rgba(192, 132, 252, .24), transparent 62%),
+    radial-gradient(700px 520px at 56% 122%, rgba(34, 211, 238, .18), transparent 60%),
+    linear-gradient(178deg, #0B0B0D 0%, #15151B 52%, #0B0B0D 100%);
+}
+html { background: var(--bg); }
+body {
+  background: var(--wallpaper-image), var(--wallpaper-fallback);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat;
+  background-attachment: fixed, fixed;
+}
+/* 壳与内容区透明 → 露出壁纸 */
+.app, .main, .content, .topbar, .sidebar { background: transparent; }
+/* 卡片仍是不透明面，浮在壁纸上（保持可读） */
+.card, .stat, .modal, .msg, .roster-card, .home-card, .picker-item,
+.roster-cards__head, .board, .field .input, .field .select,
+.toolbar > .input, .toolbar > .select {
+  background-color: var(--surface);
+}
+
 html, body, #root { height: 100%; margin: 0; }
 
 body {
@@ -458,13 +491,69 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   display: grid; gap: 18px; margin-top: 32px;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
+.home-wallpaper {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: var(--wall, none);
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+}
+.home-wallpaper video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+.wall-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+}
+.wall-item {
+  position: relative; aspect-ratio: 16 / 9; padding: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); cursor: pointer;
+}
+.wall-item img, .wall-item video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.wall-item--on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wall-item__tag {
+  position: absolute; left: 6px; top: 6px; font-size: 10px; letter-spacing: .04em;
+  background: rgba(0, 0, 0, .55); color: #fff; border-radius: 999px; padding: 2px 7px;
+}
+
 .home-scroll {
   position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   color: var(--text-faint); font-size: 12px; letter-spacing: .12em;
   animation: home-breathe 3.2s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce) { .home-scroll { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .home-wallpaper {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: var(--wall, none);
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+}
+.home-wallpaper video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover;
+}
+
+.wall-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+}
+.wall-item {
+  position: relative; aspect-ratio: 16 / 9; padding: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-2); cursor: pointer;
+}
+.wall-item img, .wall-item video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.wall-item--on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wall-item__tag {
+  position: absolute; left: 6px; top: 6px; font-size: 10px; letter-spacing: .04em;
+  background: rgba(0, 0, 0, .55); color: #fff; border-radius: 999px; padding: 2px 7px;
+}
+
+.home-scroll { animation: none; } }
 
 /* ── 排表页功能区保持原样（用户口径：不做任何改动）——
    全局已切到深色，这里把令牌换回原来的浅色，让排表看板原封不动。 */
@@ -946,6 +1035,9 @@ tr.row--leave > td { background: var(--surface-3); }
 
 .pcard__id:hover { text-decoration: underline; }
 .pcard__cls:hover { text-decoration: underline; }
+.pcard__cls {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 15px; line-height: 1.2; opacity: .92; cursor: pointer;
   overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .pcard__cls:hover { text-decoration: underline; }

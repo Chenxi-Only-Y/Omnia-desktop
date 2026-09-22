@@ -613,6 +613,16 @@ export interface DashboardData {
 }
 
 // ── IPC 契约 ─────────────────────────────────────────────────────
+/** 壁纸库里的一个壁纸（静态图或动态视频） */
+export interface WallpaperItem {
+  name: string;
+  /** 绝对路径 */
+  file: string;
+  /** image = 静态；video = 动态 */
+  kind: 'image' | 'video';
+  ext: string;
+}
+
 export interface AppInfo {
   version: string;
   electron: string;
@@ -768,6 +778,7 @@ export const IPC = {
   playerImport: 'player:import',
   /** 按给定顺序重排成员（拖拽换位后调用），写回「序」 */
   playerReorder: 'player:reorder',
+  metaListWallpapers: 'meta:list-wallpapers',
   playerExport: 'player:export',
   playerDetail: 'player:detail',
   metaClasses: 'meta:classes',

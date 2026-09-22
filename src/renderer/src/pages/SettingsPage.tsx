@@ -15,6 +15,25 @@ export default function SettingsPage({ info }: Props) {
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // 壁纸库：地址由用户填入 → 扫描 → 缩略图选（静态/动态都可）
+  // 默认壁纸库 = Wallpaper Engine 创意工坊；没有就让用户填
+  const [wallPath, setWallPath] = useState('C:\\Program Files (x86)\\Steam\\steamapps\\workshop\\content\\431960');
+  const [wallList, setWallList] = useState<import('@shared/types').WallpaperItem[]>([]);
+  const [wallErr, setWallErr] = useState<string | null>(null);
+  const [wallCur, setWallCur] = useState('');
+  async function scanWall(): Promise<void> {
+    try {
+      const list = await api.player.listWallpapers(wallPath.trim() || undefined);
+      setWallList(list);
+      setWallErr(list.length ? null : '没扫到壁纸（换个目录再试）');
+    } catch (err) { setWallErr(String(err)); }
+  }
+  async function useWall(w: import('@shared/types').WallpaperItem): Promise<void> {
+    await api.meta.setSetting('wallpaperImage', w.file);
+    await api.meta.setSetting('wallpaperKind', w.kind);
+    window.dispatchEvent(new CustomEvent('omnia:wallpaper', { detail: { kind: w.kind, file: w.file } }));
+    setWallCur(w.file);
+  }
   // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
   useToastAutoClear(notice, setNotice);
   const [newGroup, setNewGroup] = useState({ name: '', kind: 'attack' as 'attack' | 'defend' });
@@ -188,6 +207,34 @@ export default function SettingsPage({ info }: Props) {
           </table>
         </div>
         
+      </div>
+
+      <div className="card">
+        <h3>壁纸</h3>
+        <div className="toolbar toolbar--fields" style={{ marginBottom: 10 }}>
+          <label className="field"><span>壁纸库地址</span>
+            <input className="input" style={{ width: 340 }} placeholder="例如 D:\\我的壁纸库"
+                   value={wallPath} onChange={(e) => setWallPath(e.target.value)} />
+          </label>
+          <button className="btn" onClick={() => void scanWall()}>扫描</button>
+        </div>
+        {wallErr && <div className="msg error">{wallErr}</div>}
+        <div className="wall-grid">
+          {wallList.map((w) => (
+            <button key={w.file}
+              className={'wall-item' + (wallCur === w.file ? ' wall-item--on' : '')}
+              title={w.name + '（' + (w.kind === 'video' ? '动态' : '静态') + '）'}
+              onClick={() => void useWall(w)}>
+              {w.kind === 'video'
+                ? <video src={'file:///' + w.file.replace(/\\/g, '/')} muted loop playsInline preload="metadata" />
+                : <img src={'file:///' + w.file.replace(/\\/g, '/')} alt="" loading="lazy" />}
+              <span className="wall-item__tag">{w.kind === 'video' ? '动态' : '静态'}</span>
+            </button>
+          ))}
+          {!wallList.length && !wallErr && (
+            <div className="hint">默认找 Wallpaper Engine 创意工坊（431960）。没找到就把自己存壁纸的文件夹填到上面，点「扫描」。</div>
+          )}
+        </div>
       </div>
 
       <div className="card">

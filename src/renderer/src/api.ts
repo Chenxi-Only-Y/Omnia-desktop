@@ -206,6 +206,7 @@ export const api = {
     export: (): Promise<PlayerInput[]> => unwrap(bridge().player.export()),
     /** 拖拽换位后整批写回「序」 */
     reorder: (playerIds: number[]): Promise<true> => unwrap(bridge().player.reorder(playerIds)),
+    listWallpapers: (dir?: string): Promise<import('@shared/types').WallpaperItem[]> => unwrap(bridge().player.listWallpapers(dir)),
     detail: (playerId: number): Promise<PlayerDetail> => unwrap(bridge().player.detail(playerId)),
   },
 

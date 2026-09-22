@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { AppInfo, ClassInfo } from '@shared/types';
 import { api, ApiError } from './api';
+// 挂全局壁纸层（body 下的 fixed 容器，切页/滚动都不动）
+import './lib/wallpaper';
 import RosterPage from './pages/RosterPage';
 import OverviewPage from './pages/OverviewPage';
 import MatchPage from './pages/MatchPage';

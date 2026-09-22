@@ -1537,16 +1537,18 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
    其他页没有这层蒙层，所以本来就一致。
    这里让首页顶栏套**同一串渐变**，两边接上就没有缝了。
    ═══════════════════════════════════════════════════════════════ */
+/* 只保留**横向线性渐变**这一层，并且附件方式与首屏一致（scroll）。
+   之前多带了一个径向渐变、还用 fixed 定位 —— 它按视口算，
+   与首屏里按元素算的那层对不上，接缝处就出现一条分割线。 */
 .topbar--home {
-  background:
-    radial-gradient(900px 460px at 88% 0%, rgba(110, 123, 255, .10), transparent 62%),
-    linear-gradient(90deg,
+  background: linear-gradient(90deg,
       rgba(11, 11, 13, .90) 0%,
       rgba(11, 11, 13, .72) 30%,
       rgba(11, 11, 13, .34) 52%,
       rgba(11, 11, 13, .12) 72%,
       rgba(11, 11, 13, .40) 100%) !important;
-  background-attachment: fixed, fixed !important;
-  background-size: cover, cover !important;
-  background-position: center, center !important;
+  background-attachment: scroll !important;
+  background-size: auto !important;
+  background-position: 0 0 !important;
+  background-repeat: no-repeat !important;
 }

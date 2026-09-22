@@ -67,7 +67,7 @@ function apply(kind: string, file: string) {
   document.documentElement.style.setProperty('--wallpaper-image',
     !isVideo && url ? `url("${url}")` : 'none');
   // 加载自检：file:// 受限或文件不在时，把原因送出去（不再静默）
-  if (url) {
+  if (url && !isVideo) {
     const probe = new Image();
     probe.onerror = () => {
       // 清掉内联写法即可 —— CSS 的 .home-wallpaper 上还有一层渐变兜底，不会纯黑
@@ -80,6 +80,23 @@ function apply(kind: string, file: string) {
       }));
     };
     probe.src = url;
+  }
+  if (url && isVideo) {
+    // 视频用 <video> 探测：能读到 duration 就算加载成功（<img> 加载 mp4 必然失败）
+    const vprobe = document.createElement('video');
+    vprobe.preload = 'metadata';
+    vprobe.onloadedmetadata = () => {
+      window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+        detail: '动态壁纸已就绪：' + url.split('/').pop(),
+      }));
+    };
+    vprobe.onerror = () => {
+      for (const t of [document.documentElement, document.body]) t.style.removeProperty('background-image');
+      window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+        detail: '视频加载失败（编解码或文件不存在）：' + url,
+      }));
+    };
+    vprobe.src = url;
   }
   current = next;
 }

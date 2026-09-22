@@ -1537,18 +1537,23 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
    其他页没有这层蒙层，所以本来就一致。
    这里让首页顶栏套**同一串渐变**，两边接上就没有缝了。
    ═══════════════════════════════════════════════════════════════ */
-/* 只保留**横向线性渐变**这一层，并且附件方式与首屏一致（scroll）。
-   之前多带了一个径向渐变、还用 fixed 定位 —— 它按视口算，
-   与首屏里按元素算的那层对不上，接缝处就出现一条分割线。 */
+/* 首屏那层是**渐变**（横向明暗 + 右上角径向光晕），导航栏必须与它对上同一个渐变，
+   否则一眼就是两截。关键是径向光晕的**圆心位置**：
+   首屏里圆心在 .home-hero 的「88% 0%」（即首屏上缘）；
+   导航栏紧贴在它上方，所以圆心要放在导航栏的「88% 46px」（= 导航栏下缘 = 首屏上缘）。
+   这样上半圆在导航栏、下半圆在首屏，拼起来才是一个完整的晕，接缝处没有突变。
+   横向线性渐变两侧本来就一致（同一个 0→100% 区间），附件方式对齐 scroll 即可。 */
 .topbar--home {
-  background: linear-gradient(90deg,
+  background:
+    radial-gradient(900px 460px at 88% 46px, rgba(110, 123, 255, .10), transparent 62%),
+    linear-gradient(90deg,
       rgba(11, 11, 13, .90) 0%,
       rgba(11, 11, 13, .72) 30%,
       rgba(11, 11, 13, .34) 52%,
       rgba(11, 11, 13, .12) 72%,
       rgba(11, 11, 13, .40) 100%) !important;
-  background-attachment: scroll !important;
-  background-size: auto !important;
-  background-position: 0 0 !important;
-  background-repeat: no-repeat !important;
+  background-attachment: scroll, scroll !important;
+  background-size: auto, auto !important;
+  background-position: 0 0, 0 0 !important;
+  background-repeat: no-repeat, no-repeat !important;
 }

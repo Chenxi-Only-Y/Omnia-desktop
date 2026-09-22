@@ -409,15 +409,17 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
       rgba(11, 11, 13, .72) 30%,
       rgba(11, 11, 13, .34) 52%,
       rgba(11, 11, 13, .12) 72%,
-      rgba(11, 11, 13, .40) 100%),
-    var(--wallpaper-image, none);
+      rgba(11, 11, 13, .40) 100%);
+  /* 这里**不能**再放 var(--wallpaper-image)：那是静态 preview 图，会画在
+     z-index:-1 的视频层之上，把正在播放的视频盖成一张静态图（自己截图看到的）。
+     静态壁纸由 apply() 写到 html/body/.app/.content 上，照样透得出来。 */
   /* 注意：这里**不能**再铺 var(--wallpaper-fallback) —— 那是不透明的深色渐变，
      会把 z-index:-1 的壁纸层（含正在播放的视频）整个挡死（自己截图确认过）。
      没有壁纸时由 html/body 的 --bg 兜底。 */
-  background-size: auto, auto, cover;
-  background-position: center, center, center;
-  background-repeat: no-repeat, no-repeat, no-repeat;
-  background-attachment: scroll, scroll, fixed;
+  background-size: auto, auto;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: scroll, scroll;
 }
 /* 柔光呼吸（极缓，克制；减少动效偏好时关闭） */
 .hero.home-hero::after {

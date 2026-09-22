@@ -36,6 +36,10 @@ function apply(kind: string, file: string) {
       host.appendChild(video);
     }
     video.style.display = '';
+    // 换源/转码后 play() 有时不生效（实测 paused:true、只出 4 帧）——
+    // 挂上 canplay/loadeddata 双保险，并在可见性变化时补一次 play。
+    video.oncanplay = () => { void video!.play().catch(() => {}); };
+    video.onloadeddata = () => { void video!.play().catch(() => {}); };
     if (video.src !== url) {
       video.onloadedmetadata = () => { try { video!.currentTime = t; void video!.play(); } catch { /* 自动播放策略 */ } };
       // 解码自检：能读元数据 ≠ 能解画面（HEVC 读得到 metadata 但解不出帧）。

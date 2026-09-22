@@ -1966,3 +1966,19 @@ table.grid img, .roster-card img, .stat img, .card img,
 }
 /* 外层若同时带 .input/.select，其伪元素与指示器也一并清掉 */
 .sel.input::before, .sel.select::before, .dp.input::before { display: none !important; }
+
+/* ═══ 弹层提高白度（用户口径：别太透明了，白点）════════════════
+   原来 .80 的白太透，底下的表格/卡片内容会透上来，读起来费劲。
+   三个弹层统一提到 .95 左右，保留一点磨砂感但内容不再透上来。
+   ═══════════════════════════════════════════════════════════════ */
+.dp__pop {
+  background: rgba(255, 255, 255, .95) !important;
+  border-color: rgba(11, 11, 13, .10) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .30) !important;
+}
+.sel[open] .sel__list {
+  background: rgba(255, 255, 255, .95) !important;
+  border-color: rgba(11, 11, 13, .10) !important;
+}
+.sel[open] > .sel__btn { background: rgba(255, 255, 255, .95) !important; }
+.cfm__box { background: rgba(255, 255, 255, .95) !important; }

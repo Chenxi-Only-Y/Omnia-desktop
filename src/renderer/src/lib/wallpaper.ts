@@ -38,6 +38,22 @@ function apply(kind: string, file: string) {
     video.style.display = '';
     if (video.src !== url) {
       video.onloadedmetadata = () => { try { video!.currentTime = t; void video!.play(); } catch { /* 自动播放策略 */ } };
+      // 解码自检：能读元数据 ≠ 能解画面（HEVC 读得到 metadata 但解不出帧）。
+      // 解不出来就把 <video> 藏掉，露出下面的 preview 动图 —— 否则黑画面会盖住预览。
+      video.onloadeddata = () => {
+        if (!video!.videoWidth) {
+          video!.style.display = 'none';
+          window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+            detail: '该视频本机解不了码（多半是 HEVC/H.265），已改用预览动图：' + url.split('/').pop(),
+          }));
+        }
+      };
+      video.onerror = () => {
+        video!.style.display = 'none';
+        window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+          detail: '视频加载失败，已改用预览动图：' + url.split('/').pop(),
+        }));
+      };
       video.src = url;
     } else if (video.paused) { void video.play().catch(() => {}); }
   } else if (video) {

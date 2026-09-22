@@ -6,6 +6,7 @@ import type { PageProps } from '../App';
 import ImportWizard from '../components/ImportWizard';
 import { parseTableText, toCsv } from '../lib/importer';
 import Select from '../components/Select';
+import { confirmDialog } from '../components/Confirm';
 
 interface Props extends PageProps {
   onCount: (n: number) => void;
@@ -186,7 +187,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
    */
   async function fillOrder() {
     if (!sorted.length) return;
-    if (!window.confirm(`按当前显示顺序把 ${sorted.length} 人的「序」重写为 1…${sorted.length}？`)) return;
+    if (!await confirmDialog(`按当前显示顺序把 ${sorted.length} 人的「序」重写为 1…${sorted.length}？`)) return;
     try {
       await api.player.reorder(sorted.map((x) => x.id));
       setSortKey('order');
@@ -395,7 +396,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   }
 
   async function handleRemove(p: Player) {
-    if (!window.confirm(`确认删除成员「${p.gameId}」？`)) return;
+    if (!await confirmDialog(`确认删除成员「${p.gameId}」？`)) return;
     try {
       await api.player.remove(p.id);
       setError(null);

@@ -1885,3 +1885,66 @@ table.grid img, .roster-card img, .stat img, .card img,
   font-size: 13px !important;
 }
 .input[type="date"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+
+/* ═══ 自绘日期选择器（原生日历弹层无法改样式，故自写）══════════
+   用户口径：别太矩、带弧度、透明磨砂、选中只深一点点（不是蓝）
+   ═══════════════════════════════════════════════════════════════ */
+.dp { position: relative; display: inline-block; min-width: 0; }
+.dp__native { display: none; }
+.dp__btn {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  height: 30px; box-sizing: border-box; padding: 0 9px;
+  background: rgba(255,255,255,.80); color: #0B0B0D;
+  border: 1px solid rgba(11,11,13,.18); border-radius: 10px;
+  font: inherit; font-size: 13px; min-width: 0; width: 100%; text-align: left;
+}
+.dp__btn:hover { border-color: rgba(11,11,13,.28); }
+.dp__btn::after {
+  content: ""; margin-left: auto; flex: 0 0 auto; width: 8px; height: 5px;
+  background: currentColor; opacity: .5; clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.dp__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dp__pop {
+  position: absolute; z-index: 95; left: 0; top: calc(100% + 6px); width: 264px;
+  padding: 12px 12px 8px; border-radius: 16px;
+  background: rgba(255,255,255,.80);
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,.55);
+  box-shadow: 0 14px 34px rgba(0,0,0,.26);
+  color: #0B0B0D;
+}
+.dp__head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.dp__month { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
+.dp__sp { flex: 1; }
+.dp__nav { border: none; background: transparent; cursor: pointer; font-size: 15px;
+  color: #0B0B0D; padding: 2px 8px; border-radius: 8px; font-family: inherit; }
+.dp__nav:hover { background: rgba(11,11,13,.08); }
+.dp__wd { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px;
+  font-size: 11px; color: #7C7C88; text-align: center; }
+.dp__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dp__d { border: none; background: transparent; cursor: pointer; font-family: inherit;
+  font-size: 12px; color: #0B0B0D; padding: 6px 0; border-radius: 9px; }
+.dp__d:hover { background: rgba(11,11,13,.08); }
+.dp__d--out { color: rgba(11,11,13,.26); cursor: default; }
+.dp__d--out:hover { background: transparent; }
+.dp__d.today { box-shadow: inset 0 0 0 1px rgba(11,11,13,.22); }
+/* 选中：只深一点点，不用系统那套蓝 */
+.dp__d.on { background: rgba(11,11,13,.16); font-weight: 700; }
+.dp__foot { display: flex; justify-content: space-between; margin-top: 8px; }
+.dp__lnk { border: none; background: transparent; cursor: pointer; font-family: inherit;
+  color: #0B0B0D; font-size: 12px; padding: 3px 6px; border-radius: 8px; }
+.dp__lnk:hover { background: rgba(11,11,13,.08); }
+/* 展开时抬层级，免得被下面的卡片盖住 */
+.toolbar:has(.dp__pop), .field:has(.dp__pop), .card:has(.dp__pop) { position: relative; z-index: 75; }
+
+/* 自绘确认框（替代 window.confirm） */
+.cfm { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  background: rgba(0,0,0,.35); backdrop-filter: blur(2px); }
+.cfm__box { width: min(420px, 86vw); padding: 20px; border-radius: 16px;
+  background: rgba(255,255,255,.86); backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid rgba(255,255,255,.55); box-shadow: 0 18px 44px rgba(0,0,0,.34);
+  color: #0B0B0D; }
+.cfm__msg { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.cfm__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }

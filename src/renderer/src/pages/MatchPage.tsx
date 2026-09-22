@@ -6,6 +6,8 @@ import type { PageProps } from '../App';
 import { MATCH_RESULT_LABEL, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import MatchDetail from './MatchDetail';
 import Select from '../components/Select';
+import DatePicker from '../components/DatePicker';
+import { confirmDialog } from '../components/Confirm';
 
 interface Props extends PageProps {
   onCount?: (n: number) => void;
@@ -83,7 +85,7 @@ export default function MatchPage({ classes, classMap }: Props) {
   }
 
   async function handleRemove(m: MatchSummary) {
-    if (!window.confirm(`确认删除 ${m.date} 第 ${m.indexInDay} 场（${m.ourSide} vs ${m.oppSide}）？\n该场所有参战与战报会一并删除。`)) return;
+    if (!await confirmDialog(`确认删除 ${m.date} 第 ${m.indexInDay} 场（${m.ourSide} vs ${m.oppSide}）？\n该场所有参战与战报会一并删除。`)) return;
     try {
       await api.match.remove(m.id);
       if (selected === m.id) setSelected(null);
@@ -126,7 +128,7 @@ export default function MatchPage({ classes, classMap }: Props) {
         <div className="toolbar" style={{ marginBottom: 8 }}>
           <label className="field">
             <span>日期</span>
-            <input className="input" type="date" value={form.date}
+            <DatePicker className="input" value={form.date}
                    onChange={(e) => setForm({ ...form, date: e.target.value })} />
           </label>
           <label className="field">

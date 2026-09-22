@@ -12,6 +12,7 @@ import RulesPage from './pages/RulesPage';
 import SeasonsPage from './pages/SeasonsPage';
 import LineupPage from './pages/LineupPage';
 import SettingsPage from './pages/SettingsPage';
+import ConfirmHost from './components/Confirm';
 
 export interface PageProps {
   classes: ClassInfo[];
@@ -142,6 +143,7 @@ export default function App() {
           {page === 'settings' && <SettingsPage {...props} info={info} />}
         </section>
       </main>
+      <ConfirmHost />
     </div>
   );
 }

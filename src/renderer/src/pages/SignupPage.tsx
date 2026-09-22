@@ -9,6 +9,7 @@ import ClassChip from '../components/ClassChip';
 import { SIGNUP_LABEL } from '@shared/types';
 import { PART_STATE_LABEL } from '@shared/domain';
 import Select from '../components/Select';
+import { confirmDialog } from '../components/Confirm';
 
 interface Props extends PageProps {
   matchId: number;
@@ -84,7 +85,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
     if (!board) return;
     const pending = board.rows.filter((r) => r.status === 'active' && r.signup === null);
     if (!pending.length) { setNotice('没有未报名的在队成员'); return; }
-    if (!window.confirm(`把 ${pending.length} 名未报名的在队成员标为「参加」？`)) return;
+    if (!await confirmDialog(`把 ${pending.length} 名未报名的在队成员标为「参加」？`)) return;
     try {
       for (const r of pending) await api.signup.set({ matchId, playerId: r.playerId, status: 'JOIN' });
       setNotice(`已标记 ${pending.length} 人为参加`);
@@ -183,7 +184,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
   async function createMissing() {
     if (!review?.signedNotInRoster.length) return;
     const ids = review.signedNotInRoster.map((r) => r.gameId);
-    if (!window.confirm(`把 ${ids.length} 个 ID 补建为成员主档，并写入本场报名？`)) return;
+    if (!await confirmDialog(`把 ${ids.length} 个 ID 补建为成员主档，并写入本场报名？`)) return;
     setBusy(true);
     try {
       const res = await api.signup.createMissing(matchId, ids);
@@ -202,7 +203,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
     if (!board) return;
     const marked = board.rows.filter((r) => r.signup !== null).length;
     if (!marked) { setNotice('还没有任何报名记录'); return; }
-    if (!window.confirm(`按报名结果更新上场名单？\n参加 → 上场（保留已排小队）\n替补 → 替补\n请假 → 请假\n涉及 ${marked} 人。`)) return;
+    if (!await confirmDialog(`按报名结果更新上场名单？\n参加 → 上场（保留已排小队）\n替补 → 替补\n请假 → 请假\n涉及 ${marked} 人。`)) return;
     try {
       const res = await api.signup.apply(matchId, []);
       setNotice(`已按报名结果更新 ${res.applied} 人的上场状态`);

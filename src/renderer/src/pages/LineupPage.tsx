@@ -304,14 +304,17 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           classMap={classMap}
           onClose={() => setCellPick(null)}
           onAssign={async (playerId, targetSquad, subClass) => {
-            // 点的是第几格就放第几格 —— 不再总是挤到最左边
-            await assign([playerId], targetSquad, cellPick.slotIndex);
-            // 选了二职就同时把本场职业换成它
+            // 顺序很重要：**先设职业、再落位**。
+            // 原来反过来：先 assign 放进小队，再用 upsertParticipation 只带 classUsed
+            // 去改职业 —— 那是 ON CONFLICT DO UPDATE，没传的 squad 会被写成空串，
+            // 等于刚放进去的人又被踢出小队，卡片就成了空白（没文字没职业）。
             if (subClass && matchId !== null) {
               await run(() => api.match.upsertParticipation({
                 matchId, playerId, classUsed: subClass,
               }));
             }
+            // 点的是第几格就放第几格 —— 不再总是挤到最左边
+            await assign([playerId], targetSquad, cellPick.slotIndex);
             setCellPick(null);
           }}
         />

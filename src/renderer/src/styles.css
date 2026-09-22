@@ -1514,3 +1514,25 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
   color: #FFFFFF !important;
 }
 .tab.active { border-radius: 999px !important; }
+
+
+/* ═══ 排表：标题/小队名不再溢出容器（用户反馈文字超出被裁）══════
+   原因：这些是 flex 子项，默认 min-width:auto 不肯收缩，
+   小队名又是 nowrap → 直接顶出容器右侧；左侧标题同样被裁。
+   ═══════════════════════════════════════════════════════════════ */
+.board__head, .board__unassigned, .board__half, .board__group,
+.board__halves, .board__scroll {
+  min-width: 0;
+}
+.board__head, .board__unassigned {
+  flex-wrap: wrap; row-gap: 6px;
+}
+.board__stat, .board__unassigned-title, .board__chip,
+.board__calligraphy, .board [class*="name"], .board [class*="title"] {
+  min-width: 0; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 胶囊按钮在被压缩时也不许顶破容器 */
+.board__chip { display: inline-block; box-sizing: border-box; }
+/* 半区/分组内的行同样允许收缩换行 */
+.board__half > *, .board__group > *, .board__halves > * { min-width: 0; }

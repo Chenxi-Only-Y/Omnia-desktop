@@ -1697,12 +1697,13 @@ table.grid img, .roster-card img, .stat img, .card img,
 }
 /* 实测确认规则**已经命中**（transition 里就是这条），但 3px 肉眼看不出来 ——
    加大到 6px + 轻微放大，并把动效做成带弹性的上浮。 */
+/* 幅度（用户口径：-6px 太大）→ 收小到 -3px，缩放也降下来，投影同步减轻 */
 .picker-group .chip:hover, .chip.class:hover {
-  transform: translateY(-6px) scale(1.06);
+  transform: translateY(-3px) scale(1.02);
   background: transparent !important;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, .18);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .14);
 }
-.picker-group .chip:active, .chip.class:active { transform: translateY(-2px) scale(1.0); }
+.picker-group .chip:active, .chip.class:active { transform: translateY(-1px) scale(1.0); }
 /* 去掉外圈的底色加深与焦点框 —— 但**不能**在 :hover 上写 box-shadow: none !important，
    那会把悬停时的悬浮投影一起干掉（上一版就是被它压住的）。
    只清 outline，投影交给 :hover 规则自己决定。 */

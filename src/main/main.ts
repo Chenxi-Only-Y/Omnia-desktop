@@ -534,10 +534,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
             + '；当前内容区前 120 字=' + (document.querySelector('.content')?.textContent ?? '').slice(0, 120));
         };
 
-        // 点「进入」打开对局详情（若列表页直接带了进入按钮）
-        const enterBtn = [...document.querySelectorAll('table.grid button')]
-          .find(b => b.textContent.trim() === '进入');
-        if (enterBtn) enterBtn.click();
+        // 点「进入」打开对局详情。**必须等按钮出现再点**：列表是异步加载的，
+        // 只查一次会拿到 null → 卡在列表页（这个竞态原来被"自动选中第一场"掩盖着，
+        // 而那个自动选中已移除：它会让详情页的「返回列表」失效）。
+        const enterBtn = await waitFor(() => [...document.querySelectorAll('table.grid button')]
+          .find(b => b.textContent.trim() === '进入'), '列表里的「进入」按钮');
+        enterBtn.click();
 
         // 切到阵容编排页签
         await waitFor(() => document.querySelector('button.tab') ? true : null, '页签出现');

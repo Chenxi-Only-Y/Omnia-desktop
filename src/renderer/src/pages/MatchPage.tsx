@@ -40,13 +40,15 @@ export default function MatchPage({ classes, classMap }: Props) {
       const rows = await api.match.list();
       setList(rows);
       setError(null);
-      if (selected === null && rows.length) setSelected(rows[0].id);
+      // 这里**不能**再「没选中就自动选第一场」：那会让详情页的「返回列表」
+      // 刚 setSelected(null) 就又被自动选回去，表现为返回按钮完全无效。
+      // 创建对局后进入详情由 handleCreate 自己 setSelected 负责。
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, [selected]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 

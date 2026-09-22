@@ -241,6 +241,17 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
         </div>
 
         <div className="toolbar" style={{ marginBottom: 0 }}>
+          {/* 日期与场次都可改：不同日期各自独立编号（第 N 场按当天算）。
+              改日期时若该场次已被占用，后端会明确报错，不会静默产生重复场次。 */}
+          <label className="field"><span>日期</span>
+            <input className="input" type="date" style={{ width: 140 }} value={match.date}
+                   onChange={(e) => void patchMatch({ date: e.target.value })} />
+          </label>
+          <label className="field"><span>当天第几场</span>
+            <input className="input" style={{ width: 72 }} type="number" min={1}
+                   value={match.indexInDay}
+                   onChange={(e) => void patchMatch({ indexInDay: Math.max(1, Number(e.target.value) || 1) })} />
+          </label>
           <label className="field"><span>胜负</span>
             <select className="select" value={match.result}
                     onChange={(e) => void patchMatch({ result: e.target.value as Match['result'] })}>

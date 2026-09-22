@@ -147,9 +147,12 @@ export class MatchRepo {
     const oppSide = s(input.oppSide) || '对手';
 
     const dup = this.db.prepare(
-      'SELECT id FROM match WHERE date = ? AND index_in_day = ? AND our_side = ? AND opp_side = ?',
-    ).get(date, index, ourSide, oppSide);
-    if (dup) throw new Error(`${date} 第 ${index} 场（${ourSide} vs ${oppSide}）已存在`);
+      'SELECT opp_side FROM match WHERE date = ? AND index_in_day = ?',
+    ).get(date, index) as { opp_side: string } | undefined;
+    if (dup) {
+      throw new Error(`${date} 第 ${index} 场已被「${dup.opp_side}」占用；`
+        + `同一天同一场次只能有一个对局（该日已有 ${this.nextIndexInDay(date) - 1} 场）`);
+    }
 
     const info = this.db.prepare(
       `INSERT INTO match (season_id, date, index_in_day, our_side, opp_side, result,
@@ -198,6 +201,23 @@ export class MatchRepo {
     if (patch.remark !== undefined) put('remark', s(patch.remark));
 
     if (!sets.length) return cur;
+
+    // 改日期/场次时要做唯一性校验。**同一天同一场次只能有一个对局** ——
+    // 场次是"当天第几场"，与对手无关；否则同一天能挤出两个「第 1 场」，
+    // 列表里看着就是重复的，也谈不上"不同场次独立"。
+    // （create 原本允许换对手绕过，这里一并收紧。）
+    const nextDate = patch.date !== undefined ? s(patch.date) : cur.date;
+    const nextIndex = patch.indexInDay !== undefined
+      ? Math.max(1, n(patch.indexInDay))
+      : cur.indexInDay;
+    const clash = this.db.prepare(
+      'SELECT opp_side FROM match WHERE date = ? AND index_in_day = ? AND id <> ?',
+    ).get(nextDate, nextIndex, id) as { opp_side: string } | undefined;
+    if (clash) {
+      throw new Error(`${nextDate} 第 ${nextIndex} 场已被「${clash.opp_side}」占用，`
+        + `同一天同一场次只能有一个对局（该日已有 ${this.nextIndexInDay(nextDate) - 1} 场）`);
+    }
+
     sets.push(`updated_at = datetime('now','localtime')`);
     vals.push(id);
     this.db.prepare(`UPDATE match SET ${sets.join(', ')} WHERE id = ?`).run(...vals);

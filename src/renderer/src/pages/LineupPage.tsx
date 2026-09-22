@@ -92,7 +92,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   const placedIds = useMemo(
     () => new Set(
       our.filter((r) => r.squad && !(BENCH_SQUADS as readonly string[]).includes(r.squad))
-        .map((r) => r.playerId),
+        .map((r) => String(r.playerId)),   // 用字符串：报名行与参与行的 id 类型可能不一致，
+                                           // 数字/字符串混用时 Set.has 永远不命中 → 一个都过滤不掉
     ),
     [our],
   );
@@ -100,7 +101,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       于是被排过的人还留在列表里（只显示所在队伍），没排过的却因为别的原因消失，
       表现不一致 —— 现在统一：排进小队即从候选移除。 */
   const candidates = useMemo(
-    () => signupRows.filter((r) => !placedIds.has(r.playerId)),
+    () => signupRows.filter((r) => !placedIds.has(String(r.playerId))),
     [signupRows, placedIds],
   );
 

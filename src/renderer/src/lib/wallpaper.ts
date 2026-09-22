@@ -18,7 +18,12 @@ function apply(kind: string, file: string) {
   if (!host) return;
   const next = kind + '|' + file;
   if (next === current) return;          // 同一张：什么都不动，绝不打断播放
-  const url = file ? 'file:///' + file.replace(/\\\\/g, '/') : '';
+  // 路径转 URL：按 / 或 \ 切开再用 / 拼。
+  // 原来是 file.replace(/\\\\/g, '/') —— 那个正则匹配的是「两个反斜杠」，
+  // 单个反斜杠永远换不掉，生成 file:///C:WindowsWeb... 这种非法 URL，
+  // 图永远加载不出来（CDP 实测确认，见诊断【5】）。
+  const norm = String(file ?? '').split(/[\\\/]+/).filter(Boolean).join('/');
+  const url = norm ? 'file:///' + norm : '';
   if (kind === 'video' && url) {
     // 记住当前播放进度，换源后接着播（保证「不重置」）
     const t = video && video.src === url ? video.currentTime : lastTime;

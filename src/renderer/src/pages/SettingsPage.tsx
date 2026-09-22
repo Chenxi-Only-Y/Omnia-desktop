@@ -43,6 +43,12 @@ export default function SettingsPage({ info }: Props) {
     setNotice('已切换壁纸：' + w.name + '（' + (w.kind === 'video' ? '动态' : '静态') + '）'
       + (saved ? '' : ' —— 但设置没保存成功，重启后会回到默认'));
   }
+  // 壁纸图加载不出来时的回声（file:// 受限 / 文件不存在）
+  useEffect(() => {
+    const onErr = (e: Event) => setNotice(String((e as CustomEvent<string>).detail ?? '壁纸加载失败'));
+    window.addEventListener('omnia:wallpaper-error', onErr);
+    return () => window.removeEventListener('omnia:wallpaper-error', onErr);
+  }, []);
   // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
   useToastAutoClear(notice, setNotice);
   const [newGroup, setNewGroup] = useState({ name: '', kind: 'attack' as 'attack' | 'defend' });

@@ -105,6 +105,15 @@ html { background: var(--bg); }
    body 一旦有自己的背景就会画在 z-index:-1 的壁纸层之上，把壁纸整个盖掉
    （这就是「点了壁纸没反应」的根因）。 */
 body { background: transparent; }
+/* 壁纸铺在每一层全屏容器上：卡片画在它们之上 → 空隙一定露壁纸。
+   background-attachment:fixed 保证切页/滚动都不动。 */
+html, body, .app, .content {
+  background-image: var(--wallpaper-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
 /* 壳与内容区透明 → 露出壁纸 */
 .app, .main, .content, .topbar, .sidebar { background: transparent; }
 /* 卡片仍是不透明面，浮在壁纸上（保持可读） */

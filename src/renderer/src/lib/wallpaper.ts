@@ -48,6 +48,21 @@ function apply(kind: string, file: string) {
   bd.backgroundPosition = 'center';
   bd.backgroundRepeat = 'no-repeat';
   bd.backgroundAttachment = 'fixed';
+  // 同一变量铺到 :root，CSS 会给 html / body / .app / .content 都铺上这层
+  document.documentElement.style.setProperty('--wallpaper-image',
+    !isVideo && url ? `url("${url}")` : 'none');
+  // 加载自检：file:// 受限或文件不在时，把原因送出去（不再静默）
+  if (!isVideo && url) {
+    const probe = new Image();
+    probe.onerror = () => {
+      document.documentElement.style.setProperty('--wallpaper-image', 'none');
+      bd.backgroundImage = 'none';
+      window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+        detail: '图片加载失败（file:// 受限或文件不存在）：' + (url || '(空)'),
+      }));
+    };
+    probe.src = url;
+  }
   current = next;
 }
 

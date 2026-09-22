@@ -1075,7 +1075,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         steps.push('雷达维度=' + d.data.radar.map(r => r.label + ':' + r.ratio.toFixed(2)).join(' '));
         const kb = d.data.radar.find(r => r.key === 'kill');
         const kd = d.data.radar.find(r => r.key === 'dmg');
-        steps.push('球队人均 有效击杀=' + d.data.teamAverage.effKills.toFixed(2)
+        steps.push('团队人均 有效击杀=' + d.data.teamAverage.effKills.toFixed(2)
           + ' 有效人伤=' + d.data.teamAverage.effDmg.toFixed(2));
 
         // 乙：第二场没填战报，plays=2 但 statFilled=1

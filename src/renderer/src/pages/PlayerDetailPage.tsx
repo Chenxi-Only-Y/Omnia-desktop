@@ -148,7 +148,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
       {tab === 'overview' && (
         <>
           <div className="card">
-            <h3>六维对比（个人场均 vs 球队人均）</h3>
+            <h3>六维对比（个人场均 vs 团队人均）</h3>
             {totals.statFilled === 0 ? (
               <div className="hint">这个人还没有填写过战报，无法做能力对比。</div>
             ) : (
@@ -161,14 +161,14 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
                   </div>
                   <div className="radar-legend__row">
                     <span className="lg lg--base" />
-                    球队人均（虚线基准圈 = 1.0）
+                    团队人均（虚线基准圈 = 1.0）
                   </div>
                   <div className="radar-legend__hint">
-                    最外圈 = 球队人均的 2 倍。比值越靠外，说明这项相对队内越突出。
+                    最外圈 = 团队人均的 2 倍。比值越靠外，说明这项相对队内越突出。
                   </div>
                   <table className="grid" style={{ marginTop: 8 }}>
                     <thead>
-                      <tr><th>维度</th><th className="num">本人场均</th><th className="num">球队人均</th><th className="num">比值</th></tr>
+                      <tr><th>维度</th><th className="num">本人场均</th><th className="num">团队人均</th><th className="num">比值</th></tr>
                     </thead>
                     <tbody>
                       {radar.map((a) => (
@@ -217,7 +217,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
           </div>
 
           <div className="card">
-            <h3>球队基准（所有我方上场记录的人均）</h3>
+            <h3>团队基准（所有我方上场记录的人均）</h3>
             <div className="table-wrap">
               <table className="grid">
                 <thead>

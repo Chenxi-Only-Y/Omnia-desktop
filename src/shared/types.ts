@@ -555,7 +555,7 @@ export interface PlayerMatchRow {
   bone: number;
 }
 
-/** 六维对比数据：个人 vs 球队人均 */
+/** 六维对比数据：个人 vs 团队人均 */
 export interface RadarAxis {
   key: string;
   label: string;
@@ -586,9 +586,9 @@ export interface PlayerDetail {
   totals: PlayerTotals;
   /** 按日期倒序 */
   matches: PlayerMatchRow[];
-  /** 六维雷达（仅在本人与球队都有数据时有意义） */
+  /** 六维雷达（仅在本人与团队都有数据时有意义） */
   radar: RadarAxis[];
-  /** 球队基准：所有我方上场记录的人均值 */
+  /** 团队基准：所有我方上场记录的人均值 */
   teamAverage: {
     effKills: number; assists: number; effDmg: number;
     effTower: number; healing: number; taken: number; deaths: number;

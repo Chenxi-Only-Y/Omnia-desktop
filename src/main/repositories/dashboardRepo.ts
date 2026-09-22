@@ -43,7 +43,7 @@ export class DashboardRepo {
   constructor(private db: SqlDatabase) {}
 
   /**
-   * 个人详情：逐场记录 + 汇总 + 六维雷达（对比球队人均）。
+   * 个人详情：逐场记录 + 汇总 + 六维雷达（对比团队人均）。
    * 只统计「我方 + 上场」的记录；未填战报的场次计入出勤但不计入数值汇总。
    */
   playerDetail(playerId: number): PlayerDetail {
@@ -113,7 +113,7 @@ export class DashboardRepo {
       };
     });
 
-    // 球队人均基准：所有我方上场记录（含未填战报的 0）的人均值
+    // 团队人均基准：所有我方上场记录（含未填战报的 0）的人均值
     const team = this.db.prepare(`
       SELECT COUNT(*) AS n,
              AVG(COALESCE(cs.kills,0) + COALESCE(cs.fountain_kills,0)) AS eff_kills,
@@ -160,7 +160,7 @@ export class DashboardRepo {
       revives: sum((m) => m.revives),
     };
 
-    // 雷达用「本人均值 vs 球队均值」，避免场次多的人被总量拉高
+    // 雷达用「本人均值 vs 团队均值」，避免场次多的人被总量拉高
     const n = Math.max(1, filled.length);
     const selfAvg: Record<string, number> = {
       kill: totals.effKills / n,

@@ -11,8 +11,8 @@ interface Props {
 /**
  * 六维雷达图（纯 SVG，无第三方依赖）。
  *
- * 归一化方式：以「球队人均」为 1.0 的基准圈，个人值 / 球队人均 = 半径比例。
- * 半径上限按 2.0 截断（即某人某项是球队人均两倍时顶到最外圈），
+ * 归一化方式：以「团队人均」为 1.0 的基准圈，个人值 / 团队人均 = 半径比例。
+ * 半径上限按 2.0 截断（即某人某项是团队人均两倍时顶到最外圈），
  * 这样不同量级的维度（击杀 vs 伤害）能画在同一张图上而不用各自归一化，
  * 也让"1.0 圈"成为可读的参照线。
  */
@@ -34,7 +34,7 @@ export default function RadarChart({ axes, size = 260, color = 'var(--fg)' }: Pr
         r,
         x: cx + Math.cos(ang) * r,
         y: cy + Math.sin(ang) * r,
-        // 满刻度（2.0 倍球队人均）的坐标，用于画轴线
+        // 满刻度（2.0 倍团队人均）的坐标，用于画轴线
         ax: cx + Math.cos(ang) * rMax,
         ay: cy + Math.sin(ang) * rMax,
         // 基准圈（1.0 倍）
@@ -52,7 +52,7 @@ export default function RadarChart({ axes, size = 260, color = 'var(--fg)' }: Pr
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="radar" role="img">
-      {/* 同心圈（0.5 ~ 2.0 倍球队人均） */}
+      {/* 同心圈（0.5 ~ 2.0 倍团队人均） */}
       {rings.map((k) => (
         <circle key={k} cx={cx} cy={cy} r={(k / CAP) * rMax}
                 fill="none"
@@ -75,7 +75,7 @@ export default function RadarChart({ axes, size = 260, color = 'var(--fg)' }: Pr
           </text>
         </g>
       ))}
-      {/* 球队人均基准圈（多边形） */}
+      {/* 团队人均基准圈（多边形） */}
       <polygon points={basePoly} fill="none" stroke="var(--text-faint)" strokeWidth={1} strokeDasharray="4 3" />
       {/* 个人 */}
       <polygon points={poly} fill={`${color}33`} stroke={color} strokeWidth={1.8} />

@@ -16,33 +16,33 @@
    唯一的例外是排表看板的职业色块：那里文字固定用深色 #10121A，浅底亮底都成立。
    ───────────────────────────────────────────────────────────── */
 :root {
-  /* —— 单色骨灰阶 —— */
-  --bg: #E6E1E6;           /* 3 背景主色 */
-  --surface: #FCF8FD;      /* 5 卡片 */
-  --surface-2: #E6E0F0;    /* 2 次级面 */
-  --surface-3: #E9E0EA;    /* 4 分隔/次级 */
-  --fg: #4A4459;           /* 1 按钮与正文 */
-  --line: #D6CFDA;
-  --line-strong: #B9AFC4;
-  --hover: #DCD5E2;
+  /* —— 深色骨色阶（大厂风，见根目录 DESIGN.md）—— */
+  --bg: #0B0B0D;           /* 页面底（近黑） */
+  --surface: #131317;      /* 卡片 / 抬升面 */
+  --surface-2: #1C1C22;    /* 次级面 / 嵌套托盘 */
+  --surface-3: #1C1C22;    /* 分隔 / 次级 */
+  --fg: #FFFFFF;           /* 标题与主文 */
+  --line: #26262E;
+  --line-strong: #3B3B46;
+  --hover: #1F1F26;
 
-  /* —— 文本（同一支深色，靠透明度分层）—— */
-  --text: #4A4459;
-  --text-dim: #6F6879;
-  --text-faint: #928B9C;
+  /* —— 文本（同一支浅色，靠明度分层）—— */
+  --text: #FFFFFF;
+  --text-dim: #A8A8B4;
+  --text-faint: #6E6E7A;
 
-  /* —— 语义色：单色稿里也不该丢语义，用低饱和版本 —— */
-  --accent: #4A4459;
-  --accent-soft: #E0D8E8;
-  --danger: #8E4453;
-  --danger-soft: #F2DFE3;
-  --warn: #8A6A22;
-  --warn-soft: #F4EAD5;
-  /* 橙武标记专用橙：主题整体偏灰，这里要能一眼跳出来 */
-  --orange: #C4701C;
-  --orange-soft: #F7E7D2;
-  --ok: #3F6F58;
-  --ok-soft: #DCEBE2;
+  /* —— 语义色：深底上的低饱和亮色 —— */
+  --accent: #6E7BFF;
+  --accent-soft: rgba(110, 123, 255, .20);
+  --danger: #FF6B6B;
+  --danger-soft: rgba(255, 107, 107, .14);
+  --warn: #F2C94C;
+  --warn-soft: rgba(242, 201, 76, .14);
+  /* 橙武标记专用橙：深底上要能一眼跳出来 */
+  --orange: #F0A44A;
+  --orange-soft: rgba(240, 164, 74, .18);
+  --ok: #3FD68C;
+  --ok-soft: rgba(63, 214, 140, .14);
 
   /* 兼容旧变量名（早期代码里用过 --bg-panel / --border 等） */
   --bg-panel: var(--surface);
@@ -70,18 +70,16 @@
   /* 攻/防类别文字色（浅底上降饱和的蓝/橙，比亮青亮橙可读） */
   --kind-defend: #3A5C8A;
   --kind-attack: #8A5630;
-  /* 图标托底：职业图标保持原色（用户要求），靠一层浅色托底 + 深色描边提可读性 */
-  --icon-plate: rgba(74, 68, 89, .30);
-  --icon-plate-bg: #FFFFFF;
+  /* 图标托底：职业图标保持原色（用户要求），靠一层托底 + 描边提可读性 */
+  --icon-plate: rgba(255, 255, 255, .30);
+  --icon-plate-bg: #1C1C22;
   /* 卡片文字色：白字（用户口径，不做描边/阴影等处理） */
   --ink-on-class: #FFFFFF;
-  /* 卡片尺寸已改为按行宽自动分配（flex + aspect-ratio 16:9），不再用固定宽高。
-     三行字号保持绝对值：ID 22px / 技能备注 15px / 职业 13px。 */
 
-  --radius: 8px;
+  --radius: 18px;
   --radius-sm: 5px;
-  --shadow: 0 1px 2px rgba(74, 68, 89, .06), 0 2px 8px rgba(74, 68, 89, .05);
-  --shadow-lift: 0 4px 16px rgba(74, 68, 89, .16);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .30), 0 2px 12px rgba(0, 0, 0, .24);
+  --shadow-lift: 0 10px 32px rgba(0, 0, 0, .48);
 }
 
 * { box-sizing: border-box; }
@@ -322,6 +320,226 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 .msg--toast.error { animation: none; }   /* 报错不做位移，translateX 会被动画覆盖 */
 @media (prefers-reduced-motion: reduce) {
   .msg--toast { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   首页「大厂风」深色视觉层（照 seedance2_0 的视觉特征手写，见根目录 DESIGN.md）
+   —— 只作用于首页：.home-dark 挂在首屏与数据层上，局部换深色令牌，
+      不影响 App 其余浅色页面。
+   ═══════════════════════════════════════════════════════════════ */
+.home-dark {
+  --bg: #0B0B0D;
+  --bg-elev: #131317;
+  --bg-elev-2: #1C1C22;
+  --line: #26262E;
+  --line-strong: #3B3B46;
+  --text: #FFFFFF;
+  --text-dim: #A8A8B4;
+  --text-faint: #6E6E7A;
+  --fg: #FFFFFF;
+  --fg-on: #0B0B0D;
+  --surface: #131317;
+  --surface-2: #1C1C22;
+  --surface-3: #1C1C22;
+  --border: #26262E;
+  --border-strong: #3B3B46;
+  --accent: #FFFFFF;
+  --accent-soft: rgba(110, 123, 255, .20);
+  --glow-cool: #6E7BFF;
+  --glow-warm: #C084FC;
+  --glow-cyan: #22D3EE;
+  color: var(--text);
+  font-family: Inter, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+}
+
+/* ── 首屏 ───────────────────────────────────────────────────── */
+.home-hero {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(1100px 520px at 88% -8%,  rgba(110, 123, 255, .18), transparent 62%),
+    radial-gradient(760px 420px at 4% 108%,  rgba(192, 132, 252, .14), transparent 60%),
+    radial-gradient(520px 320px at 50% 118%, rgba(34, 211, 238, .10), transparent 62%),
+    var(--bg);
+}
+/* 柔光呼吸（极缓，克制；减少动效偏好时关闭） */
+.home-hero::after {
+  content: ''; position: absolute; inset: -20%;
+  background: radial-gradient(600px 320px at 78% 22%, rgba(110, 123, 255, .12), transparent 60%);
+  animation: home-breathe 7.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes home-breathe {
+  0%, 100% { opacity: .55; transform: translate3d(0, 0, 0); }
+  50%      { opacity: .95; transform: translate3d(-10px, 8px, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .home-hero::after { animation: none; } }
+
+/* 眉题：小、灰、宽字距，前置一条短横线 */
+.home-eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 11px; font-weight: 500; letter-spacing: .08em;
+  color: var(--text-faint); text-transform: uppercase;
+}
+.home-eyebrow::before {
+  content: ''; width: 24px; height: 1px; background: var(--line-strong);
+}
+
+/* Display：超大标题，负字距，紧行高 */
+.home-display {
+  font-size: clamp(40px, 6vw, 72px); font-weight: 700;
+  line-height: 1.05; letter-spacing: -.025em; color: var(--text);
+  margin: 18px 0 0;
+}
+.home-display-en {
+  font-size: clamp(15px, 1.6vw, 22px); font-weight: 400;
+  letter-spacing: .02em; color: var(--text-dim); margin-top: 14px;
+}
+.home-lede {
+  max-width: 640px; font-size: 15px; line-height: 1.75;
+  color: var(--text-dim); margin-top: 18px;
+}
+
+/* 药丸按钮 */
+.home-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; }
+.home-btn {
+  border: 1px solid transparent; border-radius: 999px;
+  padding: 11px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+  background: var(--accent); color: var(--fg-on);
+  transition: transform .15s ease, box-shadow .15s ease;
+  font-family: inherit;
+}
+.home-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255, 255, 255, .14); }
+.home-btn--ghost {
+  background: transparent; color: var(--text);
+  border-color: var(--line-strong);
+}
+.home-btn--ghost:hover { background: var(--bg-elev-2); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .home-btn { transition: none; } }
+
+/* 职业图标托盘：圆形深托 + 原色图标 */
+.home-tray {
+  display: flex; flex-wrap: wrap; gap: 14px; margin-top: 40px;
+}
+.home-tray__item {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 56px;
+}
+.home-tray__plate {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--bg-elev-2); border: 1px solid var(--line);
+  display: grid; place-items: center;
+  transition: border-color .15s ease, transform .15s ease;
+}
+.home-tray__item:hover .home-tray__plate {
+  border-color: var(--line-strong); transform: translateY(-2px);
+}
+.home-tray__plate img { width: 26px; height: 26px; object-fit: contain; }
+.home-tray__label { font-size: 10px; letter-spacing: .04em; color: var(--text-faint); }
+
+/* ── 数据层 ─────────────────────────────────────────────────── */
+.home-section { padding-block: clamp(72px, 10vh, 128px); }
+.home-h2 {
+  font-size: clamp(28px, 3.4vw, 44px); font-weight: 650;
+  line-height: 1.18; letter-spacing: -.015em; margin: 14px 0 0;
+}
+.home-card {
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: 18px; padding: 26px 28px;
+}
+.home-card:hover { border-color: var(--line-strong); }
+.home-card__k { display: block; margin-bottom: 14px; }
+.home-card__v {
+  font-size: clamp(32px, 3vw, 40px); font-weight: 700; line-height: 1;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+}
+.home-card__v small { font-size: 14px; font-weight: 500; color: var(--text-dim); margin-left: 4px; }
+.home-card__sub { font-size: 13px; color: var(--text-dim); margin-top: 12px; line-height: 1.7; }
+.home-grid {
+  display: grid; gap: 18px; margin-top: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.home-scroll {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--text-faint); font-size: 12px; letter-spacing: .12em;
+  animation: home-breathe 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .home-scroll { animation: none; } }
+
+/* ── 排表页功能区保持原样（用户口径：不做任何改动）——
+   全局已切到深色，这里把令牌换回原来的浅色，让排表看板原封不动。 */
+.theme-light {
+  --bg: #E6E1E6; --surface: #FCF8FD; --surface-2: #E6E0F0; --surface-3: #E9E0EA;
+  --fg: #4A4459; --line: #D6CFDA; --line-strong: #B9AFC4; --hover: #DCD5E2;
+  --text: #4A4459; --text-dim: #6F6879; --text-faint: #928B9C;
+  --accent: #4A4459; --accent-soft: #E0D8E8;
+  --danger: #8E4453; --danger-soft: #F2DFE3;
+  --warn: #8A6A22; --warn-soft: #F4EAD5;
+  --orange: #C4701C; --orange-soft: #F7E7D2;
+  --ok: #3F6F58; --ok-soft: #DCEBE2;
+  --bg-panel: var(--surface); --bg-panel-2: var(--surface-3); --bg-hover: var(--hover);
+  --border: var(--line); --border-strong: var(--line-strong);
+  --icon-plate: rgba(74, 68, 89, .30); --icon-plate-bg: #FFFFFF;
+  --radius: 8px; --radius-sm: 5px;
+  --shadow: 0 1px 2px rgba(74, 68, 89, .06), 0 2px 8px rgba(74, 68, 89, .05);
+  --shadow-lift: 0 4px 16px rgba(74, 68, 89, .16);
+  color: var(--text);
+  font-family: inherit;
+}
+
+/* ── 首页下滑区：白底（照 seedance2_0 的滚动区）——
+   首屏仍是深色剧场，下滑上来的内容层改为**白底黑字**，
+   和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
+.home-cover {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #F4F4F6;
+  --surface-3: #EFEFF2;
+  --fg: #0B0B0D;
+  --line: #E4E4E8;
+  --line-strong: #CFCFD6;
+  --hover: #F4F4F6;
+  --text: #0B0B0D;
+  --text-dim: #55555F;
+  --text-faint: #8A8A94;
+  --border: #E4E4E8;
+  --border-strong: #CFCFD6;
+  --bg-panel: #FFFFFF;
+  --bg-panel-2: #EFEFF2;
+  --bg-hover: #F4F4F6;
+  --accent: #0B0B0D;
+  --accent-soft: rgba(11, 11, 13, .10);
+  color: var(--text);
+  font-family: Inter, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+}
+.home-cover .home-h2,
+.home-cover .home-card__v { color: var(--text); }
+.home-cover .home-card {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.home-cover .home-eyebrow { color: var(--text-faint); }
+.home-cover .home-eyebrow::before { background: var(--line-strong); }
+
+/* 媒体卡（视频/图占位，照参考站的圆角视频卡） */
+.home-media {
+  display: grid; gap: 18px; margin-top: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.home-media__frame {
+  position: relative; overflow: hidden;
+  border-radius: 20px; border: 1px solid var(--line);
+  background: var(--surface-2);
+  aspect-ratio: 16 / 9;
+}
+.home-media__frame img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.home-media__cap {
+  position: absolute; left: 14px; top: 12px;
+  font-size: 11px; letter-spacing: .08em; color: #fff;
+  background: rgba(0, 0, 0, .38); border-radius: 999px; padding: 3px 10px;
+  backdrop-filter: blur(6px);
 }
 
 .placeholder {

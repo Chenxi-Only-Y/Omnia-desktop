@@ -14,9 +14,6 @@ import { api, ApiError } from '../api';
 import type { PageProps } from '../App';
 import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import { classIconSrc } from '../lib/assets';
-/** 换成真实立绘时填文件名，例如 'hero/cover.png'（相对 public/） */
-const HERO_IMAGE: string | null = null;
-
 type Target = 'roster' | 'match' | 'board' | 'settings';
 
 interface Props extends PageProps {
@@ -67,57 +64,62 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const active = players.filter((p) => p.status === 'active').length;
   const ready = latestSignups.filter((r) => r.signup === 'JOIN').length;
   const capacity = catalog?.capacity ?? TOTAL_MATCH_SLOTS;
-  // 用户口径：首页背景就用那套**渐变铺满**（不用上传的图），首屏钉住不动。
-  // 上传的中缝图仍然只用于排表中缝，两者互不影响。
-  const heroSrc = HERO_IMAGE ? `${import.meta.env.BASE_URL}${HERO_IMAGE}` : null;
 
   return (
     <>
       {error && <div className="msg msg--toast error">{error}</div>}
 
-      {/* ── 首屏：渐变铺满、钉住不动（下滑时下面的数据层盖上来） ── */}
-      <section className="hero hero--pinned">
-        {heroSrc && <img className="hero__img" src={heroSrc} alt="" />}
-        <div className="hero__veil" aria-hidden="true" />
+      {/* ── 首屏：深色剧场（照 seedance2_0 视觉特征，见根目录 DESIGN.md）——
+          大留白 + 超大标题 + 药丸按钮 + 职业图标托盘；钉住不动，下滑被数据层盖住 ── */}
+      <section className="hero hero--pinned home-hero home-dark">
         <div className="hero__body">
-          <div className="hero__brand">
+          <span className="home-eyebrow">All leagues · One universe</span>
+          <h1 className="home-display">
             万象<span className="dot-sep">·</span>Omnia
-          </div>
-          <div className="hero__slogan">All leagues. One universe.</div>
-          <div className="hero__slogan hero__slogan--cn">万象归一，联赛集成</div>
+          </h1>
+          <div className="home-display-en">All leagues. One universe.</div>
+          <p className="home-lede">
+            万象归一，联赛集成。报名、排表、战报、评分、出勤都在同一处完成 ——
+            职业只来自各场报名表，口径统一。
+          </p>
 
-          <div className="hero__cta">
-            <button className="hero__btn hero__btn--primary" onClick={() => onGo('match')}>录入对局与战报</button>
-            <button className="hero__btn" onClick={() => onGo('roster')}>成员主档</button>
-            <button className="hero__btn" onClick={() => onGo('board')}>数据看板</button>
-            <button className="hero__btn" onClick={() => onGo('settings')}>战斗组与小队</button>
+          <div className="home-cta">
+            <button className="home-btn" onClick={() => onGo('match')}>录入对局与战报</button>
+            <button className="home-btn home-btn--ghost" onClick={() => onGo('roster')}>成员主档</button>
+            <button className="home-btn home-btn--ghost" onClick={() => onGo('board')}>数据看板</button>
+            <button className="home-btn home-btn--ghost" onClick={() => onGo('settings')}>战斗组与小队</button>
+          </div>
+
+          {/* 12 职业原色图标托盘：深色圆托 + 原色图标（图标禁止重染） */}
+          <div className="home-tray" aria-hidden="true">
+            {CLASSES.map((c) => {
+              const src = classIconSrc(c.name);
+              return (
+                <span key={c.name} className="home-tray__item" title={c.name}>
+                  <span className="home-tray__plate">
+                    {src
+                      ? <img src={src} alt="" />
+                      : <i style={{ display: 'block', width: 14, height: 14, borderRadius: '50%', background: c.color }} />}
+                  </span>
+                  <span className="home-tray__label">{c.name}</span>
+                </span>
+              );
+            })}
           </div>
         </div>
 
-        {/* 职业图标阵 —— 既是装饰也是"这个系统认识哪些职业"的表达 */}
-        <div className="hero__classes" aria-hidden="true">
-          {CLASSES.map((c) => {
-            const src = classIconSrc(c.name);
-            return (
-              <span key={c.name} className="hero__class" title={c.name}>
-                {src
-                  ? <img src={src} alt="" />
-                  : <i style={{ background: c.color }} />}
-                <em style={{ color: c.color }}>{c.name}</em>
-              </span>
-            );
-          })}
-        </div>
-
-        {/* 下滑提示：告诉用户下面还有东西 */}
-        <div className="hero__scroll" aria-hidden="true">
+        <div className="home-scroll" aria-hidden="true">
           <span>下滑查看数据</span>
-          <span className="hero__scroll-arrow">↓</span>
+          <span>↓</span>
         </div>
       </section>
 
-      {/* ── 数据层：不透明背景 + 更高层级 → 滚动时从下往上盖住首屏 ── */}
-      <div className="hero-cover">
+      {/* ── 数据层：**白底**（照 seedance2_0 滚动区），下滑时从下往上盖住首屏 ── */}
+      <div className="hero-cover home-cover">
+        <div className="home-section" style={{ paddingBottom: 0 }}>
+          <span className="home-eyebrow">Overview</span>
+          <h2 className="home-h2">今天的盘子</h2>
+        </div>
       <div className="stat-grid">
         <div className="stat">
           <div className="k">成员总数</div>
@@ -142,6 +144,26 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
           <div className="k">分制</div>
           <div className="v">60<small> 基础 · 封顶 100</small></div>
           
+        </div>
+      </div>
+
+      {/* 媒体展示区（照 seedance2_0 的视频卡阵）——
+          目前用旧表抽出来的立绘占位；有真视频时把 <img> 换成 <video src autoplay muted loop playsinline /> */}
+      <div className="home-section" style={{ paddingBottom: 8 }}>
+        <span className="home-eyebrow">Showcase</span>
+        <h2 className="home-h2">实战画面</h2>
+        <p className="home-lede">
+          一场对局从报名到结算的完整链路，都在同一屏里跑完。
+        </p>
+        <div className="home-media">
+          <div className="home-media__frame">
+            <img src={`${import.meta.env.BASE_URL}guide/image26.png`} alt="防守半区" />
+            <span className="home-media__cap">防守半区</span>
+          </div>
+          <div className="home-media__frame">
+            <img src={`${import.meta.env.BASE_URL}guide/image22.png`} alt="进攻半区" />
+            <span className="home-media__cap">进攻半区</span>
+          </div>
         </div>
       </div>
 

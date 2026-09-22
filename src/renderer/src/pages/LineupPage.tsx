@@ -171,7 +171,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
 
   return (
     // page-fill：让排表看板那张卡撑满内容区高度（否则会缩在上半部分）
-    <div className="page-fill">
+    // theme-light：排表功能区保持原样（用户口径），全局切深色后这里显式回到浅色
+    <div className="page-fill theme-light">
       {error && <div className="msg msg--toast error">{error}</div>}
       {notice && <div className="msg msg--toast ok">{notice}</div>}
 

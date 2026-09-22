@@ -1651,3 +1651,35 @@ table.grid img, .roster-card img, .stat img, .card img,
   box-shadow: none !important;
   padding: 0 !important;
 }
+
+
+/* ═══ 选职业的反馈：职业标签自己放大/跳动（用户口径）════════════
+   原来选中/悬停时是**外圈那格底色加深**（一块灰底），
+   用户要求改成"职业卡片跳动或者放大" —— 反馈落在标签自己身上。
+   ═══════════════════════════════════════════════════════════════ */
+/* 外圈不再加深 */
+.picker-item__main, .picker-item__sub,
+.picker-item__main:hover, .picker-item__sub:hover,
+.picker-item__main:focus, .picker-item__sub:focus {
+  background: transparent !important;
+}
+/* 标签本体：悬停放大、按下弹一下 */
+.picker-item .chip,
+.picker-item__main .chip, .picker-item__sub .chip,
+.picker-item__main > *, .picker-item__sub > * {
+  transition: transform .12s cubic-bezier(.2, .7, .2, 1);
+  transform-origin: center;
+}
+.picker-item__main:hover > *, .picker-item__sub:hover > * { transform: scale(1.10); }
+.picker-item__main:active > *, .picker-item__sub:active > * { animation: cls-pop .3s ease; }
+
+@keyframes cls-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.24); }
+  70%  { transform: scale(.98); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .picker-item__main:active > *, .picker-item__sub:active > * { animation: none; }
+  .picker-item__main:hover > *, .picker-item__sub:hover > * { transform: none; }
+}

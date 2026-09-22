@@ -1478,27 +1478,14 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
 }
 
 
-/* ═══ 圆角（用户口径：不要直角，要有弧度）══════════════════════
-   三级各给一档半径，越往里越小：一级 18 / 二级 14 / 三级 10。
-   排表看板内部的半区、分组、槽位等也一并给弧度。
+/* ═══ 圆角（用户口径：**只给容器矩形**加弧度）══════════════════
+   上一版我把槽位/图片/按钮也圆了 —— 空位变成椭圆，属于改过头，已撤。
+   现在只有容器类矩形带弧度；槽位、职业卡、控件保持原样。
    ═══════════════════════════════════════════════════════════════ */
-.card, .board, .home-card { border-radius: 18px !important; }
-.stat, .roster-card, .picker-item, .modal, .roster-cards__head { border-radius: 14px !important; }
-.roster-card__edit, .card .card, .modal .card, .stat .stat { border-radius: 10px !important; }
-/* 排表看板内部容器：原来不少是直角 */
-.board__half, .board__halves, .board__divider, .board__scroll,
-.squad, .squadrow, .squad-row, .slot, .empty-slot, .board__group,
-.picker-item__sub, .picker-item__main { border-radius: 14px; }
-.board img, .board__divider img { border-radius: 12px; }
-/* 交互控件统一带弧度（按钮/输入/下拉不再直角） */
-.btn, .tab, .input, .select, .chip, .badge, .badge-state, .nav-item,
-.wall-item, .wall-seg__b, .pcard, .pcard__icon {
-  border-radius: 10px;
-}
-.btn, .tab, .chip, .badge, .badge-state, .nav-item, .wall-seg__b, .pcard { border-radius: 999px; }
-.input, .select, .pcard__icon { border-radius: 10px; }
-.tab { border-radius: 999px 999px 0 0; }
-
+.card, .board, .home-card { border-radius: 18px; }
+.stat, .modal, .roster-cards__head { border-radius: 14px; }
+.roster-card { border-radius: 12px; }
+.board__half, .board__halves, .board__divider, .board__scroll { border-radius: 12px; }
 
 /* ═══ 侧栏选中项：不要纯黑，用半透明叠层（壁纸透得过去）══════════
    原来选中态是实心黑块，把壁纸磨砂效果整个压没了。

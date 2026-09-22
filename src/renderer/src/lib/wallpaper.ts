@@ -100,7 +100,7 @@ function apply(kind: string, file: string) {
   let bgLayers = url ? 'url("' + url + '")' : '';
   if (isVideo && url) {
     const dir = url.slice(0, url.lastIndexOf('/'));
-    bgLayers = ['preview.gif', 'preview.jpg', 'preview.png']
+    bgLayers = ['preview.gif', 'preview.jpg', 'preview.webp', 'preview.png']
       .map(nm => 'url("file:///' + dir + '/' + nm + '")').join(', ');
   }
   // 渲染模式：关闭壁纸 → 全清；静态帧 → 只用静态图（gif 换成 jpg、视频不播）

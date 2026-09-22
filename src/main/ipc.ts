@@ -130,6 +130,7 @@ export function registerIpc(ctx: IpcContext): void {
             try { const t = JSON.parse(fsp.readFileSync(pj, 'utf8')); if (t && t.title) title = String(t.title); } catch { /* 坏 json 用目录名 */ }
             let best: Wall | null = null;
             let img: Wall | null = null;
+            let imgSize = -1;
             let prev: Wall | null = null;
             try {
               for (const m of fsp.readdirSync(fp, { withFileTypes: true })) {
@@ -140,7 +141,12 @@ export function registerIpc(ctx: IpcContext): void {
                 if (VID.has(ext)) { if (!best) best = item; }
                 else if (IMG.has(ext)) {
                   if (/^preview/i.test(m.name)) { if (!prev) prev = item; }
-                  else if (!img) img = item;
+                  else {
+                    // 挑**最大**的那张当原图（小图铺满全屏会糊）
+                    let sz = 0;
+                    try { sz = fsp.statSync(full).size; } catch { /* 读不到就按 0 */ }
+                    if (sz > imgSize) { img = item; imgSize = sz; }
+                  }
                 }
               }
             } catch { /* 读不了就跳过 */ }
@@ -170,7 +176,7 @@ export function registerIpc(ctx: IpcContext): void {
     if (!src) throw new Error('没有选中的壁纸');
     const fsp = require('node:fs') as typeof import('node:fs');
     const pth = require('node:path') as typeof import('node:path');
-    const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+    const { execFile } = require('node:child_process') as typeof import('node:child_process');
     const ffmpeg = require('ffmpeg-static') as unknown as string;
     const dir = pth.join(app.getPath('userData'), 'wallpaper-cache');
     fsp.mkdirSync(dir, { recursive: true });
@@ -178,8 +184,12 @@ export function registerIpc(ctx: IpcContext): void {
     try { key += '-' + Math.floor(fsp.statSync(src).mtimeMs); } catch { /* 文件可能已删 */ }
     const out = pth.join(dir, key + '.mp4');
     if (!fsp.existsSync(out)) {
-      execFileSync(ffmpeg, ['-y', '-i', src, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-        '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', out], { timeout: 600000 });
+      // async execFile：同步的 execFileSync 会阻塞主进程、冻住整个应用
+      return new Promise<string>((resolve, reject) => {
+        execFile(ffmpeg, ['-y', '-i', src, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+          '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart', out],
+          { timeout: 600000 }, (err) => (err ? reject(err) : resolve(out)));
+      });
     }
     return out;
   }));

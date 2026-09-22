@@ -42,7 +42,8 @@ function apply(kind: string, file: string) {
   // 双保险：静态图直接铺到 body 背景上（body 背景绘制在 z-index:-1 的容器之上，
   // 不会被任何东西盖住）；动态视频仍走容器内的 <video>，body 保持透明。
   const isVideo = kind === 'video' && !!url;
-  const image = !isVideo && url ? `url("${url}")` : 'none';
+  // 有 url 就铺：视频当 CSS 背景会加载失败，正好露出渐变兜底（绝不纯黑）
+  const image = url ? `url("${url}")` : 'none';
   // 内联样式优先级最高：逐个元素写死，任何 CSS 规则都压不过它
   const targets: HTMLElement[] = [document.documentElement, document.body,
     ...Array.from(document.querySelectorAll<HTMLElement>('.app, .content, .main'))];
@@ -61,11 +62,14 @@ function apply(kind: string, file: string) {
   document.documentElement.style.setProperty('--wallpaper-image',
     !isVideo && url ? `url("${url}")` : 'none');
   // 加载自检：file:// 受限或文件不在时，把原因送出去（不再静默）
-  if (!isVideo && url) {
+  if (url) {
     const probe = new Image();
     probe.onerror = () => {
+      // 清掉内联写法即可 —— CSS 的 .home-wallpaper 上还有一层渐变兜底，不会纯黑
+      for (const t of [document.documentElement, document.body]) {
+        t.style.removeProperty('background-image');
+      }
       document.documentElement.style.setProperty('--wallpaper-image', 'none');
-      document.body.style.backgroundImage = 'none';
       window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
         detail: '图片加载失败（file:// 受限或文件不存在）：' + (url || '(空)'),
       }));

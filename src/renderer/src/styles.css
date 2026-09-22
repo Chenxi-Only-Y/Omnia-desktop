@@ -1703,11 +1703,10 @@ table.grid img, .roster-card img, .stat img, .card img,
   box-shadow: 0 6px 14px rgba(0, 0, 0, .18);
 }
 .picker-group .chip:active, .chip.class:active { transform: translateY(-2px) scale(1.0); }
-/* 外圈不再做任何底色加深（上一轮的口径） */
-.picker-group .chip, .picker-group .chip:hover, .picker-group .chip:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
+/* 去掉外圈的底色加深与焦点框 —— 但**不能**在 :hover 上写 box-shadow: none !important，
+   那会把悬停时的悬浮投影一起干掉（上一版就是被它压住的）。
+   只清 outline，投影交给 :hover 规则自己决定。 */
+.picker-group .chip:focus, .chip.class:focus { outline: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .picker-group .chip:hover, .chip.class:hover,
   .picker-group .chip:active, .chip.class:active { transform: none; }

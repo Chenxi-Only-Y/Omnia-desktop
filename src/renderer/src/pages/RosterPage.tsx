@@ -48,7 +48,6 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [notice, setNotice] = useState<string | null>(null);
   // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
   useToastAutoClear(notice, setNotice);
-  const [q, setQ] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   /** 当前场次：用于判定「未填表」（报名表是分场次的） */
   const [matches, setMatches] = useState<Match[]>([]);
@@ -144,14 +143,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   }
 
   const filtered = useMemo(() => {
-    const key = q.trim().toLowerCase();
-    return players.filter((p) => {
-      if (filterStatus && p.status !== filterStatus) return false;
-      if (!key) return true;
-      return p.gameId.toLowerCase().includes(key) || p.remark.toLowerCase().includes(key)
-        || (p.orangeWeapon ?? '').toLowerCase().includes(key);
-    });
-  }, [players, q, filterStatus]);
+    return players.filter((p) => !filterStatus || p.status === filterStatus);
+  }, [players, filterStatus]);
 
   /** 列表顺序：默认按「序」（没填序的排最后，同序按 id）；点表头可临时换列 */
   const sorted = useMemo(() => {
@@ -496,8 +489,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         </div>
 
         <div className="toolbar" style={{ marginBottom: 0 }}>
-          <input className="input grow" placeholder="搜索 ID / 备注"
-                 value={q} onChange={(e) => setQ(e.target.value)} />
+
           {/* 「未填表」是相对某一场的报名表而言，所以这里必须选场次 */}
           <select className="select" value={matchId ?? ''}
                   onChange={(e) => setMatchId(e.target.value === '' ? null : Number(e.target.value))}

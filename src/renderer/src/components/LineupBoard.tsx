@@ -12,6 +12,15 @@
  *
  * 建制仍完全数据驱动：战斗组与小队的名称、归属、战术、人数都来自数据库。
  */
+/** playerId → 是否有橙武（用户口径：职业右侧、卡片最右端显示「橙武」徽标；
+    没有就不显示）。模块级拉一次即可 —— 它比首帧渲染更早发起。 */
+let OW: Map<number, boolean> = new Map();
+void api.player.list().then((ps) => {
+  const m = new Map<number, boolean>();
+  for (const q of ps) m.set(q.id, (q.orangeWeapon ?? '') !== '');
+  OW = m;
+}).catch(() => { /* 取不到就不显示徽标 */ });
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
@@ -431,6 +440,8 @@ function PlayerCard({
           {cls || '未登记职业'}
         </div>
       )}
+      {/* 橙武徽标：有就显示、没有不显示（用户口径，字号比职业小 2px） */}
+      {OW.get(row.playerId) && <span className="pcard__ow">橙武</span>}
       {/* 技能备注：单行、无框，看起来就是一行普通文字（用户口径） */}
       <input
         className="pcard__note"

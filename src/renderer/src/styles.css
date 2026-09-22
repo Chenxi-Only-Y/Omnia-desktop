@@ -1556,3 +1556,23 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
 }
 /* 首屏改成整屏高：内容区上移 46px 后，仍要铺满整视口 */
 .hero.hero--pinned.home-hero { height: 100vh !important; }
+
+
+/* ═══ 卡片上的「橙武」徽标（用户口径）══════════════════════════
+   位置：职业右侧、卡片最右端；有橙武才显示，没有不显示。
+   字号：比职业字号小 2px（职业 15px → 这里 13px）。
+   配色：橙色卡片 + 橙色字体。
+   ═══════════════════════════════════════════════════════════════ */
+.pcard__ow {
+  align-self: flex-end;
+  margin-top: -22px;      /* 提回职业那一行 */
+  margin-right: 2px;
+  padding: 0 6px;
+  font-size: 13px;        /* 职业 15px − 2px */
+  line-height: 1.4;
+  color: var(--orange);
+  background: var(--orange-soft);
+  border: 1px solid var(--orange);
+  border-radius: 6px;
+  white-space: nowrap;
+}

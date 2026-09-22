@@ -1399,14 +1399,15 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
         const savedShut = await window.omnia.meta.settings();
         // 先不展开：留给主进程截图，截完由主进程点一下恢复
         steps.push('折叠前 侧栏=' + wOpen + 'px 标签可见=' + labelOpen + ' grid=' + bgOpen);
-        steps.push('折叠后 侧栏=' + wShut + 'px 标签可见=' + labelShut
+        // 收起必须**完全隐藏**（宽度 0），不能留图标条 —— 用户口径
+        steps.push('折叠后 侧栏=' + wShut + 'px（应为 0 = 完全隐藏）标签可见=' + labelShut
           + ' nav-collapsed=' + collapsedClass + ' 落库 navCollapsed=' + JSON.stringify(savedShut.data.navCollapsed));
 
         return {
           ok: heroOk
             && stillThere === false
             && themeOk
-            && wOpen > 180 && wShut < 70 && labelOpen && !labelShut && collapsedClass
+            && wOpen > 180 && wShut === 0 && labelOpen && !labelShut && collapsedClass
             && savedShut.data.navCollapsed === '1',
           steps,
         };

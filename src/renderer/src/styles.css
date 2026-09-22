@@ -106,23 +106,14 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 
 /* ── 布局 ─────────────────────────────────────────────────── */
 .app { display: grid; grid-template-columns: 216px 1fr; height: 100%; }
-/* 侧栏折叠：只留图标（图标是几何符号，本身就是稳定的视觉锚点） */
-.app.nav-collapsed { grid-template-columns: 56px 1fr; }
-.app.nav-collapsed .brand { padding: 14px 0 12px; text-align: center; }
-.app.nav-collapsed .brand h1 { font-size: 0; }
-.app.nav-collapsed .brand h1 .dot-sep { font-size: 20px; }
-.app.nav-collapsed .brand .sub { display: none; }
-.app.nav-collapsed .nav { padding: 10px 6px; }
-.app.nav-collapsed .nav-group-title { font-size: 0; padding: 6px 0; }
-.app.nav-collapsed .nav-group-title::after {
-  content: '·'; font-size: 12px; color: var(--text-faint);
-  display: block; text-align: center;
-}
-.app.nav-collapsed .nav-item { justify-content: center; padding: 9px 0; gap: 0; }
-.app.nav-collapsed .nav-item .ico { width: auto; font-size: 15px; opacity: .9; }
-/* 折叠时标签与角标隐藏 —— 标签文字改用 title 提示 */
-.app.nav-collapsed .nav-label,
-.app.nav-collapsed .nav-item .badge { display: none; }
+/* 侧栏收起：**整条完全隐藏**（用户口径）。
+   之前留 56px 只显示图标，用户明确要求"隐藏的时候都完全隐藏"——
+   展开入口仍在顶栏左侧的 ☰，所以收起后不会有"找不回来"的问题。 */
+.app.nav-collapsed { grid-template-columns: 0 1fr; }
+.app.nav-collapsed .sidebar { display: none; }
+/* 必须显式指定主区在第 2 列：侧栏一旦 display:none 就不再是网格项，
+   .main 会自动落到第 1 列（0px）→ 内容被挤成一条竖排文字。实测踩过。 */
+.main { grid-column: 2; }
 
 .sidebar {
   background: var(--bg-panel);

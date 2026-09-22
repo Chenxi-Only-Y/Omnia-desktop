@@ -71,8 +71,8 @@
   --kind-defend: #3A5C8A;
   --kind-attack: #8A5630;
   /* 图标托底：职业图标保持原色（用户要求），靠一层托底 + 描边提可读性 */
-  --icon-plate: rgba(255, 255, 255, .30);
-  --icon-plate-bg: #1C1C22;
+  --icon-plate: transparent;
+  --icon-plate-bg: transparent;
   /* 卡片文字色：白字（用户口径，不做描边/阴影等处理） */
   --ink-on-class: #FFFFFF;
 
@@ -630,7 +630,7 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   --ok: #3F6F58; --ok-soft: #DCEBE2;
   --bg-panel: var(--surface); --bg-panel-2: var(--surface-3); --bg-hover: var(--hover);
   --border: var(--line); --border-strong: var(--line-strong);
-  --icon-plate: rgba(74, 68, 89, .30); --icon-plate-bg: #FFFFFF;
+  --icon-plate: transparent; --icon-plate-bg: transparent;
   --radius: 8px; --radius-sm: 5px;
   --shadow: 0 1px 2px rgba(74, 68, 89, .06), 0 2px 8px rgba(74, 68, 89, .05);
   --shadow-lift: 0 4px 16px rgba(74, 68, 89, .16);
@@ -1096,7 +1096,7 @@ tr.row--leave > td { background: var(--surface-3); }
    尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
 .pcard__icon {
   width: 22px; height: 22px; flex: 0 0 auto; object-fit: contain;
-  background: rgba(255, 255, 255, .82); border-radius: 4px; padding: 1px;
+  background: transparent; border-radius: 4px; padding: 0;
   box-sizing: border-box;
 }
 
@@ -1634,3 +1634,20 @@ table.grid tbody td, table.grid tbody th { color: #0B0B0D !important; }
   border-color: rgba(11, 11, 13, .18) !important;
 }
 .input::placeholder { color: #7C7C88 !important; }
+
+
+/* ═══ 职业图标一律透明托底（用户口径：「职业的图片也是得透明的」）═══
+   原来图标后面有一层深色（--icon-plate-bg: #1C1C22）或白色小方底，
+   在卡片/表格里看就是一个个色块。这里统一清掉底色与描边、去掉内边距，
+   只留图标本身的原色（既定口径：职业图标不改色）。
+   ═══════════════════════════════════════════════════════════════ */
+.chip img, .chip .ico, .chip .icon,
+.picker-item img, .picker-item__main img, .picker-item__sub img,
+table.grid img, .roster-card img, .stat img, .card img,
+.pcard__icon, .home-tray__plate img {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}

@@ -1683,3 +1683,29 @@ table.grid img, .roster-card img, .stat img, .card img,
   .picker-item__main:active > *, .picker-item__sub:active > * { animation: none; }
   .picker-item__main:hover > *, .picker-item__sub:hover > * { transform: none; }
 }
+
+
+/* ═══ 职业标签：悬停上移一点点（与首页职业图标一致），移开恢复 ═════
+   上一版我写的 .picker-item__main / .picker-item__sub **这两个类根本不存在**
+   （实测 DOM：候选是 .picker-group，标签是 .chip.class，图标是 .chip-icon），
+   所以写了等于没写 —— 这就是「没动啊」的原因。
+   这次按实测到的真实类名写，效果对齐首页 .home-tray__item:hover 的 translateY(-2px)。
+   ═══════════════════════════════════════════════════════════════ */
+.picker-group .chip, .chip.class, .chip-icon {
+  transition: transform .15s cubic-bezier(.2, .7, .2, 1), background-color .15s ease;
+  will-change: transform;
+}
+.picker-group .chip:hover, .chip.class:hover {
+  transform: translateY(-3px);
+  background: transparent !important;
+}
+.picker-group .chip:active, .chip.class:active { transform: translateY(-1px); }
+/* 外圈不再做任何底色加深（上一轮的口径） */
+.picker-group .chip, .picker-group .chip:hover, .picker-group .chip:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .picker-group .chip:hover, .chip.class:hover,
+  .picker-group .chip:active, .chip.class:active { transform: none; }
+}

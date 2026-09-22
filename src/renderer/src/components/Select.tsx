@@ -36,11 +36,18 @@ export default function Select({
       const p = (c as unknown as { props: OptProps }).props;
       return { value: String(p.value ?? ''), label: p.children, disabled: !!p.disabled };
     });
+  // 过滤掉 select / input 这类**原生控件类名**：它们自带底色+描边+内边距，
+  // 套在外层 <details> 上就会和里面的 .sel__btn 形成"双框套娃"（用户反馈：太丑了）。
+  // 盒子统一由 .sel__btn 提供，外层只做定位。
+  const cls = String(className ?? '')
+    .split(/\s+/)
+    .filter((c) => c && c !== 'select' && c !== 'input')
+    .join(' ');
   const curVal = String(value ?? '');
   const cur = opts.find((o) => o.value === curVal) ?? opts[0];
 
   return (
-    <details className={'sel' + (className ? ' ' + className : '')} style={style} onClick={onClick}>
+    <details className={'sel' + (cls ? ' ' + cls : '')} style={style} onClick={onClick}>
       <summary className="sel__btn" title={title} aria-disabled={disabled || undefined}>
         {icon && <img className="sel__ico" src={icon} alt="" />}
         <span className="sel__txt" style={color ? { color } : undefined}>{cur ? cur.label : ''}</span>

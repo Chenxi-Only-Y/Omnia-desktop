@@ -430,7 +430,7 @@ function PlayerCard({
           value={cls || row.mainClass || row.subClass}
           title="选择本场使用职业"
           icon={icon ?? undefined}
-          color={def ? def.color : undefined}
+          /* 不要在这里传职业色：卡片底色就是职业色，同色文字会隐形（只剩箭头） */
           onClick={(e) => e.stopPropagation()}
           onChange={(e) => onChangeClass(row.playerId, e.target.value)}
         >

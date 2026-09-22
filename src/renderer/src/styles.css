@@ -1982,3 +1982,10 @@ table.grid img, .roster-card img, .stat img, .card img,
 }
 .sel[open] > .sel__btn { background: rgba(255, 255, 255, .95) !important; }
 .cfm__box { background: rgba(255, 255, 255, .95) !important; }
+
+/* 卡片上的职业：图标 + 职业名，白字（与原来的样子一致） */
+.pcard .sel__btn { color: inherit !important; }
+.pcard .sel__txt { color: inherit !important; }
+.pcard .sel__ico { width: 22px; height: 22px; }
+/* 展开的列表里才用深色文字，保证在白底列表上可读 */
+.pcard .sel__list .sel__opt { color: #0B0B0D !important; }

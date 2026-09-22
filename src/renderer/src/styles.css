@@ -1651,3 +1651,26 @@ table.grid img, .roster-card img, .stat img, .card img,
   box-shadow: none !important;
   padding: 0 !important;
 }
+
+
+/* ═══ 去掉候选/列表里过于明显的分割线（用户口径：「好明显的分割线」）═══
+   之前每一项都带 1px 描边，一层层排下来像表格线。
+   这里：项本身无边框，仅保留极轻的底色区分；分隔靠间距而不是线。
+   职业标签（素问/妙音那种带职业色圆环的）保持原样 —— 那是内容不是分割线。
+   ═══════════════════════════════════════════════════════════════ */
+.picker-item, .picker-item__main, .picker-item__sub, .picker-card {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.picker-item + .picker-item, .picker-item--split + .picker-item--split {
+  border-top: none !important;
+}
+/* 候选卡片本身用极轻的白底，去掉那圈灰边 */
+.picker-item {
+  background-color: rgba(255, 255, 255, .34) !important;
+}
+.picker-item:hover { background-color: rgba(255, 255, 255, .62) !important; }
+/* 表格行线也压淡（原来 1px 实线太抢眼） */
+table.grid tbody td, table.grid tbody th { border-color: rgba(11, 11, 13, .06) !important; }
+table.grid thead th { border-color: rgba(11, 11, 13, .10) !important; }

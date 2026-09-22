@@ -104,6 +104,42 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
     [signupRows, placedIds],
   );
 
+  /**
+   * 自愈：在队但没有格号（slotNo = -1）的人，补一个固定格号并落库。
+   * 不补的话，看板对 -1 的人是「从最左的空位补位」——
+   * 删掉左边的人时，他就会往前跳一格，看起来就是「右边的往左移」。
+   * 实测复现：欠囚(slotNo=-1) 在心一丶(第0格) 被删后从 x=507 跳到 x=333。
+   */
+  useEffect(() => {
+    if (matchId === null) return;
+    const isBench = (q: string) => (BENCH_SQUADS as readonly string[]).includes(q);
+    const need = our.filter((r) => r.squad && !isBench(r.squad) && (r.slotNo ?? -1) < 0);
+    if (!need.length) return;
+    const used = new Map<string, number[]>();
+    for (const r of our) {
+      if (!r.squad || isBench(r.squad)) continue;
+      const arr = used.get(r.squad) ?? [];
+      if ((r.slotNo ?? -1) >= 0) arr.push(r.slotNo);
+      used.set(r.squad, arr);
+    }
+    void (async () => {
+      try {
+        for (const r of need) {
+          const arr = used.get(r.squad) ?? [];
+          let slot = 0;
+          while (arr.includes(slot)) slot += 1;
+          arr.push(slot);
+          used.set(r.squad, arr);
+          await api.match.assignBulk({
+            matchId, playerIds: [r.playerId], squad: r.squad, allowOverfill: true, slotIndex: slot,
+          });
+        }
+        await loadDetail(matchId);
+      } catch { /* 补不上就算了，不打断正常使用 */ }
+    })();
+    // 依赖 our：补完会重新加载，新的 our 里没有 -1，自然终止，不会循环
+  }, [our, matchId, loadDetail]);
+
   async function run(fn: () => Promise<unknown>, okMsg?: string) {
     try {
       await fn();

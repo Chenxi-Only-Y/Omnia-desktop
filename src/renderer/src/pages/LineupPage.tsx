@@ -191,7 +191,14 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   async function changeClass(playerId: number, cls: string) {
     if (matchId === null) return;
     await run(async () => {
-      await api.match.upsertParticipation({ matchId, playerId, classUsed: cls });
+      // 必须把 squad / state 一起带上：upsertParticipation 是
+      // ON CONFLICT DO UPDATE SET squad = excluded.squad …，
+      // 只传 classUsed 会把 squad 写成空串 → 人从格子里消失。
+      await api.match.upsertParticipation({
+        matchId, playerId, classUsed: cls,
+        squad: our.find((r) => r.playerId === playerId)?.squad ?? '',
+        state: our.find((r) => r.playerId === playerId)?.state ?? 'PLAY',
+      });
       setNotice(`本场职业已改为「${cls}」`);
     });
   }

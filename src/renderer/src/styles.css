@@ -1716,3 +1716,20 @@ table.grid img, .roster-card img, .stat img, .card img,
 @media (prefers-reduced-motion: reduce) {
   .picker-group .chip, .chip.class { transition-duration: .01s; }
 }
+
+/* 卡片上的职业下拉：跟卡片一体，去掉系统灰框（用户口径：好丑） */
+.pcard .pcard__cls--edit {
+  appearance: none; -webkit-appearance: none;
+  background: transparent !important;
+  border: none !important; outline: none !important; box-shadow: none !important;
+  color: inherit !important; font: inherit !important; font-size: 15px !important;
+  line-height: 1.2 !important; padding: 0 16px 0 0 !important; margin: 0 !important;
+  width: auto; max-width: 100%; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%) !important;
+  background-position: calc(100% - 7px) 55%, calc(100% - 3px) 55% !important;
+  background-size: 4px 4px, 4px 4px !important;
+  background-repeat: no-repeat !important;
+}
+.pcard .pcard__cls--edit:hover { opacity: .85; }
+.pcard .pcard__cls--edit option { background: #FFFFFF; color: #0B0B0D; }

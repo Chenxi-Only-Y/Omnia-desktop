@@ -510,6 +510,9 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
               ] as [SortKey, string][]).map(([k, label]) => (
                 <span key={k} className={`th${sortKey === k ? ' th--active' : ''}`}
                       title="点击排序（再点一次反序）"
+                      // 序这一列的内容是居中的（.roster-card__order-text），
+                      // 表头也得居中才对得上（原来表头一律左对齐 → 用户反馈"序没对齐"）
+                      style={k === 'order' ? { textAlign: 'center' } : undefined}
                       onClick={() => toggleSort(k)}>
                   {label}{sortKey === k ? (sortDir === 1 ? ' ↑' : ' ↓') : ''}
                 </span>

@@ -88,6 +88,22 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   );
   const missingSlots = Math.max(0, capacity - assigned);
 
+  /** 已排进小队的人（用户口径：选过之后要从候选里**同步消失**） */
+  const placedIds = useMemo(
+    () => new Set(
+      our.filter((r) => r.squad && !(BENCH_SQUADS as readonly string[]).includes(r.squad))
+        .map((r) => r.playerId),
+    ),
+    [our],
+  );
+  /** 候选 = 本场报名里**还没排进小队**的。原来直接把全部报名丢给选择器，
+      于是被排过的人还留在列表里（只显示所在队伍），没排过的却因为别的原因消失，
+      表现不一致 —— 现在统一：排进小队即从候选移除。 */
+  const candidates = useMemo(
+    () => signupRows.filter((r) => !placedIds.has(r.playerId)),
+    [signupRows, placedIds],
+  );
+
   async function run(fn: () => Promise<unknown>, okMsg?: string) {
     try {
       await fn();
@@ -205,7 +221,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
         </div>
         {showAdd && (
           <AddPlayerPicker
-            candidates={signupRows}
+            candidates={candidates}
             existing={new Set(our.map((r) => r.playerId))}
             classMap={classMap}
             onPick={(id, subClass) => { void addPlayer(id, subClass); }}
@@ -247,7 +263,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       {cellPick && (
         <CellPicker
           squad={cellPick.squad}
-          candidates={signupRows}
+          candidates={candidates}
           rows={our}
           classMap={classMap}
           onClose={() => setCellPick(null)}

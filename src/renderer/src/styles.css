@@ -488,13 +488,12 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
 }
 .home-tray__plate {
   width: 48px; height: 48px; border-radius: 50%;
-  background: var(--bg-elev-2); border: 1px solid var(--line);
+  /* 用户口径：职业图标托盘与背景一致（透明）—— 只要原色图标，不要深色圆底 */
+  background: transparent; border: none;
   display: grid; place-items: center;
   transition: border-color .15s ease, transform .15s ease;
 }
-.home-tray__item:hover .home-tray__plate {
-  border-color: var(--line-strong); transform: translateY(-2px);
-}
+.home-tray__item:hover .home-tray__plate { transform: translateY(-2px); }
 .home-tray__plate img { width: 26px; height: 26px; object-fit: contain; }
 .home-tray__label { font-size: 10px; letter-spacing: .04em; color: var(--text-faint); }
 
@@ -1409,11 +1408,19 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
   color: #0B0B0D !important;
   border-color: rgba(11, 11, 13, .18) !important;
 }
-.sidebar, .topbar {
+.sidebar {
   background: rgba(11, 11, 13, .55) !important;
   backdrop-filter: blur(18px) saturate(1.15);
   -webkit-backdrop-filter: blur(18px) saturate(1.15);
   border-color: rgba(255, 255, 255, .08);
+}
+/* 用户口径：顶栏**透明**（不要那条深色横带），收起导航栏按钮保持原样 */
+.topbar {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 /* 二级：白色半透明（卡内的行/格子/浮层），文字翻黑 */
 .stat, .roster-card, .picker-item, .modal, .home-card, .roster-cards__head {

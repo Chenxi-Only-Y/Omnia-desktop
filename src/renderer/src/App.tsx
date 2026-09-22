@@ -37,7 +37,8 @@ export default function App() {
   const [classMap, setClassMap] = useState<Map<string, ClassInfo>>(new Map());
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
-  const [playerCount, setPlayerCount] = useState<number | null>(null);
+  // 顶栏已只保留「收起导航栏」按钮，成员人数不再显示；setter 仍被别处调用
+  const [, setPlayerCount] = useState<number | null>(null);
   /** 在成员主档里点开的成员详情 */
   const [detailId, setDetailId] = useState<number | null>(null);
   /** 侧栏折叠：偏好存进库（app_setting），下次打开保持原样 */
@@ -108,10 +109,6 @@ export default function App() {
           >
             {navOpen ? '«' : '☰'}
           </button>
-          <h2>{NAV.find((n) => n.key === page)?.label}</h2>
-          <div className="spacer" />
-          {playerCount !== null && <span className="meta">成员 {playerCount} 人</span>}
-          {info && <span className="meta">Electron {info.electron} · Node {info.node}</span>}
         </header>
 
         <section className={`content${page === 'overview' ? ' content--flush-top' : ''}`}>

@@ -40,30 +40,32 @@ function apply(kind: string, file: string) {
       video.onloadedmetadata = () => { try { video!.currentTime = t; void video!.play(); } catch { /* 自动播放策略 */ } };
       // 解码自检：能读元数据 ≠ 能解画面（HEVC 读得到 metadata 但解不出帧）。
       // 解不出来就把 <video> 藏掉，露出下面的 preview 动图 —— 否则黑画面会盖住预览。
-      // **视频一律先转码**：10-bit/HDR 能解出帧但合成黑屏（实测 278 帧仍黑），
-      // 任何运行时检测都发现不了 —— 唯一可靠做法是转成 8-bit H.264。
-      // preview 只是转码期占位；转码 async、按 mtime 缓存，转过一次后秒开。
+      // 视频**直接播**：实测源文件是 h264 8-bit yuv420p，Chromium 能解码（278 帧）。
+      // 之前"黑"的真因是①满幅不透明层盖住②我在 4K 转码的 136 秒里把 opacity 设成 0。
+      // 所以这里不再改可见性；只有真解不出帧时才后台转码兜底。
       {
-        video!.style.opacity = '0';           // 转码期先不显示（避免黑块盖住 preview）
-        window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-          detail: '视频壁纸正在转码为 8-bit H.264（首次较慢，之后秒开）…',
-        }));
-        void (async () => {
-          try {
-            const out = await api.player.wallpaperTranscode();
-            video!.src = 'file:///' + out.replace(/[\\/]+/g, '/');
-            video!.style.opacity = '1';
-            void video!.play();
-            window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-              detail: '转码完成，已用 H.264 全分辨率播放（已缓存）',
-            }));
-          } catch (err) {
-            video!.style.opacity = '0';
-            window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-              detail: '转码失败，保持预览图：' + String(err).slice(0, 80),
-            }));
-          }
-        })();
+        let gotFrame = false;
+        try { video!.requestVideoFrameCallback(() => { gotFrame = true; }); } catch { gotFrame = true; }
+        setTimeout(() => {
+          if (gotFrame) return;   // 正常解码 → 什么都不做，mp4 直接播
+          window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+            detail: '该视频解不出帧，后台转码中（当前画面不受影响）…',
+          }));
+          void (async () => {
+            try {
+              const out = await api.player.wallpaperTranscode();
+              video!.src = 'file:///' + out.replace(/[\\/]+/g, '/');
+              void video!.play();
+              window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+                detail: '转码完成，已切换到 H.264',
+              }));
+            } catch (err) {
+              window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
+                detail: '转码失败，保持预览图：' + String(err).slice(0, 80),
+              }));
+            }
+          })();
+        }, 3000);
       }
       video.onerror = () => {
         video!.style.display = 'none';

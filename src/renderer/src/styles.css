@@ -1826,19 +1826,34 @@ table.grid img, .roster-card img, .stat img, .card img,
 /* 排表卡片里的职业下拉：透明、随卡片字色、图标+文字同色 */
 .pcard .sel__btn { background: transparent !important; backdrop-filter: none !important; border: none !important; }
 
-/* 下拉「展开/选中」态 = 深色玻璃（用户口径：下滑选中就深色玻璃） */
+/* ═══ 下拉展开态（用户口径修正）════════════════════════════════
+   ① 之前写成深色玻璃 → 用户说「选中才深点点不是黑色」，改回半透明磨砂，
+      选中项只加一点点深灰底。
+   ② 展开的列表被**下一张卡片盖住** → 给正在展开的那一层抬 z-index。
+      用 :has() 精准命中"里面有展开下拉"的容器，不影响别的层。
+   ═══════════════════════════════════════════════════════════════ */
 .sel[open] > .sel__btn {
-  background: rgba(19, 19, 23, .78) !important;
-  color: #FFFFFF !important;
-  border-color: rgba(255, 255, 255, .22) !important;
+  background: rgba(255, 255, 255, .74) !important;
+  color: #0B0B0D !important;
+  border-color: rgba(11, 11, 13, .30) !important;
 }
 .sel[open] .sel__list {
-  background: rgba(19, 19, 23, .78) !important;
-  backdrop-filter: blur(24px) saturate(1.25);
-  -webkit-backdrop-filter: blur(24px) saturate(1.25);
-  border-color: rgba(255, 255, 255, .18) !important;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .45);
+  background: rgba(255, 255, 255, .80) !important;
+  backdrop-filter: blur(22px) saturate(1.3);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3);
+  border-color: rgba(255, 255, 255, .55) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .26);
 }
-.sel[open] .sel__opt { color: rgba(255, 255, 255, .88); }
-.sel[open] .sel__opt:hover { background: rgba(255, 255, 255, .12); color: #FFFFFF; }
-.sel[open] .sel__opt.on { background: rgba(255, 255, 255, .18); color: #FFFFFF; font-weight: 700; }
+.sel[open] .sel__opt { color: #0B0B0D; }
+.sel[open] .sel__opt:hover { background: rgba(11, 11, 13, .07); }
+/* 选中项：只深一点点，不是黑块 */
+.sel[open] .sel__opt.on { background: rgba(11, 11, 13, .12); color: #0B0B0D; font-weight: 700; }
+
+/* 抬层级：正在展开下拉的容器整体提到最前，避免被下一张卡片盖住 */
+.sel[open] { z-index: 80; }
+.toolbar:has(.sel[open]),
+.card:has(.sel[open]),
+.stat:has(.sel[open]),
+.roster-cards__head:has(.sel[open]),
+.home-card:has(.sel[open]),
+.field:has(.sel[open]) { position: relative; z-index: 75; }

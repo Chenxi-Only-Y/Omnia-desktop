@@ -222,8 +222,8 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
               <table className="grid">
                 <thead>
                   <tr>
-                    <th>有效击杀</th><th>助攻</th><th>有效人伤</th><th>有效塔伤</th>
-                    <th>治疗量</th><th>承伤</th><th>重伤</th>
+                    <th className="num">有效击杀</th><th className="num">助攻</th><th className="num">有效人伤</th><th className="num">有效塔伤</th>
+                    <th className="num">治疗量</th><th className="num">承伤</th><th className="num">重伤</th>
                   </tr>
                 </thead>
                 <tbody>

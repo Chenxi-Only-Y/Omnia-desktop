@@ -110,8 +110,8 @@ export default function SeasonsPage({ onSeasonChanged }: Props) {
                 <th style={{ width: 60 }}>状态</th>
                 <th style={{ width: 180 }}>名称</th>
                 <th style={{ width: 230 }}>起止</th>
-                <th style={{ width: 80 }}>对局</th>
-                <th style={{ width: 80 }}>规则集</th>
+                <th className="num" style={{ width: 80 }}>对局</th>
+                <th className="num" style={{ width: 80 }}>规则集</th>
                 <th style={{ width: 200 }}>数据区间</th>
                 <th>备注</th>
                 <th style={{ width: 210 }}>操作</th>

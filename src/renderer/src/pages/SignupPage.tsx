@@ -315,7 +315,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
           <table className="grid">
             <thead>
               <tr>
-                <th style={{ width: 50 }}>序</th>
+                <th className="num" style={{ width: 50 }}>序</th>
                 <th>ID</th>
                 <th style={{ width: 90 }}>主职业</th>
                 <th style={{ width: 90 }}>副职</th>
@@ -426,7 +426,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
               <table className="grid">
                 <thead>
                   <tr>
-                    <th style={{ width: 56 }}>行</th>
+                    <th className="num" style={{ width: 56 }}>行</th>
                     <th style={{ minWidth: 180 }}>ID（可改）</th>
                     <th style={{ width: 104 }}>参加/请假</th>
                     <th style={{ width: 78 }}>麦</th>

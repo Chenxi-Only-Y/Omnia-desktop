@@ -6,7 +6,8 @@ import { MATCH_RESULT_LABEL } from '@shared/domain';
 
 type Tab = 'attendance' | 'completeness' | 'lineup';
 
-export default function BoardPage({ classMap }: PageProps) {
+export default function BoardPage(_props: PageProps) {
+  // 不再用 classMap：出勤明细里的职业列已按用户口径移除（职业只在单场视图显示）
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('attendance');
@@ -83,21 +84,22 @@ export default function BoardPage({ classMap }: PageProps) {
             <table className="grid">
               <thead>
                 <tr>
-                  <th style={{ width: 50 }}>#</th>
+                  <th className="num" style={{ width: 50 }}>#</th>
                   <th>成员</th>
-                  <th style={{ width: 90 }}>主职业</th>
+                  {/* 职业不在这里显示 —— 用户口径：职业只在**看单场数据**时出现，
+                      而且要显示该场报名表里上传的那个职业。这里是跨场汇总，没有"哪个职业"一说。 */}
                   <th style={{ width: 90 }}>备注角色</th>
-                  <th style={{ width: 70 }}>场次</th>
-                  <th style={{ width: 70 }}>上场</th>
-                  <th style={{ width: 70 }}>替补</th>
-                  <th style={{ width: 70 }}>请假</th>
-                  <th style={{ width: 110 }}>出勤率</th>
-                  <th style={{ width: 110 }}>战报已填</th>
+                  <th className="num" style={{ width: 70 }}>场次</th>
+                  <th className="num" style={{ width: 70 }}>上场</th>
+                  <th className="num" style={{ width: 70 }}>替补</th>
+                  <th className="num" style={{ width: 70 }}>请假</th>
+                  <th className="num" style={{ width: 110 }}>出勤率</th>
+                  <th className="num" style={{ width: 110 }}>战报已填</th>
                 </tr>
               </thead>
               <tbody>
                 {attendance.length === 0 && (
-                  <tr><td className="empty" colSpan={10}>还没有成员或对局数据</td></tr>
+                  <tr><td className="empty" colSpan={9}>还没有成员或对局数据</td></tr>
                 )}
                 {attendance.map((r, i) => (
                   <tr key={r.playerId}>
@@ -110,16 +112,6 @@ export default function BoardPage({ classMap }: PageProps) {
                           {r.status === 'left' ? '离队' : '暂离'}
                         </span>
                       )}
-                    </td>
-                    <td>
-                      <span className="chip class"
-                            style={{
-                              borderColor: classMap.get(r.mainClass)?.color ?? 'var(--line-strong)',
-                              color: 'var(--text)',
-                            }}>
-                        <span className="dot" style={{ background: classMap.get(r.mainClass)?.color ?? 'var(--text-faint)' }} />
-                        {r.mainClass || '—'}
-                      </span>
                     </td>
                     <td>{r.noteRole ? <span className="badge-note">{r.noteRole}</span> : '—'}</td>
                     <td className="num">{r.matches}</td>
@@ -155,8 +147,8 @@ export default function BoardPage({ classMap }: PageProps) {
                     <th style={{ width: 130 }}>场次</th>
                     <th style={{ width: 70 }}>结果</th>
                     <th>对手</th>
-                    <th style={{ width: 90 }}>上场</th>
-                    <th style={{ width: 90 }}>已填战报</th>
+                    <th className="num" style={{ width: 90 }}>上场</th>
+                    <th className="num" style={{ width: 90 }}>已填战报</th>
                     <th style={{ width: 160 }}>完整度</th>
                   </tr>
                 </thead>
@@ -239,7 +231,7 @@ export default function BoardPage({ classMap }: PageProps) {
             <div className="table-wrap" style={{ maxHeight: '40vh' }}>
               <table className="grid">
                 <thead>
-                  <tr><th>小队</th><th style={{ width: 110 }}>战斗组</th><th style={{ width: 80 }}>类别</th><th style={{ width: 90 }}>上场人次</th></tr>
+                  <tr><th>小队</th><th style={{ width: 110 }}>战斗组</th><th style={{ width: 80 }}>类别</th><th className="num" style={{ width: 90 }}>上场人次</th></tr>
                 </thead>
                 <tbody>
                   {data.squadUsage.length === 0 && <tr><td className="empty" colSpan={4}>还没有排入小队的记录</td></tr>}

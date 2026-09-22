@@ -115,8 +115,8 @@ export default function SettingsPage({ info }: Props) {
               <tr>
                 <th style={{ width: 160 }}>战斗组</th>
                 <th style={{ width: 80 }}>类别</th>
-                <th style={{ width: 90 }}>小队数</th>
-                <th style={{ width: 100 }}>槽位</th>
+                <th className="num" style={{ width: 90 }}>小队数</th>
+                <th className="num" style={{ width: 100 }}>槽位</th>
                 <th>小队</th>
                 <th style={{ width: 90 }}>操作</th>
               </tr>
@@ -166,8 +166,8 @@ export default function SettingsPage({ info }: Props) {
                 <th style={{ width: 150 }}>小队</th>
                 <th style={{ width: 110 }}>战斗组</th>
                 <th style={{ width: 110 }}>战术</th>
-                <th style={{ width: 70 }}>人数</th>
-                <th style={{ width: 70 }}>序号</th>
+                <th className="num" style={{ width: 70 }}>人数</th>
+                <th className="num" style={{ width: 70 }}>序号</th>
                 <th style={{ width: 90 }}>操作</th>
               </tr>
             </thead>

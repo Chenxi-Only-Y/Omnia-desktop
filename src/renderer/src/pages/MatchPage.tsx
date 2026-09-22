@@ -174,13 +174,13 @@ export default function MatchPage({ classes, classMap }: Props) {
             <thead>
               <tr>
                 <th style={{ width: 108 }}>日期</th>
-                <th style={{ width: 60 }}>场次</th>
+                <th className="num" style={{ width: 60 }}>场次</th>
                 <th>我方</th>
                 <th>对手</th>
                 <th style={{ width: 60 }}>结果</th>
-                <th style={{ width: 120 }}>塔数（我/敌）</th>
-                <th style={{ width: 100 }}>我方参战</th>
-                <th style={{ width: 100 }}>已录战报</th>
+                <th className="num" style={{ width: 120 }}>塔数（我/敌）</th>
+                <th className="num" style={{ width: 100 }}>我方参战</th>
+                <th className="num" style={{ width: 100 }}>已录战报</th>
                 <th style={{ width: 130 }}>操作</th>
               </tr>
             </thead>

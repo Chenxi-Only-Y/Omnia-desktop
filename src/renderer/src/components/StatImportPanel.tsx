@@ -138,7 +138,7 @@ export default function StatImportPanel({
               <div className="table-wrap" style={{ maxHeight: 180 }}>
                 <table className="grid">
                   <thead>
-                    <tr><th style={{ width: 60 }}>行</th><th style={{ width: 70 }}>级别</th><th style={{ width: 170 }}>分类</th><th style={{ width: 110 }}>对象</th><th>说明</th></tr>
+                    <tr><th className="num" style={{ width: 60 }}>行</th><th style={{ width: 70 }}>级别</th><th style={{ width: 170 }}>分类</th><th style={{ width: 110 }}>对象</th><th>说明</th></tr>
                   </thead>
                   <tbody>
                     {preview.issues.map((i, idx) => (
@@ -164,7 +164,7 @@ export default function StatImportPanel({
               <table className="grid">
                 <thead>
                   <tr>
-                    <th style={{ width: 50 }}>行</th>
+                    <th className="num" style={{ width: 50 }}>行</th>
                     <th style={{ width: 120 }}>队员</th>
                     <th style={{ width: 80 }}>职业</th>
                     <th style={{ width: 90 }}>匹配</th>

@@ -169,7 +169,7 @@ export default function RulesPage({ classes }: PageProps) {
           <table className="grid">
             <thead>
               <tr>
-                <th style={{ width: 60 }}>版本</th>
+                <th className="num" style={{ width: 60 }}>版本</th>
                 <th>名称</th>
                 <th style={{ width: 70 }}>激活</th>
                 <th style={{ width: 200 }}>分制</th>

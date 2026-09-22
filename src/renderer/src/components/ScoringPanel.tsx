@@ -115,7 +115,7 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
           <table className="grid">
             <thead>
               <tr>
-                <th style={{ width: 50 }}>#</th>
+                <th className="num" style={{ width: 50 }}>#</th>
                 <th>队员</th>
                 <th style={{ width: 110 }}>小队</th>
                 <th className="num" style={{ width: 90 }}>团队分</th>

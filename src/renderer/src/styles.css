@@ -250,6 +250,9 @@ table.grid thead th {
 }
 table.grid tbody tr:hover { background: var(--bg-hover); }
 table.grid td.num { text-align: right; }
+/* 数值列的表头也要右对齐：原来只有 td.num 有规则，表头一律左对齐，
+   于是「序号/场次/上场…」这些列的表头与内容对不上（用户反馈"序号没对准"）。 */
+table.grid th.num { text-align: right; }
 table.grid td.actions { text-align: right; }
 table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px; }
 

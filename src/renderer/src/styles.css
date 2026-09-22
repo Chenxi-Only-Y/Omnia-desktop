@@ -643,16 +643,8 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
    和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
 .hero-cover.home-cover {
   /* 白底降为叠层（约 88% 不透明）→ 壁纸透得出来，但仍读作「白底」 */
-  /* 用户口径（更新）：首页下滑区与上面**一致** —— 也透出壁纸。
-     上面首屏是「壁纸 + 压暗蒙层」，这里就是「壁纸 + 白蒙层」：
-     白纱 72% 叠在壁纸上，既透出画面，文字也仍然可读。
-     其余页顶栏保持透明，不受影响。 */
-  background-color: rgba(255, 255, 255, .72);
-  background-image: var(--wallpaper-image, none);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  /* 撤销上一版：首页下滑区回到**纯白**（我误把"上面"理解成了首屏） */
+  background: #FFFFFF;
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F4F4F6;
@@ -1475,7 +1467,7 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
   color: #0B0B0D;
 }
 /* 排表功能区（.theme-light）显式还原：不透明浅色、不磨砂 —— 用户要求不做改动 */
-/* 用户口径更新：排表区**也**套三级卡片；只保留卡内浅色令牌，
+/* 用户口径更新：排表区也套三级卡片；只保留卡内浅色令牌，
    .pcard 等职业色块不受影响（换职业仍按职业色）。 */
 .theme-light .stat, .theme-light .roster-card,
 .theme-light .picker-item, .theme-light .modal,
@@ -1500,7 +1492,6 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
 .card, .board, .home-card { border-radius: 18px; }
 .stat, .modal, .roster-cards__head { border-radius: 14px; }
 .roster-card { border-radius: 12px; }
-.board__half, .board__halves, .board__divider, .board__scroll { border-radius: 12px; }
 
 /* ═══ 侧栏选中项：不要纯黑，用半透明叠层（壁纸透得过去）══════════
    原来选中态是实心黑块，把壁纸磨砂效果整个压没了。
@@ -1524,23 +1515,17 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
 .tab.active { border-radius: 999px !important; }
 
 
-/* ═══ 排表：标题/小队名不再溢出容器（用户反馈文字超出被裁）══════
-   原因：这些是 flex 子项，默认 min-width:auto 不肯收缩，
-   小队名又是 nowrap → 直接顶出容器右侧；左侧标题同样被裁。
+/* ═══ 顶部导航条（用户说的"上面那块"）══════════════════════════
+   它必须和下方内容一致：透出壁纸，不要自己一条深色横带。
+   之前只设了 background:transparent，但 .topbar 在网格里仍可能被
+   兄弟层的不透明底顶上来 —— 这里补上定位与层级，并清掉任何底/描边/滤镜。
    ═══════════════════════════════════════════════════════════════ */
-.board__head, .board__unassigned, .board__half, .board__group,
-.board__halves, .board__scroll {
-  min-width: 0;
+.topbar {
+  position: relative; z-index: 2;
+  background: transparent !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
-.board__head, .board__unassigned {
-  flex-wrap: wrap; row-gap: 6px;
-}
-.board__stat, .board__unassigned-title, .board__chip,
-.board__calligraphy, .board [class*="name"], .board [class*="title"] {
-  min-width: 0; max-width: 100%;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-/* 胶囊按钮在被压缩时也不许顶破容器 */
-.board__chip { display: inline-block; box-sizing: border-box; }
-/* 半区/分组内的行同样允许收缩换行 */
-.board__half > *, .board__group > *, .board__halves > * { min-width: 0; }

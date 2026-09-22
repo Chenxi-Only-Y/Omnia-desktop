@@ -40,36 +40,36 @@ function apply(kind: string, file: string) {
       video.onloadedmetadata = () => { try { video!.currentTime = t; void video!.play(); } catch { /* 自动播放策略 */ } };
       // 解码自检：能读元数据 ≠ 能解画面（HEVC 读得到 metadata 但解不出帧）。
       // 解不出来就把 <video> 藏掉，露出下面的 preview 动图 —— 否则黑画面会盖住预览。
-      video.onloadeddata = () => {
-        // videoWidth 来自容器元数据（HEVC 没解码器也读得到），不能用它判断。
-        // requestVideoFrameCallback 只在**真解出一帧**时才回调；2.5 秒没出帧 = 解不了。
+      // 解码自检**不依赖事件**：HEVC 无解码器时 onloadeddata 根本不触发（只有 loadedmetadata
+      // 会触发），挂事件上就永远查不到。这里挂上 src 就起定时器，2.5 秒后必查：
+      // requestVideoFrameCallback 只在真解出一帧时才回调 —— 没出帧就是解不了。
+      {
         let gotFrame = false;
         try { video!.requestVideoFrameCallback(() => { gotFrame = true; }); } catch { gotFrame = true; }
-        setTimeout(() => {
-          if (gotFrame) return;
+        const hideAndTranscode = () => {
           video!.style.display = 'none';
           window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-            detail: '该视频解不出帧（HEVC/H.265 本机无解码器），正在转码为 H.264…',
+            detail: 'mp4 解不出帧（HEVC/H.265 本机无解码器），正在转码为 H.264…',
           }));
           void (async () => {
             try {
               const out = await api.player.wallpaperTranscode();
               video!.src = 'file:///' + out.replace(/[\\/]+/g, '/');
               video!.style.display = '';
-              video!.onloadeddata = null;
               video!.onerror = null;
               void video!.play();
               window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-                detail: '转码完成，已用 H.264 播放（已缓存，下次秒开）',
+                detail: '转码完成，已用 H.264 全分辨率播放（已缓存，下次秒开）',
               }));
             } catch (err) {
               window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
-                detail: '转码失败，保持预览动图：' + String(err).slice(0, 80),
+                detail: '转码失败，退到预览动图：' + String(err).slice(0, 80),
               }));
             }
           })();
-        }, 2500);
-      };
+        };
+        setTimeout(() => { if (!gotFrame) hideAndTranscode(); }, 2500);
+      }
       video.onerror = () => {
         video!.style.display = 'none';
         window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {

@@ -150,6 +150,23 @@ export function registerIpc(ctx: IpcContext): void {
                 }
               }
             } catch { /* 读不了就跳过 */ }
+            // 子目录再找一层大图：WE 的 web 型作品顶层只有 192x192 的 preview，
+            // 真正的素材在子目录里 —— 只取顶层就是「静态壁纸糊」的根因。
+            try {
+              for (const m of fsp.readdirSync(fp, { withFileTypes: true })) {
+                if (!m.isDirectory()) continue;
+                const sub = pth.join(fp, m.name);
+                for (const n of fsp.readdirSync(sub, { withFileTypes: true })) {
+                  if (!n.isFile()) continue;
+                  const ext = pth.extname(n.name).toLowerCase();
+                  if (!IMG.has(ext) || /^preview/i.test(n.name)) continue;
+                  const full = pth.join(sub, n.name);
+                  let sz = 0;
+                  try { sz = fsp.statSync(full).size; } catch { continue; }
+                  if (sz > imgSize) { img = { name: title, file: full, kind: 'image', ext: ext.slice(1) }; imgSize = sz; }
+                }
+              }
+            } catch { /* 读不了就跳过 */ }
             const pick = best ?? img ?? prev;
             if (pick) out.push(pick);
             continue;

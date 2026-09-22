@@ -38,6 +38,11 @@ const DEV_SERVER_URL = env('OMNIA_DEV_SERVER_URL', 'LIS_DEV_SERVER_URL');
  * %APPDATA%\万象Omnia\，用户此前所有数据在新包里就"看不见"了
  * （不是丢失，而是去了另一个目录）。必须在 app ready 之前调用。
  */
+// 视频壁纸「解码成功但画面黑」：Chromium 走 GPU 硬解 4K60 H.264 时，
+// 部分显卡/驱动会解出帧但合成黑屏（帧计数正常、readyState=4）。
+// 关掉硬件视频解码 → 改软件解码，这类文件就能正常出画。
+app.commandLine.appendSwitch('disable-accelerated-video-decode');
+
 app.setPath('userData', path.join(app.getPath('appData'), 'omnia-desktop'));
 
 let mainWindow: BrowserWindow | null = null;

@@ -124,6 +124,8 @@ html, body, .app, .content {
 }
 
 html, body, #root { height: 100%; margin: 0; }
+/* 内容层抬到壁纸层（z-index:0）之上 */
+#root { position: relative; z-index: 1; }
 
 body {
   background: var(--bg);
@@ -518,8 +520,12 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   display: grid; gap: 18px; margin-top: 32px;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
+/* 换结构：**不用负 z-index**。
+   实测（主进程 capturePage 截图 + 关闭硬解都验证过）：把 <video> 放在 z-index:-1 的
+   容器里，Chromium 合成器会把它丢到根背景之后、整层不出画 —— 帧数/readyState 全正常，
+   但屏幕上什么都没有。改成 z-index:0 + 让 #root 抬到 1 层，视频就正常合成了。 */
 .home-wallpaper {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background-image: var(--wall, none), var(--wallpaper-fallback);
   background-size: cover, cover;
   background-position: center, center;
@@ -565,8 +571,12 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   color: var(--text-faint); font-size: 12px; letter-spacing: .12em;
   animation: home-breathe 3.2s ease-in-out infinite;
 }
-@media (prefers-reduced-motion: reduce) { .home-wallpaper {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+@media (prefers-reduced-motion: reduce) { /* 换结构：**不用负 z-index**。
+   实测（主进程 capturePage 截图 + 关闭硬解都验证过）：把 <video> 放在 z-index:-1 的
+   容器里，Chromium 合成器会把它丢到根背景之后、整层不出画 —— 帧数/readyState 全正常，
+   但屏幕上什么都没有。改成 z-index:0 + 让 #root 抬到 1 层，视频就正常合成了。 */
+.home-wallpaper {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background-image: var(--wall, none), var(--wallpaper-fallback);
   background-size: cover, cover;
   background-position: center, center;

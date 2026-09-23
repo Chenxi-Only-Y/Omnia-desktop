@@ -65,34 +65,43 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const ready = latestSignups.filter((r) => r.signup === 'JOIN').length;
   const capacity = catalog?.capacity ?? TOTAL_MATCH_SLOTS;
 
-  /* 轻推即翻（用户口径：要"丝滑"，不要神经质）。
-     做法：
-       ① **累计**滚轮位移，达到 110px 才翻 —— 滚轮一格约 100px，
-          所以是"确实推了一下"才触发，而不是碰到 2px 就跳（上一版就是 2px，太灵敏）；
-       ② 翻页期间上锁 700ms，避免一次滑动连翻两屏；
-       ③ 用 behavior: smooth，配合上面的冷却，读起来是顺的。
-     只在「滚动位置在顶部」且「数据层存在」时介入，不影响其他页面与数据层内部滚动。 */
+  /* 首屏"轻推即翻"（用户口径：要丝滑、不要神经质）。
+
+     上一版没有任何吸附效果，原因是我在**累计阶段没有 preventDefault**：
+     原生滚动先把页面滚走了（scrollTop 立刻 > 6），
+     于是 `scrollTop > 6 → acc = 0` 每帧清零，累计值永远到不了阈值。
+
+     现在：
+       ① 在顶部往下滚时**先拦住原生滚动**再累计（这是关键）；
+       ② 累计满 110px（滚轮一格约 100px）才翻 —— 不神经质；
+       ③ 翻页期间上锁 820ms，避免一次滑动连翻两屏；
+       ④ rAF + easeInOutCubic 补间 760ms —— 数据层是"升上来"的。
+
+     滚动容器不写死：优先用能真正滚动的那个（.content 撑得开就用它，
+     否则退回 document.scrollingElement），避免容器换了以后整段失效。 */
   useEffect(() => {
-    const sc = document.querySelector('.content') as HTMLElement | null;
-    if (!sc) return;
+    const pickScroller = (): HTMLElement => {
+      const c = document.querySelector('.content') as HTMLElement | null;
+      if (c && c.scrollHeight > c.clientHeight + 4) return c;
+      return (document.scrollingElement as HTMLElement) || document.documentElement;
+    };
     let acc = 0;
     let locked = false;
     let timer = 0;
     const onWheel = (e: WheelEvent) => {
       if (locked) return;
+      const sc = pickScroller();
       if (sc.scrollTop > 6 || e.deltaY <= 0) { acc = 0; return; }
+      // 关键：先拦住原生滚动，否则 scrollTop 会立刻越过 6px、累计值被清零
+      e.preventDefault();
       acc += e.deltaY;
       if (acc < 110) return;
       const cover = document.querySelector('.home-cover') as HTMLElement | null;
-      if (!cover) return;
-      e.preventDefault();
+      if (!cover) { acc = 0; return; }
       acc = 0;
       locked = true;
-      const delta = cover.getBoundingClientRect().top - sc.getBoundingClientRect().top;
-      // 自己补间：浏览器自带的 behavior:"smooth" 只有 300~500ms，偏"弹"不够"丝滑"；
-      // 这里用 rAF + easeInOutCubic 走 760ms，起收都缓，读起来是"升上来"的。
       const from = sc.scrollTop;
-      const to = from + delta;
+      const to = from + (cover.getBoundingClientRect().top - sc.getBoundingClientRect().top);
       const t0 = performance.now();
       const ms = 760;
       const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
@@ -105,9 +114,9 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       window.clearTimeout(timer);
       timer = window.setTimeout(() => { locked = false; }, 820);
     };
-    sc.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('wheel', onWheel, { passive: false });
     return () => {
-      sc.removeEventListener('wheel', onWheel);
+      window.removeEventListener('wheel', onWheel);
       window.clearTimeout(timer);
     };
   }, []);

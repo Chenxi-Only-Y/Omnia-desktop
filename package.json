@@ -54,7 +54,8 @@
           ]
         }
       ],
-      "artifactName": "Omnia-Setup-${version}.${ext}"
+      "artifactName": "Omnia-Setup-${version}.${ext}",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,

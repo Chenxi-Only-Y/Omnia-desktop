@@ -114,17 +114,21 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       if (!cover) { acc = 0; return; }
       const base = sc.getBoundingClientRect().top;
       const coverTop = cover.getBoundingClientRect().top - base + sc.scrollTop;
-      const near = (v: number, target: number) => Math.abs(v - target) <= 6;
+      // 武装范围（用户口径：向上时"有一点首屏出现"就要吸附）——
+      // 整个过渡区（0 … 数据层顶部）都算，而不是只在吸附点 ±6px 内。
+      // 向下：还没到数据层顶部 → 轻推即滑到数据层；
+      // 向上：已离开首屏顶部、且首屏已露出一部分 → 轻推即回首屏。
+      // 阈值：向下 110（一格约 100，要"确实推一下"）；向上 70（更灵敏，用户要求）。
       if (e.deltaY > 0) {
-        if (!near(sc.scrollTop, 0)) { acc = 0; return; }
+        if (sc.scrollTop >= coverTop - 6) { acc = 0; return; }
         e.preventDefault();
         acc = Math.max(0, acc) + e.deltaY;
         if (acc >= 110) glide(sc, coverTop);
       } else if (e.deltaY < 0) {
-        if (!near(sc.scrollTop, coverTop)) { acc = 0; return; }
+        if (sc.scrollTop <= 6 || sc.scrollTop > coverTop + 6) { acc = 0; return; }
         e.preventDefault();
         acc = Math.min(0, acc) + e.deltaY;
-        if (acc <= -110) glide(sc, 0);
+        if (acc <= -70) glide(sc, 0);
       } else { acc = 0; }
     };
     window.addEventListener('wheel', onWheel, { passive: false });

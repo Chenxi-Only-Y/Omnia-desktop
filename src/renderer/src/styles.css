@@ -2087,9 +2087,9 @@ table.grid img, .roster-card img, .stat img, .card img,
      改成 **repeating-linear-gradient + 按像素位移一整个周期**，
      位移量与元素宽度无关，必定无缝。 */
   background-image: repeating-linear-gradient(100deg,
-    color-mix(in srgb, var(--pc) 45%, #000000) 0px,
+    color-mix(in srgb, var(--pc) 90%, #000000) 0px,
     #FFFFFF 70px,
-    color-mix(in srgb, var(--pc) 45%, #000000) 140px);
+    color-mix(in srgb, var(--pc) 90%, #000000) 140px);
   background-size: auto;
   background-position: 0 0;
   -webkit-background-clip: text;

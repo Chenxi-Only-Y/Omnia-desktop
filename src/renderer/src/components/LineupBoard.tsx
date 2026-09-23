@@ -15,11 +15,16 @@
 /** playerId → 是否有橙武（用户口径：职业右侧、卡片最右端显示「橙武」徽标；
     没有就不显示）。模块级拉一次即可 —— 它比首帧渲染更早发起。 */
 let OW: Map<number, boolean> = new Map();
-void api.player.list().then((ps) => {
-  const m = new Map<number, boolean>();
-  for (const q of ps) m.set(q.id, (q.orangeWeapon ?? '') !== '');
-  OW = m;
-}).catch(() => { /* 取不到就不显示徽标 */ });
+/** 拉一次成员表，刷新"是否有橙武"的快照（模块级，方便 PCard 直接读） */
+async function refreshOW(): Promise<void> {
+  try {
+    const ps = await api.player.list();
+    const m = new Map<number, boolean>();
+    for (const q of ps) m.set(q.id, (q.orangeWeapon ?? '') !== '');
+    OW = m;
+  } catch { /* 取不到就不显示徽标 */ }
+}
+void refreshOW();
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
@@ -99,6 +104,12 @@ export default function LineupBoard({
   }, []);
 
   /** 小队名 → 已排入的队员（按加入顺序） */
+  /** 橙武快照的版本号：重拉后 +1，用来触发重渲染（PCard 直接读模块级 OW） */
+  const [, bumpOw] = useState(0);
+  useEffect(() => {
+    void refreshOW().then(() => bumpOw((v) => v + 1));
+  }, []);
+
   const bySquad = useMemo(() => {
     const m = new Map<string, ParticipationRow[]>();
     for (const r of playing) {

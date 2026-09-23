@@ -1,77 +1,107 @@
 # 万象·Omnia
 
-**All leagues. One universe.**
-**万象归一，联赛集成。**
+> **All leagues. One universe.**
+> 万象归一，联赛集成。
 
-联赛集成系统 · 桌面端。前身是 `LIS 联赛集成系统 v1.0`（WPS 表格），现重建为 Electron + 本地 SQLite 的原生应用。
+联赛集成系统的桌面应用：报名、排表、战报、评分、出勤集中在同一处完成。
+
+- 前身是一份 Excel 工作簿（`LIS 联赛集成系统v1.0`），本项目是对它的完整重做。
+- 数据落在本机 SQLite（`node:sqlite`，**不依赖 better-sqlite3**）。
+- 界面是 Electron + React，深色玻璃主题；视觉规范见根目录 `DESIGN.md`。
+
+当前版本：**v0.1.1**
 
 ---
 
-## 主题（单色稿）
+## 目录
 
-主色板由用户指定，取自设计稿上 5 个圆点，**逐像素提取的精确值**：
+- [功能一览](#功能一览)
+- [技术栈](#技术栈)
+- [快速开始](#快速开始)
+- [命令一览](#命令一览)
+- [目录结构](#目录结构)
+- [数据模型](#数据模型)
+- [核心业务口径](#核心业务口径)
+- [界面体系](#界面体系)
+- [自检](#自检)
+- [打包与发布](#打包与发布)
+- [已知问题与待办](#已知问题与待办)
 
-| # | HEX | 用途 |
-|---|---|---|
-| 1 | `#4A4459` | 按钮与正文（`--fg`） |
-| 2 | `#E6E0F0` | 次级面 / 边框（`--surface-2`） |
-| 3 | `#E6E1E6` | **背景主色**（`--bg`） |
-| 4 | `#E9E0EA` | 分隔 / 次级（`--surface-3`） |
-| 5 | `#FCF8FD` | **卡片**（`--surface`） |
+---
 
-整套灰阶共用一个紫调底（B 通道略高），相邻档只差 3~6 个数值，所以层次靠
-**边框 + 极轻阴影**撑，而不是靠色差 —— 这是这类单色板的关键。
+## 功能一览
 
-两条必须遵守的约束：
-
-1. **职业图标与职业色板不变色**（用户明确要求）。12 个职业色是高饱和亮色，
-   浅底上只用于**小块**（色点、图标、细条、左边线），不铺大面积、**不做正文颜色**。
-   图标另加一层白色托底 —— 否则金色/浅色图标（惊鸿、玄机）在浅背景上几乎看不见。
-2. 唯一的例外是排表看板的职业色块：那里文字固定用 `--on-class`（`#10121A`），
-   浅底亮底都成立。
-
-语义色（成功/警告/错误）在单色稿里也没丢，改用低饱和版本（`--ok` / `--warn` / `--danger`）。
+| 模块 | 内容 |
+|---|---|
+| **总览** | 首屏大图 + 快捷入口；下滑显示数据层（成员总数、本场可上阵、每方塔数、比分） |
+| **成员主档** | 成员列表（ID / 报名状态 / 在队状态 / 麦克风 / 备注角色 / 橙武 / 备注）；新增 / 编辑 / 删除 / 详情；拖动换序；定位 ID |
+| **报名与请假** | 从报名表导入；候选规则；未填表提醒；孤儿 ID 一键补建；请假者折叠展示 |
+| **排表** | 战斗组 → 小队 → 位置格；落位到指定格；跨小队拖拽；主职⇄二职切换；职业来自报名表；橙武卡片特效 |
+| **对局与战报** | 新建对局（含「当天第几场」）；对局列表；战报导入与完整度 |
+| **评分** | 评分引擎（`src/shared/scoreEngine.ts`）与评分面板 |
+| **数据看板** | 场次 / 成员 / 参战记录 / 场均上场 / 出勤 / 职业出场 / 小队使用 / 治疗值覆盖 |
+| **赛季与规则** | 赛季模块、权重与规则 |
+| **设置** | 壁纸（动态 / 静态帧 / 关闭，适应方式、静音）、壁纸库地址、战斗组与小队 |
 
 ---
 
 ## 技术栈
 
-| 层 | 选型 | 说明 |
-|---|---|---|
-| 外壳 | Electron 37 | 单实例锁、contextIsolation、外链走系统浏览器 |
-| 数据库 | **`node:sqlite`（Electron 内置）** | 刻意不用 `better-sqlite3`：原生模块需为 Electron ABI 重编译并依赖 VS Build Tools，是部署链上最大的不确定因素。仓储层已隔离，换实现只改 `src/main/db.ts` 的 `loadSqlite()` |
-| 界面 | React 19 + Vite 6 | 暗色主题，12 职业色板取自原表「下滑预选」 |
-| 语言 | TypeScript 5（strict） | 主进程 CommonJS，渲染层 ESM，共享层 `src/shared` 双端复用 |
+| 层 | 选型 |
+|---|---|
+| 运行时 | Electron 37 · Node 22 |
+| 数据库 | `node:sqlite`（Node 内置，带**版本化迁移**，当前到 **v11**） |
+| 界面 | React 19 · TypeScript（strict）· Vite 6 |
+| 主进程 | CommonJS |
+| 渲染进程 | ESM |
+| 共享层 | `src/shared/*` 同时被主进程与渲染进程引用 |
+| 表格解析 | 自研 xlsx 解析（`src/main/xlsx.ts`）+ TSV 网格 |
+| 视频转码 | `ffmpeg-static`（壁纸 mp4 转码用） |
+
+**IPC 约定**：所有调用走 `window.omnia`（preload 暴露），返回值统一是 `IpcResult<T>` 信封。
 
 ---
 
 ## 快速开始
 
 ```bash
+# 1. 安装依赖（国内建议先配镜像，见下）
 npm install
-npm run dev      # 开发：Vite HMR + Electron
-npm start        # 生产：构建后启动
-npm run smoke    # 自检：跑通 renderer→preload→IPC→SQLite 全链路并验证增删改
+
+# 2. 开发
+npm run dev
+
+# 3. 构建 + 启动
+npm start
 ```
 
-### ⚠️ 首次安装后如果启动报 “Electron failed to install correctly”
+### 安装依赖
 
-npm 11 **默认不执行依赖的 postinstall 脚本**，且本环境下 Electron 自带的 `extract-zip` 会静默失败（只解出 `locales/` 就退出），导致 `node_modules/electron/dist/electron.exe` 不存在。
-
-`npm install` 的 `postinstall` 会自动修复。若被拦截，手动执行：
+项目根目录已有 `.npmrc`，默认使用 npmmirror 镜像。若需手动指定：
 
 ```bash
-npm run fix:electron
+npm config set registry https://registry.npmmirror.com
+npm config set electron_mirror https://npmmirror.com/mirrors/electron/
 ```
 
-该脚本会：查缓存 zip → 用系统解压能力展开到 `node_modules/electron/dist` → 写入 `path.txt`。
-若缓存也没有 zip，先设镜像再执行：
+### ⚠️ 首次安装后若启动报 `Electron failed to install correctly`
 
-```powershell
-$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
-node node_modules\electron\install.js   # 只下载到缓存
-npm run fix:electron                    # 再展开
+npm 的 allow-scripts 策略会拦掉 Electron 的 postinstall 脚本。两种解法：
+
+```bash
+npm approve-scripts electron      # 方案 A：批准该脚本
+npm run fix:electron              # 方案 B：手动跑修复脚本（已接在 postinstall）
 ```
+
+`ffmpeg-static` 同理（它也要下载二进制）：`npm approve-scripts ffmpeg-static`
+
+### 环境变量（开发用）
+
+| 变量 | 作用 |
+|---|---|
+| `OMNIA_DB_PATH` / `LIS_DB_PATH` | 指定数据库文件路径（自检与多库测试用） |
+
+实际数据库默认落在 `%APPDATA%\omnia-desktop\lis.db`。
 
 ---
 
@@ -79,22 +109,17 @@ npm run fix:electron                    # 再展开
 
 | 命令 | 作用 |
 |---|---|
-| `npm run dev` | 开发模式（Vite 5173 + Electron） |
-| `npm run build` | 清理并构建主进程 / 预加载 / 渲染层 |
-| `npm start` | 构建并启动 |
-| `npm run typecheck` | 两套 tsconfig 全量类型检查 |
-| `npm run smoke` | 端到端自检（含 DB 写入往返、重复 ID 拦截） |
-| `npm run dist` | 打包 Windows 安装包（NSIS）到 `release/` |
-
-### 环境变量（开发用）
-
-| 变量 | 作用 |
-|---|---|
-| `OMNIA_DB_PATH` | 指定数据库文件路径（默认 `<userData>/lis.db`） |
-| `OMNIA_DEV_SERVER_URL` | 连 Vite dev server |
-| `OMNIA_SMOKE=1` | 自检模式：加载完成后探针全链路并退出 |
-
-> 旧的 `LIS_*` 前缀仍兼容（`LIS_DB_PATH` / `LIS_DEV_SERVER_URL` / `LIS_SMOKE`）。
+| `npm run clean` | 清理构建产物 |
+| `npm run typecheck` | 类型检查（主进程 + 渲染进程两套 tsconfig） |
+| `npm run build:node` | 编译主进程（tsc） |
+| `npm run build:renderer` | 构建渲染进程（vite） |
+| `npm run build` | clean + tsc + vite |
+| `npm start` | build 后直接启动 |
+| `npm run start:only` | 不构建，直接启动（用已有产物） |
+| `npm run dev` | 开发模式（`scripts/dev.mjs`） |
+| `npm run smoke` | **自检**：构建后跑无头自检（`scripts/smoke.mjs`） |
+| `npm run dist` | 打 Windows 安装包（NSIS） |
+| `npm run dist:dir` | 只产出免安装目录（`release/win-unpacked`） |
 
 ---
 
@@ -103,175 +128,155 @@ npm run fix:electron                    # 再展开
 ```
 lis-desktop/
 ├─ src/
-│  ├─ main/                    主进程
-│  │  ├─ main.ts               入口：窗口、单实例、自检模式
-│  │  ├─ db.ts                 node:sqlite 封装 + 版本化迁移
-│  │  ├─ ipc.ts                IPC 契约实现（统一 IpcResult 包装）
-│  │  └─ repositories/
-│  │     └─ playerRepo.ts      成员主档仓储（按 game_id 幂等导入）
-│  ├─ preload/preload.ts       暴露 window.omnia
-│  ├─ renderer/                React 界面
-│  │  ├─ public/class-icons/   11 个职业图标（原表 DISPIMG 导出，public 原样拷贝）
-│  │  ├─ src/App.tsx           导航外壳
-│  │  ├─ src/api.ts            IpcResult 解包封装
-│  │  ├─ src/components/       可复用组件
-│  │  │   LineupBoard.tsx      排表看板（含原生拖拽排表）
-│  │  │   ImportWizard.tsx     xlsx 导入向导（选表/探表头/预览）
-│  │  │   StatImportPanel.tsx  战报批量导入（粘贴/CSV/校验）
-│  │  │   CellPicker / AddPlayerPicker / ClassChip
-│  │  ├─ src/lib/              importer / sheet / assets
-│  │  ├─ src/pages/            总览 / 成员主档 / 对局与战报 / 数据看板 / 设置
-│  │  └─ src/styles.css        主题与 12 职业色令牌
-│  └─ shared/                  双端共享
-│     ├─ domain.ts             领域常量（职业/对局/战报字段/权重）
-│     ├─ types.ts              实体类型 + IPC 契约
-│     ├─ tableText.ts          成员名单列名映射与 CSV 导出
-│     └─ statImport.ts         战报解析与校验（纯函数，可单测）
-└─ scripts/                    clean / dev / smoke / fix-electron
+│  ├─ main/                主进程
+│  │  ├─ main.ts           窗口、生命周期、自检探针
+│  │  ├─ ipc.ts            IPC 处理（含壁纸扫描 / 转码）
+│  │  ├─ db.ts             版本化迁移（v1…v11）与建表
+│  │  ├─ xlsx.ts           xlsx 解析
+│  │  └─ repositories/     各表的数据访问
+│  ├─ preload/preload.ts   window.omnia 桥
+│  ├─ renderer/src/        渲染进程
+│  │  ├─ pages/            12 个页面
+│  │  ├─ components/       14 个组件
+│  │  ├─ lib/              wallpaper / smoothScroll 等
+│  │  ├─ assets/           应用内图标（透明底 logo.svg）
+│  │  └─ styles.css        全部样式（含设计令牌）
+│  └─ shared/              主/渲染共用
+│     ├─ types.ts · domain.ts
+│     ├─ scoreEngine.ts    评分引擎
+│     ├─ signupImport.ts   报名表导入
+│     ├─ statImport.ts     战报导入
+│     └─ tableText.ts      表格文本处理
+├─ build/                  打包资源
+│  ├─ icon.svg             图标矢量源（**黑底圆角**，应用外用）
+│  └─ icon.png             512×512（electron-builder 自动生成多尺寸 .ico）
+├─ docs/                   打包后自检日志等
+├─ scripts/                clean / dev / fix-electron / smoke 等
+├─ DESIGN.md               设计规范
+└─ release/                打包产物（**已在 .gitignore 中**）
 ```
 
 ---
 
-## 当前进度
+## 数据模型
 
-| 模块 | 状态 |
+SQLite，**版本化迁移**（`src/main/db.ts`，当前最高 **v11**）。16 张表：
+
+```
+season            rule_set         class             player
+match             match_side       participation     combat_stat
+squad_score       score            app_setting       combat_group
+squad             signup           squad_alias       schema_migration
+```
+
+几个**关键口径**（都是踩过坑之后定下来的）：
+
+| 点 | 说明 |
 |---|---|
-| **M0 骨架**（窗口 / 数据库 / 迁移 / IPC / 主题令牌） | ✅ 完成，自检 PASS |
-| **M2 成员主档**（增删改查 / 导入导出 / 职业字典与别名映射） | ✅ 完成 |
-| **M3 对局与战报**（对局 5 字段 + 单人 14 字段 + 粘贴导入 + 校验） | ✅ 完成，自检 PASS |
-| **排表（独立页）** | ✅ 侧栏直达，顶部选场次后直接拖。看板与「对局详情 → 阵容编排」共用同一个 `LineupBoard` 组件，不存在两套逻辑；本页只做排上场名单，战报/报名/评分仍在对局详情里 |
-| **M5 阵容编排（排表看板）** | ✅ 版式对齐原表「排表」页：每小队 6 人 × 5 行、职业色块+图标、组间留隙、左右半区中缝；**支持拖拽排表**（拖姓名换小队、拖到「未分配」区移出，落库为单事务）；建制数据驱动（战斗组可新增，组内第 N 队自动命名 `组名-N`） |
-| **M6 数据看板** | ✅ 出勤明细（上场/替补/请假/出勤率）、战报完整度（逐场 + 逐维度覆盖）、职业出场与小隊使用 —— **不含评分**（等算法） |
-| **M8 职业图标** | ✅ 12 个职业各有**独立**图标。惊鸿原表缺陷见下方说明；图标可重生成（`node scripts/make-jinghong-icon.mjs`） |
-| **导航栏折叠** | ✅ 顶栏左侧按钮折叠/展开侧栏（216px ⇄ 56px）。折叠后只留图标 + hover 提示，偏好存库（`app_setting.navCollapsed`），重启保持 |
-| ~~攻略图库~~ | ❌ 已按用户要求删除（那是用户打草稿的地方，不属于最终产品）。首页要用的两张流派立绘（`image22` / `image26`）已拆到 `components/BannerCards.tsx` 保留；其余 11 张攻略图与配套样式一并清掉，省 6.5MB |
-| **设置页** | ✅ 战斗组与小队增删（组下有小队时禁止删组）、建制容量、数据库路径与 **schema 版本**（排障时不用猜"库是不是旧的"） |
-| **成员详情页** | ✅ 个人汇总（上场/替补/请假、战报完整度、有效击杀/人伤/塔伤、治疗/承伤、重伤/复活）、**六维雷达**（个人场均 vs 球队人均，虚线基准圈=1.0）、逐场趋势柱、逐场明细 |
-| **报名 / 请假** | ✅ 报名与上场名单分离（意愿 vs 排表结果，允许不一致）、逐人标记参加/替补/请假/撤回、未报名清单与批量标参加、一键按报名更新上场名单 |
-| **权重与规则中心** | ✅ 规则集版本化（新建/另存/切换使用中/删除保护）、分制常数、个人权重（按定位）、战术权重（按类型）、12 职业系数、附加分，**带实时校验**（权重和≠1、封顶<基础、系数为负等分级提示）与导出 JSON。**只做参数管理，未接评分** |
-| M7 与旧 xlsx 互通 | ✅ **xlsx 直读/直写 + 应用内导入向导**（自写 OOXML 解析，无第三方依赖）；成员与战报都能直接选旧表文件导入 |
-| **M1 评分引擎** | ✅ 可插拔纯函数引擎：口径全部读「使用中」的规则集，不写死参数；战术执行分按类型分别计算并只在同类型小队间归一；中间量全部落库可审计；支持重算、按规则集并存、幂等。**口径为可标定实现，等你给正式算法或直接改规则** |
-| **赛季** | ✅ 赛季切换 + 历史对局归档。只给「对局」和「规则集」打标，成员主档与战斗组建制跨赛季（人是跨赛季的、建制是长期资产）。新建对局自动登记到当前赛季；删除赛季不删数据，只解除归属 |
-| 打包发布 | ✅ NSIS 安装包（95.92MB）已产出，**打包后 13 项自检全 PASS**（asar + `node:sqlite` + 图标资源 + 拖拽排表 + 评分 + 赛季）。证据：`docs/packaged-smoke.log` |
-| 首页主视觉 | 🔶 用户要求「大图/立绘为主视觉」；原表首页大图实测为空图，现用渐变+品牌字+职业图标阵占位，拿到立绘后填 `HERO_IMAGE` 即切换 |
+| **成员只有一个 ID 字段** | ID 与昵称已合并，不再分列 |
+| **职业不在主档** | `player` **不持有职业**；职业只来自各场**报名表**，排表时的本场职业写在 `participation.class_used` |
+| **落位槽号** | `participation.slot_no`（INTEGER，`-1` = 未指定，按加入顺序排）。落位语义是「点到哪个空位就是哪个」，不是从左往右补 |
+| **空 class_used 回退主职** | 查询用 `COALESCE(NULLIF(p.class_used,''), sg.main_class, '')` |
+| **橙武判据** | 必须 `=== '有'`；早期写成 `!== ''` 时，「无」会被误判成有橙武 |
+| **局部更新载荷** | 改字段时**必须把该字段放进更新载荷**——漏字段会「改了不生效且不报错」（`indexInDay` 就栽过） |
 
-### 建制结构（用户口径，非猜测）
+---
 
-```
-10 个战斗队 × 6 人 = 60 个上场槽位
-划归 4 个战斗组：防守一 / 防守二 / 进攻一 / 进攻二（可新增）
-组内第 N 队命名 = 组名-N，例：防守二有 3 队 → 防守二-1 / -2 / -3
-替补 / 请假 = 状态（三选一），不占战斗组
-```
+## 核心业务口径
 
-> 迁移脚本当前预置 12 支小队（4 组 × 3 队 = 72 槽位）。若实际只有 10 队，
-> 可在「设置 → 战斗组与小队」删掉多余的 2 支，或在下一轮直接把种子改成 10 队。
+这些是使用中的实际规则，不是猜测：
 
-#### 职业图标：惊鸿原表缺陷的补法
+- **报名 / 请假导入**：已存在的跳过，缺的自动创建；未填的给提醒；主档里不写职业。
+- **候选规则**：主档有 → 报名有 → 才显示状态；两者都没有则不显示。孤儿 ID 进复核列表，支持一键补建。
+- **二职（副职）**：一个成员可以同时有主职与二职，排表时二者都能选；卡片上点职业就在两者间切换（只有一个职业时只轻微抖动，不弹选择器）。
+- **排表落位**：点空格子 → 弹选择器 → 落到**被点的那一格**。
+- **跨小队拖拽**：拖到别的小队时，落点 = **离松手位置最近的那个格子**。
+- **拖动换序**：编号恒为连续的 1…N，改序走「插入语义」，不会撞号。
+- **「当天第几场」**：新建对局时**留空 = 自动取当天已有场次的最大值 + 1**。
 
-回原表「下滑预选」逐行核对（行6..行17 → D 列 DISPIMG ID → `xl/cellimages.xml` →
-`cellimages.xml.rels` → `xl/media/*.png`），结果是代码与原表**一字不差**：
+---
 
-| 行 | 职业 | 色板 | 原表图标 |
-|---|---|---|---|
-| 7 | 妙音 | `A4D663` | `image3.png` |
-| 8 | 惊鸿 | `F0BC06` | `image3.png` ← **同一个 DISPIMG ID** |
+## 界面体系
 
-也就是**原表里这两个职业本来就共用同一张图**，界面上看起来就是"图标一样"。
-原表也没有多余素材可用（26 张图各被引用一次，另有 1 个空目录条目）。
+### 自绘控件（替换原生）
 
-补法：`jinghong.png` = 取 `image3` 的形状与明暗，按惊鸿自己的色板 `F0BC06` 重着色。
-形状沿用原素材（不发明新图形），颜色用惊鸿的色板值 —— 同风格且一眼可分。
-自检里加了一条回归断言：**12 个职业必须各有一张互不相同的图标**（`不同图标=12/12`）。
-拿到官方惊鸿图标后直接替换 `public/class-icons/jinghong.png` 即可，不用改代码。
+原生 `<select>` / `<input type="date">` / `window.confirm` 的弹层由**操作系统绘制**，CSS 改不了，因此三者都已自绘：
 
-#### 小队别名（旧表写法兼容）
+| 原生 | 替代 | 位置 |
+|---|---|---|
+| `<select>` | `components/Select.tsx` | 全站 25 处 |
+| `<input type="date">` | `components/DatePicker.tsx` | 对局相关表单 |
+| `window.confirm` | `components/Confirm.tsx` | 7 处 |
 
-旧表里小队写作 `防守一2`（无连字符），本系统按用户口径写作 `防守一-2`（带连字符）。
-两种写法都要能对上，否则历史战报里的队名查库查不到，**战术与攻/防类别会静默变成空** ——
-打分时少了战术执行分，界面上还看不出原因。
+三者共用同一套**展开/收起动画**（`unfold` / `fold` 关键帧，`clip-path` 驱动），展开与收起**两个方向都有过渡**。
 
-- 查名顺序：正式名 → `squad_alias` 别名表 → 给结尾数字插连字符再试（`防守一2` → `防守一-2`）。
-- **落库统一存正式名**：否则 `squad` 存外来写法、`tactic` 却取自正式名，
-  看板上同一支队会分裂成两个格子。
-- 认不出来就报错（`未知小队：xxx`），不瞎认 —— 认错会把分数算到别的小队头上，
-  因为战术执行分是按小队归一化的。
-- 迁移 v6 会为已有小队自动补上「组名+序号」这个旧写法作为别名。
+### 视觉分层
 
-### 自检覆盖（`npm run smoke`）
+- **三层卡片**：一级磨砂半透明 → 二级白色半透明 → 三级纯白
+- **弹层层级**：`.modal` 300 / `.cfm` 400 / 下拉 150（都高于侧栏 40）
+- **侧栏**：覆盖式收起，只动 `transform`（合成器属性），保持 60fps
 
-- 全链路：renderer → preload（`window.omnia`）→ IPC → SQLite
-- M2：create / update / remove / 列表计数一致 / 重复角色 ID 被拦
-- M3：建对局 → 粘贴导入解析 → 严格模式校验（不在档 + 重复行报错）→ 有错误拒绝入库 → 完整模式自动建档入库 → 读回校验数值
-- M5：建制读取（组/队/容量）→ 新增战斗组与小队的自动命名 → 排表看板真实渲染（方块数、小队名、职业图标）→ **用原生拖拽事件驱动看板，验证队员真的换了小队且战术自动推导** → 小队别名（旧写法 `防守一2` 能对上 `防守一-2`、落库归一成正式名、未知小队被拦）
-- M6：造 2 场对局 3 名成员 → 校验统计口径（上场人次、战报完整度、出勤率、职业出场、小队使用）→ 首页主视觉与看板页/设置页真实渲染
-- M7：用真实旧表走「列工作表 → 探测表头行 → 网格 → TSV → 列名映射」全链路（无样本时该项 SKIP）
-- M8：职业图标在 `file://` 下真实加载（校验 `naturalWidth`）并在页面上渲染
-- 首页立绘与导航：两张流派立绘真实解码（宽度 > 500）且导航里**已不存在「攻略」**（防回归）
-- 主题令牌：页面背景必须渲染成 `rgb(230,225,230)`、卡片 `rgb(252,248,253)`（防止改 CSS 时把主色板弄丢）
-- 排表页：侧栏可达、场次选择器可用、12 个看板方块渲染、未分配区存在、本场队员真的出现在看板上
-- 成员详情：造 2 场对局验证汇总口径（有效击杀 33 / 有效人伤 2300 / 有效塔伤 500）、
-  未填战报的场次只计出勤不计数值、雷达轴计算与 SVG 渲染（2 个多边形 + 6 个轴标签）
-- 评分引擎：6 人实测（区间 71.81~94.39、互不相同、分解合计=总分）、幂等重算、行数不变、
-  **改规则会改分**（死亡扣分 3→15 时 71.81→29.81）、两套规则分数并存、评分页渲染与明细展开
+### ⚠️ 两条样式陷阱（改样式前务必知道）
 
-### 用旧表验证导入（可选）
+1. **主题前缀会提高特异性**：`.theme-light` / `.page-fill` 这类前缀让规则更具体，覆盖它们必须**带同样的前缀**，只写单个类名 + `!important` 是压不住的。
+2. **自绘弹层所在的那一层必须抬层级**：否则会被后面的行盖住，表现为「下拉是白的、点了没反应」。用 `:has(.sel[open])` 抬——**不要写成 `:has(> .sel[open])`**（直接子代匹配不上嵌套的控件）。
 
-```powershell
-$env:OMNIA_SAMPLE_XLSX='D:\AI\ds.5\work\LIS_original.xlsx'   # 指向旧表
+### 壁纸
+
+全页面背景，非卡片区域为壁纸。支持动态（mp4 / gif / webp / png）与静态；可从本机壁纸库扫描（默认取 Wallpaper Engine 工坊目录）；渲染模式（动态 / 静态帧 / 关闭）、声音（默认静音）、适应方式（铺满裁剪 / 完整缩放 / 拉伸铺满）。mp4 首次使用会用 ffmpeg 转码缓存到 `userData/wallpaper-cache`。
+
+### 图标（两份资源，别搞混）
+
+| 用途 | 文件 | 形态 |
+|---|---|---|
+| **应用内**（侧边导航等） | `src/renderer/src/assets/logo.svg` | **透明底** + 白描边（浅色主题下靠细描边保证可见） |
+| **应用外**（exe / 任务栏 / 安装包） | `build/icon.svg` → `build/icon.png` | **黑底圆角** `rx=18` |
+
+> 开发模式下任务栏图标取自 `build/icon.png`（主进程的 `DEV_ICON`）；打包后由 exe 的嵌入图标负责。
+
+---
+
+## 自检
+
+```bash
 npm run smoke
 ```
 
-不设该变量时 M7 会 SKIP；设了就断言：10 张工作表、79 名成员、成员表表头在第 5 行、
-战报表头在第 6 行、`击败/清泉` 复合列与 `焚骨` 能识别、不存在的表名必须报错。
+`scripts/smoke.mjs` 会启动无头 Electron，逐项验证：数据库迁移、报名导入、排表落位、战报、评分引擎、看板、首页主视觉与钉住、图标加载、主题色等。**构建产物会被真实验证**，不是纯逻辑测试。
 
-> **实测事实（重要）**：旧表的「信息数据库」**不含职业列**（D 列 79 行全空），
-> 职业信息只存在于「数据导入」战报表。因此从该表导入成员后主职业为空是**预期行为**，
-> 需要靠战报导入或手工补齐。成员表实际可用列：C 角色ID(79) / I 麦(73) / L 备注角色(11)。
+- 探针代码是**纯 JS**（通过 `executeJavaScript` 注入），**不参与类型检查**——里面不能写 TS 语法或模板字符串。
+- 个别项（如「截取图片」「评分引擎」）历史上**偶发失败**，复跑即过；连续失败才算真问题。
 
 ---
 
-## 打包与安装验证
-
-```powershell
-npm run dist          # 出 NSIS 安装包 → release/Omnia-Setup-<version>.exe
-npm run dist:dir      # 只出免安装目录 → release/win-unpacked/
-```
-
-打包后**必须再跑一次自检**（验证 asar 路径、`node:sqlite` 与渲染资源）：
-
-```powershell
-$env:OMNIA_SMOKE='1'
-$env:OMNIA_DB_PATH="$PWD\dev-data\packaged.db"
-$env:OMNIA_SMOKE_LOG="$PWD\dev-data\packaged-smoke.log"
-& 'release\win-unpacked\万象Omnia.exe' -Wait
-Get-Content .\dev-data\packaged-smoke.log
-```
-
-> 打包时若卡在 `unable to verify the first certificate`，那是 electron-builder 下载
-> NSIS / winCodeSign 工具链时被 TLS 中间人拦了（本机网络环境，与本项目代码无关）。
-> 工具已缓存就正常，需要重下时可临时 `$env:NODE_TLS_REJECT_UNAUTHORIZED='0'` 跑一次打包。
-
-> 打包后的 Windows 程序没有控制台，stdout 拿不到日志，所以自检会把全部输出写进
-> `OMNIA_SMOKE_LOG`（默认 `<数据库同目录>/omnia-smoke.log`）。
-> 仓库里留了一份历次通过的证据：`docs/packaged-smoke.log`。
-
-实测结论（0.1.0）：安装包 95.92MB；打包后 13 项自检全 PASS；
-`M8 图标 base = .../app.asar/dist/renderer/` 说明资源与内置 `node:sqlite` 在打包环境下均正常。
-
-> 自检挂死时怎么排障：探针的 steps 会实时上报（日志前缀「探针名 ·」），
-> 超时的那一步就是挂点，不用猜。探针自建的数据由主进程在探针失败时统一清理，
-> 避免一个探针挂掉把后面的探针断言一起带歪。
-
-### xlsx 模块自测
+## 打包与发布
 
 ```bash
-node scripts/test-xlsx.mjs   # 读真实旧表 + 写入读回往返
+# 需要镜像（否则 electron-builder 下载会超时）
+$env:ELECTRON_MIRROR='https://npmmirror.com/mirrors/electron/'
+$env:ELECTRON_BUILDER_BINARIES_MIRROR='https://npmmirror.com/mirrors/electron-builder-binaries/'
+
+npm run dist
 ```
 
-覆盖真实旧表的坑：稀疏行（首行是第 5 行）、自闭合单元格、共享字符串、复合列（`击败/清泉`）、表头不在第一行（`headerRow`）。
+产物：`release/Omnia-Setup-<version>.exe`（NSIS，装到当前用户，可自选目录）。
 
-### 关键设计文档
+### 发布
 
-- `../LIS设计基准v2.md` —— 18 项决策日志 + 评分算法规范 + 数据模型
-- `../LIS系统识别报告v2.md` —— 原表的完整逆向识别（含算法与缺陷清单）
+安装包**不要提交进 git**（`release/` 已在 `.gitignore`；且 GitHub 单文件上限 100 MB，收紧后约 110 MB 会被直接拒绝）。
+
+正确做法是走 **GitHub Releases**：建 tag（如 `v0.1.1`），把 `Omnia-Setup-0.1.1.exe` 作为 release asset 附上。
+
+---
+
+## 已知问题与待办
+
+- **安装包尚未在干净机器上端到端装过**（会写注册表 + 开始菜单，装到当前用户）。
+- **自检偶发**：个别探针项会随机失败一次，复跑通过。
+- **Windows 会缓存任务栏图标**：换了图标后若没更新，把旧图标取消固定再固定一次。
+
+### 本项目的编码经验（省时间用）
+
+- `node -e` 里带中文 / 花括号 / 反斜杠，在 PowerShell 下容易被转义搞坏；**写成 `.cjs` 文件再 `node` 执行**更稳。
+- PowerShell here-string 的结束标记是 `'@`，所以脚本里**不能有以 `'@` 开头的行**（例如 CSS 的 `@keyframes`）。
+- 竞态类问题（"偶发、时好时坏"）**不要用"事后补一次"去修**：先把并发的两条路径合并到同一次提交里。

@@ -73,6 +73,24 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [lineupOf, setLineupOf] = useState<Map<number, PartState>>(new Map());
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editId, setEditId] = useState<number | null>(null);
+
+  /* 实测（CDP 逐帧采样）证据：
+       静止不动时 .roster-cards 的 scrollTop 稳定在 400，自己不会清零；
+       点一次「详情」后它变成 0 —— 说明是「详情」这个动作把它清了。
+     详情走的是父级传进来的 onOpenDetail（切到详情视图）→ 成员主档被卸载再重建，
+     .roster-cards 是新建的节点，scrollTop 自然是 0。
+     修法：把列表滚动位置记在 window 上（跨卸载保留），挂载时恢复、滚动时记录。
+     这样不碰 load()，所以不会影响拖拽（之前全局替换 load 就是栽在这里）。
+     放在 window 上是为了避免在本文件顶部找不到合适的插入锚点。 */
+  useEffect(() => {
+    const w = window as unknown as { __rosterScroll?: number };
+    const sc = listRef.current;
+    if (!sc) return;
+    sc.scrollTop = w.__rosterScroll ?? 0;
+    const onScroll = () => { w.__rosterScroll = sc.scrollTop; };
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    return () => sc.removeEventListener('scroll', onScroll);
+  }, []);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

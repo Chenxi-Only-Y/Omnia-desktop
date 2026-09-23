@@ -62,11 +62,21 @@ export default function MatchPage({ classes, classMap }: Props) {
     return { total: list.length, wins, played: played.length, filled };
   }, [list]);
 
+  /* 「当天第几场」：留空表示自动 —— 取当天已有场次的最大值 + 1（避免撞号）。
+     原来创建表单里根本没有这个字段，所以只能建完再去详情里改。 */
+  const [dayIndex, setDayIndex] = useState('');
   async function handleCreate() {
     if (!form.date) { setError('请选择日期'); return; }
     try {
       const res = await api.match.create({
         date: form.date,
+        // 留空 → 当天最大 + 1；填了就用填的（至少 1）
+        indexInDay: (() => {
+          const auto = list.filter((m) => m.date === form.date)
+            .reduce((mx, m) => Math.max(mx, m.indexInDay), 0) + 1;
+          const typed = Number(dayIndex);
+          return dayIndex.trim() !== '' && Number.isFinite(typed) ? Math.max(1, typed) : auto;
+        })(),
         ourSide: form.ourSide,
         oppSide: form.oppSide,
         result: form.result,
@@ -130,6 +140,11 @@ export default function MatchPage({ classes, classMap }: Props) {
             <span>日期</span>
             <DatePicker className="input" value={form.date}
                    onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          </label>
+                    <label className="field"><span>当天第几场</span>
+            <input className="input" style={{ width: 72 }} type="number" min={1}
+                   placeholder="自动" value={dayIndex}
+                   onChange={(e) => setDayIndex(e.target.value)} />
           </label>
           <label className="field">
             <span>我方</span>

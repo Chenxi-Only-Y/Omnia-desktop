@@ -332,8 +332,13 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         .filter((el) => el.scrollTop > 0)
         .map((el) => [el, el.scrollTop] as const);
       await load();
-      snap.forEach(([el, top]) => { el.scrollTop = top; });
-      requestAnimationFrame(() => snap.forEach(([el, top]) => { el.scrollTop = top; }));
+      /* 用户反馈：只恢复一次**没用**（视角照样跳回最上面）。
+         说明重排发生在我的恢复之后 —— React 的提交时机比我恢复得晚。
+         所以改成多次恢复，把延迟重排也覆盖掉。 */
+      const restore = () => snap.forEach(([el, top]) => { el.scrollTop = top; });
+      restore();
+      requestAnimationFrame(restore);
+      [60, 180, 400].forEach((ms) => window.setTimeout(restore, ms));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }

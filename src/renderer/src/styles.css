@@ -2342,3 +2342,21 @@ table.grid img, .roster-card img, .stat img, .card img,
   align-self: center;
   white-space: nowrap;
 }
+
+/* 定位命中的人：一直高亮到清空搜索框为止（用户口径）。
+   原来是 .roster-card--found（单类），这里用两个类提高特异性，
+   把描边、底色、左侧色条都加满，扫一眼就能看到是哪一行。 */
+/* 用户反馈：根本**没有**高亮（不是"消失太快"）。说明类名加上了、
+   但样式被更具体的规则压住了 —— 和 .modal 那次是同一个坑：
+   .theme-light / .page-fill 这类主题前缀会提高特异性。
+   所以这里把前缀都写上（并用两个类名 + !important）。 */
+.roster-card.roster-card--found,
+.theme-light .roster-card.roster-card--found,
+.page-fill .roster-card.roster-card--found,
+.theme-light .page-fill .roster-card.roster-card--found {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: -2px;
+  background: rgba(110, 123, 255, .16) !important;
+  box-shadow: inset 4px 0 0 0 var(--accent) !important;
+  transition: background .18s ease;
+}

@@ -299,9 +299,14 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       const el = listRef.current?.querySelector(`[data-player-id="${target.id}"]`);
       if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });
-    // 高亮 2.5 秒后淡掉，避免一直闪
-    if (foundTimer.current) window.clearTimeout(foundTimer.current);
-    foundTimer.current = window.setTimeout(() => setFoundId(null), 2500);
+    /* 用户口径：找到的人要**一直高亮**，不能自己消失。
+       原来这里 2.5 秒后把 foundId 清空，两个后果：
+         ① 高亮还没看清就没了（"找到了没有提示位置在哪"）；
+         ② foundId 变 null 后，下一次回车又从第 1 个匹配重新开始，
+            表现为"第二个回车没反应"（其实是回到第一个了）。
+       现在不清空 —— 高亮保留，回车也能正常往下轮。
+       只有在搜索框被清空时才会清掉（见上面 key 为空那一段）。 */
+    if (foundTimer.current) { window.clearTimeout(foundTimer.current); foundTimer.current = 0; }
   }
 
   async function moveTo(fromId: number, toId: number, below = false) {    const ids = sorted.map((x) => x.id);

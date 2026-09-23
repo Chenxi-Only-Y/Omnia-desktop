@@ -58,6 +58,12 @@ function dbFile(): string {
   return path.join(app.getPath('userData'), 'lis.db');
 }
 
+/* 开发模式（electron.exe .）下任务栏/标题栏图标取自这里。
+   打包后由 exe 的嵌入图标负责，而 build/ 不在 asar 里，
+   existsSync 为 false 就跳过该选项，不会报错。 */
+const DEV_ICON = path.join(__dirname, '../../build/icon.png');
+const HAS_DEV_ICON = fs.existsSync(DEV_ICON);
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -69,6 +75,7 @@ function createWindow(): void {
     backgroundColor: '#E6E1E6',
     title: '万象·Omnia',
     autoHideMenuBar: true,
+    ...(HAS_DEV_ICON ? { icon: DEV_ICON } : {}),
     webPreferences: {
       preload: PRELOAD,
       contextIsolation: true,
@@ -2183,7 +2190,10 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
 
-  app.whenReady().then(() => {
+  /* 任务栏分组与"固定到任务栏"依赖它；不设的话固定后仍是 Electron 的图标。 */
+app.setAppUserModelId('cn.omnia.league.desktop');
+
+app.whenReady().then(() => {
     if (!bootDatabase()) {
       app.exit(1);
       return;

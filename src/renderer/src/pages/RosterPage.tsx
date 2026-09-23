@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { Match, PartState, Player, PlayerInput, SignupStatus } from '@shared/types';
 import { api, ApiError } from '../api';
@@ -105,20 +105,13 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
      现在改成：**每次 players 变化都恢复**。
      重载只发生在保存/删除/导入这类明确动作上，用户正常滚动不会改 players，
      所以不会打扰正常浏览。 */
-  /* 用户反馈：删除好了、取消不跳，只有**保存**还跳。
-     差别在于保存同时做了两件事：await load()（异步重拉）
-     和 setEditId(null)（收起编辑行）—— 两次 DOM 变动，
-     用 useEffect 恢复会落在它们之前，所以设完又被覆盖。
-     改用 useLayoutEffect：它在 DOM 变更后、浏览器绘制前**同步**执行，
-     此时 listRef.current 已经是最终那个节点，设的值不会被后续提交覆盖。
-     依赖里同时加上 editId，覆盖"收起编辑行"这一次变动。 */
-  useLayoutEffect(() => {
+  useEffect(() => {
     const w = window as unknown as { __rosterScroll?: number };
     const sc = listRef.current;
     if (!sc || !players.length) return;
     const want = w.__rosterScroll ?? 0;
     if (want > 0 && sc.scrollTop !== want) sc.scrollTop = want;
-  }, [players, editId]);
+  }, [players]);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

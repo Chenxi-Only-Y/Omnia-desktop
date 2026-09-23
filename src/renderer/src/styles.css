@@ -2081,8 +2081,10 @@ table.grid img, .roster-card img, .stat img, .card img,
    想让它缓慢流动只要把 animation 那行打开即可（已写在下方注释里）。
    ═══════════════════════════════════════════════════════════════ */
 .pcard--ow .pcard__id {
+  /* 用户口径：白—黑渐变（不再七彩）。
+     首尾都收在白，配合 220% 背景位移，一个周期走完是无缝衔接的。 */
   background-image: linear-gradient(100deg,
-    #FFD86B 0%, #FF8FB1 22%, #B39DFF 44%, #6FD3FF 66%, #8CFFC4 84%, #FFD86B 100%);
+    #FFFFFF 0%, #C9C9D1 35%, #0B0B0D 50%, #C9C9D1 65%, #FFFFFF 100%);
   background-size: 220% 100%;
   background-position: 0% 50%;
   -webkit-background-clip: text;

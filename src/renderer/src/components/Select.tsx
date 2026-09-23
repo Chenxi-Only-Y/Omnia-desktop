@@ -15,6 +15,7 @@ interface OptProps { value?: string | number; children?: ReactNode; disabled?: b
 
 export default function Select({
   value, onChange, className, title, disabled, style, onClick, icon, color, children,
+  placeholder,
 }: {
   value?: string | number;
   onChange?: (e: { target: { value: string } }) => void;

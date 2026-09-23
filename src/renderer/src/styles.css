@@ -2032,26 +2032,44 @@ table.grid img, .roster-card img, .stat img, .card img,
    现在三层叠加，其中**内发光不会被祖先裁剪**，一定看得见：
      ① 2px 橙色实环    ② 外发光（放大到 22px/4px 扩散、.70）
      ③ 内发光（暖白，让卡片看起来"被点亮"） */
-/* ═══ 橙武卡片的「炫彩流光」动效 ═══════════════════════════════
-   用户口径：「橙武可以换个光，动效炫彩？」
-   色相循环（hue-rotate）驱动两层光：
-     ① 内发光（画在卡片内部，不会被祖先 overflow 裁掉，必定可见）
-     ② 卡片自身外发光（没被裁时会一起变色）
-   不依赖 @property（兼容性更稳）；也不受 prefers-reduced-motion 影响 —— 用户明确要动效。
+/* ═══ 橙武卡片：只有「外围框」炫彩，卡片本体一点不动 ═════════════
+   用户口径：「职业颜色啥的别变啊，我只用外围框」
+   上一版把 hue-rotate 动画加在 .pcard--ow **本身**上 ——
+   filter 会作用于整张卡片，于是职业底色与文字跟着变色（我的错）。
+   现在：卡片本体（背景=职业色、文字）完全不碰；
+        炫彩只发生在两个伪元素上，filter 只影响它们自己：
+          ::before = 卡外一圈光环（inset:-4px + blur + z-index:-1，衬在卡片后面）
+          ::after  = 卡内一层柔光（纯装饰，不透出卡片颜色）
    ═══════════════════════════════════════════════════════════════ */
 .pcard--ow {
   position: relative;
-  box-shadow: 0 0 22px 4px rgba(240, 164, 74, .70) !important;
-  animation: ow-hue 6s linear infinite;
+  box-shadow: 0 0 20px 3px rgba(240, 164, 74, .60) !important;
 }
+/* 卡外光环：衬在卡片下面，只在边缘露出来 —— 这就是"外围框" */
+.pcard--ow::before {
+  content: "";
+  position: absolute; inset: -4px;
+  border-radius: 18px;
+  z-index: -1;
+  background: conic-gradient(
+    rgba(255, 90, 120, .9), rgba(255, 200, 60, .9), rgba(90, 255, 170, .9),
+    rgba(80, 180, 255, .9), rgba(200, 110, 255, .9), rgba(255, 90, 120, .9));
+  filter: blur(8px) hue-rotate(0deg);
+  animation: ow-hue 6s linear infinite;
+  pointer-events: none;
+}
+/* 卡内柔光：纯装饰，只影响这一层 */
 .pcard--ow::after {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  box-shadow: inset 0 0 26px rgba(255, 200, 90, .62);
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 20px rgba(255, 210, 120, .45);
   animation: ow-hue 6s linear infinite;
 }
   @keyframes ow-hue {
-  from { filter: hue-rotate(0deg) saturate(1.15); }
-  to   { filter: hue-rotate(360deg) saturate(1.15); }
+  from { filter: blur(8px) hue-rotate(0deg) saturate(1.2); }
+  to   { filter: blur(8px) hue-rotate(360deg) saturate(1.2); }
 }
-.pcard--ow:hover { box-shadow: 0 0 30px 7px rgba(240, 164, 74, .85) !important; }
-.pcard--ow.pcard--dragging { box-shadow: 0 0 14px 2px rgba(240, 164, 74, .55) !important; }
+.pcard--ow:hover { box-shadow: 0 0 28px 6px rgba(240, 164, 74, .78) !important; }
+.pcard--ow.pcard--dragging { box-shadow: 0 0 12px 2px rgba(240, 164, 74, .50) !important; }

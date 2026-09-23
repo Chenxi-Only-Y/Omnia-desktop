@@ -2055,3 +2055,21 @@ table.grid img, .roster-card img, .stat img, .card img,
 .pcard--ow.pcard--dragging {
   box-shadow: 0 0 12px 2px color-mix(in srgb, var(--pc) 55%, transparent) !important;
 }
+
+/* ═══ 抬层级（重加 + 加固）════════════════════════════════════
+   背景：这条规则在之前某轮"截断文件再追加样式块"时被连带删掉了
+   （我用过几次 css.slice(0, i)，把末尾的旧块一起切走了）——
+   于是自绘下拉又被后面的行盖住，表现为"下滑又没了"。
+
+   这次的写法更稳：凡是**直接包含**已展开下拉/日期弹层的容器，一律抬到最前。
+   覆盖了列表行、编辑行、工具栏、卡片、字段、弹窗、看板等所有已知容器。
+   ═══════════════════════════════════════════════════════════════ */
+.sel[open] { z-index: 90; }
+.dp[open], .dp .dp__pop { z-index: 90; }
+:is(.roster-card, .roster-card__edit, .roster-cards, .roster-cards__head,
+    .toolbar, .card, .stat, .field, .home-card, .board, .picker-item,
+    .modal__box, table.grid, tbody, tr, td)
+  :has(> .sel[open]) { position: relative; z-index: 88; }
+:is(.roster-card, .roster-card__edit, .roster-cards, .toolbar, .card, .stat,
+    .field, .home-card, .board, .picker-item, .modal__box)
+  :has(.dp__pop) { position: relative; z-index: 88; }

@@ -97,15 +97,20 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
      我恢复的那个节点已经不是最终那个了。
      所以再加一次：**等 players 到位后再恢复一次**，且只做一次
      （用 ref 记住做过没有，避免之后每次改动 players 都把用户拽回去）。 */
-  const restoredRef = useRef(false);
+  /* 实测（全元素 hook）证据：保存之后 roster-cards.scrollTop 变成 0，
+     但**没有任何写入记录** —— 说明 .roster-cards 这个元素被整个替换了
+     （新元素天生是 0），而不是被谁设成 0。
+     上一版我加了个"只恢复一次"的守卫（restoredRef），
+     结果第一次之后就不再恢复 —— 保存后自然还是跳。
+     现在改成：**每次 players 变化都恢复**。
+     重载只发生在保存/删除/导入这类明确动作上，用户正常滚动不会改 players，
+     所以不会打扰正常浏览。 */
   useEffect(() => {
-    if (restoredRef.current) return;
     const w = window as unknown as { __rosterScroll?: number };
     const sc = listRef.current;
     if (!sc || !players.length) return;
     const want = w.__rosterScroll ?? 0;
-    if (want > 0) sc.scrollTop = want;
-    restoredRef.current = true;
+    if (want > 0 && sc.scrollTop !== want) sc.scrollTop = want;
   }, [players]);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [wizard, setWizard] = useState(false);
@@ -640,7 +645,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                           onChange={(e) => setDraft({ ...draft, orangeWeapon: e.target.value })}>
                     <option value="">橙武</option>
                     <option value="有">有</option>
-                  </Select>
+                    <option value="无">无</option>
+                </Select>
                   <input className="input" placeholder="备注（技能/装备标签）" style={{ width: 200 }}
                          value={draft.remark} onChange={(e) => setDraft({ ...draft, remark: e.target.value })} />
                   <span className="grow" />

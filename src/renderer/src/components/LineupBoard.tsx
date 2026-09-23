@@ -20,7 +20,8 @@ async function refreshOW(): Promise<void> {
   try {
     const ps = await api.player.list();
     const m = new Map<number, boolean>();
-    for (const q of ps) m.set(q.id, (q.orangeWeapon ?? '') !== '');
+    // 判据必须是「=== 有」：'无' 也是非空字符串，用 !== '' 会把「无」误判成有橙武
+    for (const q of ps) m.set(q.id, q.orangeWeapon === '有');
     OW = m;
   } catch { /* 取不到就不显示徽标 */ }
 }

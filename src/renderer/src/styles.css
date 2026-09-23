@@ -2295,3 +2295,14 @@ table.grid img, .roster-card img, .stat img, .card img,
 .dp__pop, .pop, .cfm__box { transform-origin: top center; }
 .dp__pop--in,  .pop--in,  .cfm__box--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
 .dp__pop--out, .pop--out, .cfm__box--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
+
+/* ═══ 模态遮罩改为半透明（用户口径：背景可以是半透明的吗）═══════
+   原来 .modal 的遮罩是不透明的浅色整屏，把下面的页面完全挡住了。
+   改为半透明 + 磨砂：能看到底下的页面轮廓，同时面板本身仍然清晰。
+   用追加覆盖 + !important，避免依赖上面那条 .modal 规则的具体写法。
+   ═══════════════════════════════════════════════════════════════ */
+.modal {
+  background: rgba(228, 226, 224, .55) !important;
+  backdrop-filter: blur(10px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(1.15) !important;
+}

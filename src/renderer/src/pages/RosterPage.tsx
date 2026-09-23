@@ -203,7 +203,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       setSortDir(1);
       setError(null);
       setNotice(`已把 ${sorted.length} 人的序填为 1…${sorted.length}`);
-      await loadKeepingScroll();
+      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -240,7 +240,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       setSortKey('order');
       setSortDir(1);
       setError(null);
-      await loadKeepingScroll();
+      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -265,24 +265,6 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
    * 匹配顺序：**整串包含** → **字符按顺序出现**（模糊，例如「珺菌」能命中「珺珺不是菌子」）。
    * reset=true（边打字边找）跳到第一个命中；reset=false（回车）跳到下一个命中。
    */
-  async function loadKeepingScroll() {
-    const snap = Array.from(document.querySelectorAll<HTMLElement>('*'))
-      .filter((el) => el.scrollTop > 0)
-      .map((el) => [el, el.scrollTop] as const);
-    await (load)();
-    const restore = () => {
-      if (document.querySelector('.roster-card--dragging')) return;
-      snap.forEach(([el, top]) => { el.scrollTop = top; });
-    };
-    restore();
-    requestAnimationFrame(restore);
-  }
-
-  /* 详情 / 编辑 / 删除等操作会调 load() 重建列表，滚动位置随之丢失。
-     统一走上面的 loadKeepingScroll：重拉前记下所有已滚动元素的位置，重拉后恢复。
-     与上一版（已回退）的关键差别是 drag guard —— 恢复前先看有没有拖拽在进行，
-     有就完全不碰 scrollTop。上一版用 60/180/400ms 定时器多次恢复，
-     在拖动过程中改写 scrollTop，直接打断了 HTML5 拖拽，导致拖不动。 */
   function locateNext(query: string, reset: boolean) {
     const key = query.trim().toLowerCase();
     if (!key) { setLocateMsg(''); setLocateMiss(false); setFoundId(null); return; }
@@ -342,6 +324,21 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       await api.player.reorder(ids);
       setError(null);
       setNotice(`已按新顺序保存（${ids.length} 人）`);
+      /* 用户口径：拖动换位后视角会跳回列表最上面一个人那里。
+         成因就是下面这个 load() —— 它重新拉取并重建整个列表，
+         滚动位置随之丢失（滚动可能发生在 .content，也可能在列表自身的容器里）。
+         这里在重拉前把**页面上所有已滚动元素**的位置记下来，重拉后恢复。 */
+      const snap = Array.from(document.querySelectorAll<HTMLElement>('*'))
+        .filter((el) => el.scrollTop > 0)
+        .map((el) => [el, el.scrollTop] as const);
+      await load();
+      /* 用户反馈：只恢复一次**没用**（视角照样跳回最上面）。
+         说明重排发生在我的恢复之后 —— React 的提交时机比我恢复得晚。
+         所以改成多次恢复，把延迟重排也覆盖掉。 */
+      const restore = () => snap.forEach(([el, top]) => { el.scrollTop = top; });
+      restore();
+      requestAnimationFrame(restore);
+      [60, 180, 400].forEach((ms) => window.setTimeout(restore, ms));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -381,7 +378,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       setDraft(EMPTY_DRAFT);
       setError(null);
       setNotice(`已添加 ${id}`);
-      await loadKeepingScroll();
+      await load();
     } catch (err) {
       setNotice(null);
       setError(err instanceof ApiError ? err.message : String(err));
@@ -420,7 +417,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       const changed = Number.isFinite(target) && target >= 1 && target !== cur;
       setEditId(null);
       if (changed) await moveToOrdinal(editId, target);
-      else { setError(null); await loadKeepingScroll(); }
+      else { setError(null); await load(); }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -432,7 +429,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       await api.player.remove(p.id);
       setError(null);
       setNotice(`已删除 ${p.gameId}`);
-      await loadKeepingScroll();
+      await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }
@@ -453,7 +450,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         (res.errors.length ? `；提示 ${res.errors.length} 条（见控制台）` : ''),
       );
       if (res.errors.length) console.warn('[import] 提示:', res.errors);
-      await loadKeepingScroll();
+      await load();
     } catch (err) {
       setNotice(null);
       setError(`导入失败：${err instanceof ApiError ? err.message : String(err)}`);

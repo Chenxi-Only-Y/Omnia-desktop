@@ -2193,7 +2193,7 @@ table.grid img, .roster-card img, .stat img, .card img,
      · 从按钮向下"揭开"，读起来是展开/收起；
      · 不用 scaleY（会把文字压扁），也不用 max-height（布局属性、每帧重排）；
      · clip-path + opacity 都是合成器友好的。 */
-.dp__pop, .pop, .cfm__box, .modal__box, .picker-grid {
+.dp__pop, .pop, .cfm__box, .modal__box {
   transform-origin: top center;
   animation: unfold .22s cubic-bezier(.22, 1, .36, 1);
 }
@@ -2285,3 +2285,8 @@ table.grid img, .roster-card img, .stat img, .card img,
 .cfm__box { position: relative; z-index: 401; }
 /* 下拉/日期弹层仍要低于模态面板，但高于普通内容与侧栏 */
 .sel[open], .dp[open] { z-index: 150; }
+
+/* 参选者职业分组：展开/收起两个方向都有动画（与 Select 同一套 fold/unfold） */
+.picker-grid { transform-origin: top center; }
+.picker-grid--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
+.picker-grid--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }

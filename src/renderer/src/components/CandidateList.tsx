@@ -58,6 +58,7 @@ export default function CandidateList({
   const [showLeave, setShowLeave] = useState(false);
   /** 已展开的职业组（空集合 = 全部收起，这是默认状态） */
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [closing, setClosing] = useState<Set<string>>(new Set());
   const searching = q.trim().length > 0;
 
   const { joins, leaves } = useMemo(() => {
@@ -112,16 +113,34 @@ export default function CandidateList({
           const open = searching || expanded.has(cls);
           return (
             <div key={cls} className="picker-group">
-              <button className="picker-group__head" onClick={() => setExpanded((prev) => {
-                const next = new Set(prev);
-                if (next.has(cls)) next.delete(cls); else next.add(cls);
-                return next;
-              })}>
+              <button className="picker-group__head" onClick={() => {
+                const isOpen = expanded.has(cls);
+                if (isOpen) {
+                  // 要收起：先播反向动画，180ms 后再真正卸载
+                  setClosing((prev) => new Set(prev).add(cls));
+                  window.setTimeout(() => setClosing((prev) => {
+                    const next = new Set(prev);
+                    next.delete(cls);
+                    return next;
+                  }), 180);
+                } else {
+                  setClosing((prev) => { const next = new Set(prev); next.delete(cls); return next; });
+                }
+                setExpanded((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(cls)) next.delete(cls); else next.add(cls);
+                  return next;
+                });
+              }}>
                 <span className="picker-group__caret">{open ? '▾' : '▸'}</span>
                 <ClassChip name={cls === UNKNOWN ? '' : cls} classMap={classMap} />
                 <span className="picker-group__count">{group.length}</span>
               </button>
-              {open && <div className="picker-grid">{group.map(item)}</div>}
+              {(open || closing.has(cls)) && (
+                <div className={'picker-grid' + (open ? ' picker-grid--in' : ' picker-grid--out')}>
+                  {group.map(item)}
+                </div>
+              )}
             </div>
           );
         })}

@@ -72,17 +72,11 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       {/* ── 首屏：深色剧场（照 seedance2_0 视觉特征，见根目录 DESIGN.md）——
           大留白 + 超大标题 + 药丸按钮 + 职业图标托盘；钉住不动，下滑被数据层盖住 ── */}
       <section className="hero hero--pinned home-hero home-dark">
+        {/* 用户口径：
+            ① 快捷按钮挪到**最上面居中**
+            ② 品牌块（eyebrow / 万象·Omnia / 英文 / 说明）挪到**左下角**
+            ③ **职业托盘整个删掉** */}
         <div className="hero__body">
-          <span className="home-eyebrow">All leagues · One universe</span>
-          <h1 className="home-display">
-            万象<span className="dot-sep">·</span>Omnia
-          </h1>
-          <div className="home-display-en">All leagues. One universe.</div>
-          <p className="home-lede">
-            万象归一，联赛集成。报名、排表、战报、评分、出勤都在同一处完成 ——
-            职业只来自各场报名表，口径统一。
-          </p>
-
           <div className="home-cta">
             <button className="home-btn" onClick={() => onGo('match')}>录入对局与战报</button>
             <button className="home-btn home-btn--ghost" onClick={() => onGo('roster')}>成员主档</button>
@@ -90,21 +84,16 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
             <button className="home-btn home-btn--ghost" onClick={() => onGo('settings')}>战斗组与小队</button>
           </div>
 
-          {/* 12 职业原色图标托盘：深色圆托 + 原色图标（图标禁止重染） */}
-          <div className="home-tray" aria-hidden="true">
-            {CLASSES.map((c) => {
-              const src = classIconSrc(c.name);
-              return (
-                <span key={c.name} className="home-tray__item" title={c.name}>
-                  <span className="home-tray__plate">
-                    {src
-                      ? <img src={src} alt="" />
-                      : <i style={{ display: 'block', width: 14, height: 14, borderRadius: '50%', background: c.color }} />}
-                  </span>
-                  <span className="home-tray__label">{c.name}</span>
-                </span>
-              );
-            })}
+          <div className="home-brand">
+            <span className="home-eyebrow">All leagues · One universe</span>
+            <h1 className="home-display">
+              万象<span className="dot-sep">·</span>Omnia
+            </h1>
+            <div className="home-display-en">All leagues. One universe.</div>
+            <p className="home-lede">
+              万象归一，联赛集成。报名、排表、战报、评分、出勤都在同一处完成 ——
+              职业只来自各场报名表，口径统一。
+            </p>
           </div>
         </div>
 

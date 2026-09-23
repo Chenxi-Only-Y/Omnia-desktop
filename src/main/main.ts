@@ -754,9 +754,9 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           throw new Error('等待超时：' + label);
         };
         await waitFor(() => document.querySelector('.hero') ? true : null, '首页主视觉');
-        // 首页已改「大厂风」：品牌字是 .home-display，职业图标托盘是 .home-tray__plate，按钮是 .home-btn
+        // 首页已改「大厂风」：品牌字是 .home-display，职业图标托盘是 .home-brand，按钮是 .home-btn
         const heroBrand = document.querySelector('.home-display')?.textContent || '';
-        const heroClasses = document.querySelectorAll('.home-tray__plate').length;
+        const heroClasses = document.querySelectorAll('.home-brand').length;
         const heroButtons = document.querySelectorAll('.home-btn').length;
         steps.push('主视觉 品牌字=' + JSON.stringify(heroBrand) + ' 职业图标=' + heroClasses + ' 快捷按钮=' + heroButtons);
 

@@ -2120,3 +2120,40 @@ table.grid img, .roster-card img, .stat img, .card img,
 .brand .sub { flex: 0 0 100%; margin-top: 2px; }
 /* 导航收起时完全隐藏（与其它导航文字一致） */
 .nav-collapsed .brand__logo { display: none; }
+
+/* ═══ 首屏重排（用户口径）══════════════════════════════════════
+   ① 快捷按钮 → 最上面居中
+   ② 品牌块（eyebrow / 万象·Omnia / 英文 / 说明）→ 左下角
+   ③ 职业托盘已删除（连同 .home-tray 相关样式不再需要，这里不重写）
+   用两段类名选择器，避免被同特异度的 .hero 规则盖住（此前踩过这个坑）。
+   ═══════════════════════════════════════════════════════════════ */
+.hero.home-hero .hero__body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+/* 顶部居中：按钮排 */
+.hero.home-hero .home-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  /* 用户口径：往下点、别贴着顶边 */
+  padding-top: 56px;
+}
+/* 左下角：品牌块。margin-top:auto 把它推到剩余空间的底部 */
+.hero.home-hero .home-brand {
+  margin-top: auto;
+  align-self: flex-start;
+  /* 用户口径：放大点、整体往上点点 */
+  max-width: min(720px, 62%);
+  text-align: left;
+  padding-bottom: 96px;
+}
+/* 品牌块尺寸（用户口径：上一版太大，收回一档） */
+.hero.home-hero .home-brand .home-display { font-size: clamp(46px, 6.6vw, 96px); }
+.hero.home-hero .home-brand .home-display-en { font-size: 18px; }
+.hero.home-hero .home-brand .home-lede { font-size: 15px; max-width: 720px; }

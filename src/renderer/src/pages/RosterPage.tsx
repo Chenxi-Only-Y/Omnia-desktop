@@ -463,7 +463,17 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
          让"数据更新"和"收起编辑行"落在同一次提交里，中间不再有可丢的窗口。
          editId 在前面已经读过，挪后不影响。 */
       if (changed) await moveToOrdinal(editId, target);
-      else { setError(null); await load(); }
+      else {
+        /* 竞态根除（第二步）：上一版把 setEditId(null) 挪到 await 之后，
+           但 await load() **内部自己还有一次异步 + setPlayers**，
+           它和这里的状态更新仍不在同一个同步块里 → React 18 不会合并提交，
+           窗口依然存在，所以"还是不稳定"。
+           这次不再调 load()，改为：这里自己取数，然后在**同一个同步块**里
+           一次性设完所有状态 → React 合并成一次提交，窗口彻底消失。 */
+        const ps = await api.player.list();
+        setPlayers(ps);
+        setError(null);
+      }
       setEditId(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));

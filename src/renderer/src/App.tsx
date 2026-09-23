@@ -13,6 +13,7 @@ import SeasonsPage from './pages/SeasonsPage';
 import LineupPage from './pages/LineupPage';
 import SettingsPage from './pages/SettingsPage';
 import ConfirmHost from './components/Confirm';
+import logo from './assets/logo.svg';
 
 export interface PageProps {
   classes: ClassInfo[];
@@ -77,6 +78,8 @@ export default function App() {
     <div className={`app${navOpen ? ' nav-open' : ' nav-collapsed'}`}>
       <aside className="sidebar">
         <div className="brand">
+          {/* 应用图标（与 exe 图标同一份矢量源） */}
+          <img className="brand__logo" src={logo} alt="" />
           <h1>万象<span className="dot-sep">·</span>Omnia</h1>
           <div className="sub">All leagues. One universe.</div>
           <div className="sub">万象归一，联赛集成</div>

@@ -2301,7 +2301,15 @@ table.grid img, .roster-card img, .stat img, .card img,
    改为半透明 + 磨砂：能看到底下的页面轮廓，同时面板本身仍然清晰。
    用追加覆盖 + !important，避免依赖上面那条 .modal 规则的具体写法。
    ═══════════════════════════════════════════════════════════════ */
-.modal {
+/* 实测：.modal 的计算背景是 rgb(252,248,253) —— 说明有一条**更具体**的规则
+   （带 .theme-light / .page-fill 之类的祖先前缀）也带 !important，压过了单类选择器。
+   所以这里把祖先前缀都写上，用更高特异性把它盖掉。 */
+.modal,
+.theme-light .modal,
+.page-fill .modal,
+.theme-light .page-fill .modal,
+.main .modal,
+.content .modal {
   background: rgba(228, 226, 224, .55) !important;
   backdrop-filter: blur(10px) saturate(1.15) !important;
   -webkit-backdrop-filter: blur(10px) saturate(1.15) !important;

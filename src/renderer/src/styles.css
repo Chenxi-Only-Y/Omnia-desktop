@@ -1995,3 +1995,16 @@ table.grid img, .roster-card img, .stat img, .card img,
 .sel__btn, .dp__btn { padding-right: 9px !important; }
 /* 卡片上的职业已改回纯文字，相关的下拉按钮样式一并撤掉 */
 .pcard .sel__btn { background: none !important; border: none !important; }
+
+/* 「数据」菜单：按钮外观的下拉（区别于值选择型下拉） */
+.sel.menu > .sel__btn {
+  background: rgba(255,255,255,.80) !important;
+  border: 1px solid rgba(11,11,13,.18) !important;
+  border-radius: 10px !important;
+  height: 30px; padding: 0 12px !important;
+  color: #0B0B0D !important; font-size: 13px !important;
+  justify-content: center;
+}
+.sel.menu > .sel__btn:hover { border-color: rgba(11,11,13,.30) !important; }
+.sel.menu .sel__list { min-width: 168px; right: 0; left: auto; }
+.sel.menu .sel__opt { font-size: 13px; }

@@ -487,6 +487,8 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                  value={draft.joinedOrder} onChange={(e) => setDraft({ ...draft, joinedOrder: e.target.value })} />
           <input className="input" placeholder="备注（技能/装备标签）" style={{ width: 200 }}
                  value={draft.remark} onChange={(e) => setDraft({ ...draft, remark: e.target.value })} />
+          {/* 弹性间隔：把「添加」推到右端，和上面的输入区拉开 */}
+          <span className="grow" />
           <button className="btn primary" onClick={handleCreate}>添加</button>
         </div>
 
@@ -507,16 +509,26 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
             <option value="">全部状态</option>
             <option value="active">在队</option><option value="inactive">暂离</option><option value="left">离队</option>
           </Select>
+          {/* 弹性间隔：左边是「筛选」，右边是「操作」，中间留白分开 */}
+          <span className="grow" />
+
           <button className="btn" onClick={() => void fillOrder()} disabled={!sorted.length}
                   title="按当前显示顺序把「序」写成 1…N（导入进来的人序都是空的）">
             一键填满序
           </button>
+          {/* 导入 / 导出收进一个「数据」下拉（用户选定方案 B） */}
+          <details className="sel menu">
+            <summary className="sel__btn">数据</summary>
+            <div className="sel__list">
+              <button type="button" className="sel__opt" onClick={() => setWizard(true)}>从 xlsx 导入</button>
+              <button type="button" className="sel__opt" onClick={() => fileRef.current?.click()}>导入 CSV / JSON</button>
+              <button type="button" className="sel__opt" onClick={handleExport}
+                      disabled={!players.length}>导出 CSV</button>
+            </div>
+          </details>
+          <button className="btn ghost" onClick={() => void load()}>刷新</button>
           <input ref={fileRef} type="file" accept=".csv,.txt,.json" style={{ display: 'none' }}
                  onChange={(e) => void handleFile(e.target.files?.[0])} />
-          <button className="btn primary" onClick={() => setWizard(true)}>从 xlsx 导入</button>
-          <button className="btn" onClick={() => fileRef.current?.click()}>导入 CSV / JSON</button>
-          <button className="btn" onClick={handleExport} disabled={!players.length}>导出 CSV</button>
-          <button className="btn ghost" onClick={() => void load()}>刷新</button>
         </div>
         
       </div>

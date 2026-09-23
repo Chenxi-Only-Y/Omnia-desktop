@@ -30,12 +30,23 @@ export default function Select({
   color?: string;
   children?: ReactNode;
 }) {
-  const opts = Children.toArray(children)
-    .filter((c) => isValidElement(c) && c.type === 'option')
-    .map((c) => {
-      const p = (c as unknown as { props: OptProps }).props;
-      return { value: String(p.value ?? ''), label: p.children, disabled: !!p.disabled };
+  // 递归收集 <option>：调用点常写成 <>{list.map(...)}</>（Fragment）或包一层组件，
+  // 而 Children.toArray **不会摊平 Fragment** —— 只认直接子元素的话选项会被全部过滤掉，
+  // 下拉就变成一个空盒子（用户截图：白色空格子，看不到东西）。
+  const opts: { value: string; label: ReactNode; disabled: boolean }[] = [];
+  const collect = (node: ReactNode) => {
+    Children.forEach(node, (c) => {
+      if (!isValidElement(c)) return;
+      if (c.type === 'option') {
+        const p = (c as unknown as { props: OptProps }).props;
+        opts.push({ value: String(p.value ?? ''), label: p.children, disabled: !!p.disabled });
+        return;
+      }
+      const kids = (c as unknown as { props?: { children?: ReactNode } }).props?.children;
+      if (kids !== undefined) collect(kids);
     });
+  };
+  collect(children);
   // 过滤掉 select / input 这类**原生控件类名**：它们自带底色+描边+内边距，
   // 套在外层 <details> 上就会和里面的 .sel__btn 形成"双框套娃"（用户反馈：太丑了）。
   // 盒子统一由 .sel__btn 提供，外层只做定位。

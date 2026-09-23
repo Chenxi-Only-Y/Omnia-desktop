@@ -2081,21 +2081,25 @@ table.grid img, .roster-card img, .stat img, .card img,
    想让它缓慢流动只要把 animation 那行打开即可（已写在下方注释里）。
    ═══════════════════════════════════════════════════════════════ */
 .pcard--ow .pcard__id {
-  /* 用户口径：白—黑渐变（不再七彩）。
-     首尾都收在白，配合 220% 背景位移，一个周期走完是无缝衔接的。 */
-  background-image: linear-gradient(100deg,
-    #FFFFFF 0%, #C9C9D1 35%, #0B0B0D 50%, #C9C9D1 65%, #FFFFFF 100%);
-  background-size: 220% 100%;
-  background-position: 0% 50%;
+  /* 用户口径：本职业色（压暗一点）→ 白，速度放慢。
+     跳变的根因：原来用 background-size:220% + position 0%→220%，
+     位移量是图片宽的 1.2 倍（非整数倍）→ 每轮接不上。
+     改成 **repeating-linear-gradient + 按像素位移一整个周期**，
+     位移量与元素宽度无关，必定无缝。 */
+  background-image: repeating-linear-gradient(100deg,
+    color-mix(in srgb, var(--pc) 45%, #000000) 0px,
+    #FFFFFF 70px,
+    color-mix(in srgb, var(--pc) 45%, #000000) 140px);
+  background-size: auto;
+  background-position: 0 0;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent !important;
   -webkit-text-fill-color: transparent;
-  /* 用户口径：开流动（9s 一轮，慢速不至于晃眼） */
-  animation: ow-id 9s linear infinite;
+  animation: ow-id 14s linear infinite;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
 }
   @keyframes ow-id {
-  from { background-position: 0% 50%; }
-  to   { background-position: 220% 50%; }
+  from { background-position: 0 0; }
+  to   { background-position: 140px 0; }   /* 正好一个周期 */
 }

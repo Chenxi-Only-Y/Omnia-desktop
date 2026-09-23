@@ -105,6 +105,10 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
     if (!match) return;
     try {
       const next = await api.match.update(match.id, {
+        /* indexInDay 原来**漏了** —— 界面上改「当天第几场」时，
+           请求里根本没带这个字段，数据库保持原值，
+           回来后 setMatch(next) 又把它写成旧值 → 表现为「只有 1，加不了」，且不报错。 */
+        indexInDay: patch.indexInDay,
         date: patch.date, ourSide: patch.ourSide, oppSide: patch.oppSide,
         result: patch.result, ourTowersLeft: patch.ourTowersLeft,
         oppTowersLeft: patch.oppTowersLeft, state: patch.state, remark: patch.remark,

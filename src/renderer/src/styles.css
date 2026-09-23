@@ -2221,9 +2221,13 @@ table.grid img, .roster-card img, .stat img, .card img,
 .main {
   grid-column: 1;
   width: calc(100% - 216px);
-  transform: translateX(216px);
-  transition: transform .3s cubic-bezier(.4, 0, .2, 1);
-  will-change: transform;
+  /* 用 margin-left 而不是 transform 做"被推开"的位移：
+     transform / will-change 会给 .main 建新的合成层与层叠上下文，
+     导致内部自绘下拉的"抬层级"(:has(> .sel[open])) 失效、被后面的行盖住。
+     margin-left 只影响布局（每帧重排的代价在这里可以接受：它是整块位移，
+     不像栅格列宽那样牵动整页），且不产生层叠上下文。 */
+  margin-left: 216px;
+  transition: margin-left .3s cubic-bezier(.4, 0, .2, 1);
 }
 .app.nav-collapsed { grid-template-columns: 1fr; }
 .app.nav-collapsed .sidebar {
@@ -2231,4 +2235,4 @@ table.grid img, .roster-card img, .stat img, .card img,
   visibility: hidden;
   transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s linear .3s;
 }
-.app.nav-collapsed .main { width: 100%; transform: translateX(0); }
+.app.nav-collapsed .main { width: 100%; margin-left: 0; }

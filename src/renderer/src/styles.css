@@ -2187,10 +2187,22 @@ table.grid img, .roster-card img, .stat img, .card img,
 /* 统一展开过渡（用户口径：所有收缩/展开都要丝滑）——
    下拉列表、日期弹层、新增成员浮层、确认框、参选者分组都是"挂载即出现"，
    用入场动画补上过渡感。不用 prefers-reduced-motion 关掉：用户明确要动效。 */
+/* 用户口径：下拉要"上下展开"的收起感，不是整块弹出来。
+   原来 pop-in 是"淡入 + 微位移"，看着是弹的。
+   改成 clip-path 自上而下展开：
+     · 从按钮向下"揭开"，读起来是展开/收起；
+     · 不用 scaleY（会把文字压扁），也不用 max-height（布局属性、每帧重排）；
+     · clip-path + opacity 都是合成器友好的。 */
 .sel__list, .dp__pop, .pop, .cfm__box, .modal__box, .picker-grid {
-  animation: pop-in .18s cubic-bezier(.22, 1, .36, 1);
+  transform-origin: top center;
+  animation: unfold .22s cubic-bezier(.22, 1, .36, 1);
 }
-  @keyframes pop-in {
+  @keyframes unfold {
+  from { clip-path: inset(0 0 100% 0 round 12px); opacity: .35; }
+  to   { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
+}
+  /* 旧的 pop-in 关键帧已由 unfold 取代（保留仅为可回溯） */
+  @keyframes pop-in-unused {
   from { opacity: 0; transform: translateY(-6px) scale(.985); }
   to   { opacity: 1; transform: none; }
 }

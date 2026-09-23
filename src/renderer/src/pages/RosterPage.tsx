@@ -454,9 +454,17 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       const target = rawOrder === '' ? sorted.length : Number(rawOrder);
       const cur = players.find((x) => x.id === editId)?.joinedOrder ?? null;
       const changed = Number.isFinite(target) && target >= 1 && target !== cur;
-      setEditId(null);
+      /* 用户口径：保存后跳回顶部是**竞态**，时好时坏。
+         原来的顺序是：先 setEditId(null)（立即提交 —— 编辑行消失、列表高度变化），
+         再 await moveToOrdinal/load（异步，之后才提交第二次 DOM 变动）。
+         两次变动分属两次提交，中间那一瞬滚动位置会丢 —— 每次谁先完成不一样，
+         所以"有时跳、有时不跳"。
+         修法（方案 1：消除竞态本身）：把 setEditId(null) 挪到 await **之后**，
+         让"数据更新"和"收起编辑行"落在同一次提交里，中间不再有可丢的窗口。
+         editId 在前面已经读过，挪后不影响。 */
       if (changed) await moveToOrdinal(editId, target);
       else { setError(null); await load(); }
+      setEditId(null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }

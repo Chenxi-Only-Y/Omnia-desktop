@@ -14,6 +14,7 @@ import LineupPage from './pages/LineupPage';
 import SettingsPage from './pages/SettingsPage';
 import ConfirmHost from './components/Confirm';
 import logo from './assets/logo.svg';
+import { installSmoothScroll } from './lib/smoothScroll';
 
 export interface PageProps {
   classes: ClassInfo[];
@@ -73,6 +74,9 @@ export default function App() {
   };
 
   const props: PageProps = { classes, classMap };
+
+  // 全站滚轮平滑（只装一次）
+  installSmoothScroll();
 
   return (
     <div className={`app${navOpen ? ' nav-open' : ' nav-collapsed'}`}>

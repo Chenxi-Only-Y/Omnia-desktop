@@ -204,7 +204,7 @@ export default function PlayerDetailPage({ playerId, classMap, onBack }: Props) 
                       <span className="trend__bar trend__bar--tower"
                             style={{ height: `${Math.max(2, (m.effTower / maxTrend) * 100)}%` }} />
                     </div>
-                    <div className="trend__label">{m.date.slice(5)}<br />-{m.indexInDay}</div>
+                    <div className="trend__label">{m.date.slice(5)}<br />{m.indexInDay}</div>
                   </div>
                 ))}
                 <div className="trend__legend">

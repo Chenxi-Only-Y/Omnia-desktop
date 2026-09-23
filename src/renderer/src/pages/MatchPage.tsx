@@ -192,7 +192,7 @@ export default function MatchPage({ classes, classMap }: Props) {
               {!loading && list.map((m) => (
                 <tr key={m.id}>
                   <td>{m.date}</td>
-                  <td className="num">-{m.indexInDay}</td>
+                  <td className="num">{m.indexInDay}</td>
                   <td>{m.ourSide}</td>
                   <td>{m.oppSide}</td>
                   <td style={{ color: m.result === 'WIN' ? 'var(--ok)' : m.result === 'LOSE' ? 'var(--danger)' : 'var(--text-dim)' }}>

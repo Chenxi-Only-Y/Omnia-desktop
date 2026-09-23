@@ -2314,3 +2314,19 @@ table.grid img, .roster-card img, .stat img, .card img,
   backdrop-filter: blur(10px) saturate(1.15) !important;
   -webkit-backdrop-filter: blur(10px) saturate(1.15) !important;
 }
+
+/* 首屏大字发白光（用户口径）。
+   两层 text-shadow：近处一层亮而紧、远处一层柔而散 ——
+   单层要么像描边要么像糊，两层叠起来才是"发光"。
+   用三段落类名选择器（.hero.home-hero .home-display），
+   避免被同特异度的 .hero / .home-display 规则盖住（这项目里踩过两次）。 */
+.hero.home-hero .home-display {
+  text-shadow:
+    0 0 12px rgba(255, 255, 255, .55),
+    0 0 34px rgba(255, 255, 255, .38),
+    0 0 72px rgba(255, 255, 255, .20);
+}
+/* 英文小标题也给一点点，避免只有主标题在发光显得孤立 */
+.hero.home-hero .home-display-en {
+  text-shadow: 0 0 18px rgba(255, 255, 255, .30);
+}

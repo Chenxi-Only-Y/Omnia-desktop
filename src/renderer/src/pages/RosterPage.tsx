@@ -324,7 +324,16 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
       await api.player.reorder(ids);
       setError(null);
       setNotice(`已按新顺序保存（${ids.length} 人）`);
+      /* 用户口径：拖动换位后视角会跳回列表最上面一个人那里。
+         成因就是下面这个 load() —— 它重新拉取并重建整个列表，
+         滚动位置随之丢失（滚动可能发生在 .content，也可能在列表自身的容器里）。
+         这里在重拉前把**页面上所有已滚动元素**的位置记下来，重拉后恢复。 */
+      const snap = Array.from(document.querySelectorAll<HTMLElement>('*'))
+        .filter((el) => el.scrollTop > 0)
+        .map((el) => [el, el.scrollTop] as const);
       await load();
+      snap.forEach(([el, top]) => { el.scrollTop = top; });
+      requestAnimationFrame(() => snap.forEach(([el, top]) => { el.scrollTop = top; }));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     }

@@ -65,20 +65,20 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const ready = latestSignups.filter((r) => r.signup === 'JOIN').length;
   const capacity = catalog?.capacity ?? TOTAL_MATCH_SLOTS;
 
-  /* 首屏"轻推即翻"（用户口径：要丝滑、不要神经质）。
+  /* 首屏与数据层的**双向**吸附（用户口径：「只吸附了一次」—— 之前只有向下那一次）。
 
-     上一版没有任何吸附效果，原因是我在**累计阶段没有 preventDefault**：
-     原生滚动先把页面滚走了（scrollTop 立刻 > 6），
-     于是 `scrollTop > 6 → acc = 0` 每帧清零，累计值永远到不了阈值。
+     两个吸附点：首屏顶部（scrollTop = 0）与数据层顶部（.home-cover 的绝对位置）。
+       向下：在首屏顶部轻推 → 吸到数据层顶部
+       向上：在数据层顶部轻推 → 吸回首屏顶部
 
-     现在：
-       ① 在顶部往下滚时**先拦住原生滚动**再累计（这是关键）；
-       ② 累计满 110px（滚轮一格约 100px）才翻 —— 不神经质；
-       ③ 翻页期间上锁 820ms，避免一次滑动连翻两屏；
-       ④ rAF + easeInOutCubic 补间 760ms —— 数据层是"升上来"的。
+     要点：
+       ① 处于吸附点时才累计，且**先 preventDefault** 拦住原生滚动
+          （否则 scrollTop 会立刻离开吸附点、累计值被清零 —— 上一版栽过）；
+       ② 累计满 110px 才吸（滚轮一格约 100px），不神经质；
+       ③ 吸附期间上锁 820ms，避免一次滑动连吸两次；
+       ④ rAF + easeInOutCubic 补间 760ms —— 是"滑"过去，不是"跳"过去。
 
-     滚动容器不写死：优先用能真正滚动的那个（.content 撑得开就用它，
-     否则退回 document.scrollingElement），避免容器换了以后整段失效。 */
+     滚动容器动态解析：能用 .content 就用，否则退回 document.scrollingElement。 */
   useEffect(() => {
     const pickScroller = (): HTMLElement => {
       const c = document.querySelector('.content') as HTMLElement | null;
@@ -88,20 +88,10 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
     let acc = 0;
     let locked = false;
     let timer = 0;
-    const onWheel = (e: WheelEvent) => {
-      if (locked) return;
-      const sc = pickScroller();
-      if (sc.scrollTop > 6 || e.deltaY <= 0) { acc = 0; return; }
-      // 关键：先拦住原生滚动，否则 scrollTop 会立刻越过 6px、累计值被清零
-      e.preventDefault();
-      acc += e.deltaY;
-      if (acc < 110) return;
-      const cover = document.querySelector('.home-cover') as HTMLElement | null;
-      if (!cover) { acc = 0; return; }
-      acc = 0;
+    const glide = (sc: HTMLElement, to: number) => {
       locked = true;
+      acc = 0;
       const from = sc.scrollTop;
-      const to = from + (cover.getBoundingClientRect().top - sc.getBoundingClientRect().top);
       const t0 = performance.now();
       const ms = 760;
       const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
@@ -113,6 +103,26 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       requestAnimationFrame(step);
       window.clearTimeout(timer);
       timer = window.setTimeout(() => { locked = false; }, 820);
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (locked) return;
+      const sc = pickScroller();
+      const cover = document.querySelector('.home-cover') as HTMLElement | null;
+      if (!cover) { acc = 0; return; }
+      const base = sc.getBoundingClientRect().top;
+      const coverTop = cover.getBoundingClientRect().top - base + sc.scrollTop;
+      const near = (v: number, target: number) => Math.abs(v - target) <= 6;
+      if (e.deltaY > 0) {
+        if (!near(sc.scrollTop, 0)) { acc = 0; return; }
+        e.preventDefault();
+        acc = Math.max(0, acc) + e.deltaY;
+        if (acc >= 110) glide(sc, coverTop);
+      } else if (e.deltaY < 0) {
+        if (!near(sc.scrollTop, coverTop)) { acc = 0; return; }
+        e.preventDefault();
+        acc = Math.min(0, acc) + e.deltaY;
+        if (acc <= -110) glide(sc, 0);
+      } else { acc = 0; }
     };
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => {

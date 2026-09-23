@@ -91,6 +91,22 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
     sc.addEventListener('scroll', onScroll, { passive: true });
     return () => sc.removeEventListener('scroll', onScroll);
   }, []);
+
+  /* 用户反馈：只在上面的挂载 effect 里恢复**不够**（详情返回仍然跳回顶部）。
+     原因是数据是异步到的 —— 挂载时列表还没渲染（或随后又被重建），
+     我恢复的那个节点已经不是最终那个了。
+     所以再加一次：**等 players 到位后再恢复一次**，且只做一次
+     （用 ref 记住做过没有，避免之后每次改动 players 都把用户拽回去）。 */
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    const w = window as unknown as { __rosterScroll?: number };
+    const sc = listRef.current;
+    if (!sc || !players.length) return;
+    const want = w.__rosterScroll ?? 0;
+    if (want > 0) sc.scrollTop = want;
+    restoredRef.current = true;
+  }, [players]);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [wizard, setWizard] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);

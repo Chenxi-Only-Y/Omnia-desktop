@@ -78,6 +78,13 @@ export default function App() {
   // 全站滚轮平滑（只装一次）
   installSmoothScroll();
 
+  /* 切页重置滚动位置：滚动是 .content 这个容器在滚，容器不会因为换页而重建，
+     所以从别的页面（已经滚下去）切回首页时，首页会带着上一页的滚动位置出现。
+     用户口径：切到首页时首页位置不应该变 —— 这里在每次切页时把它归零。 */
+  useEffect(() => {
+    const sc = document.querySelector('.content') as HTMLElement | null;
+    if (sc) sc.scrollTop = 0;
+  }, [page]);
   return (
     <div className={`app${navOpen ? ' nav-open' : ' nav-collapsed'}`}>
       <aside className="sidebar">

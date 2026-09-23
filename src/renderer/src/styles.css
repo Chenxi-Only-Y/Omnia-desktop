@@ -2330,3 +2330,15 @@ table.grid img, .roster-card img, .stat img, .card img,
 .hero.home-hero .home-display-en {
   text-shadow: 0 0 18px rgba(255, 255, 255, .30);
 }
+
+/* 修「+ 新增成员」按钮被拉伸成竖条（截图里那块黑色长方形）。
+   .pop-wrap 作为 toolbar 的 flex 子项会被 align-items 拉伸，
+   而它内部的浮层是绝对定位、不参与高度计算 —— 所以按钮跟着容器一起变高。
+   这里把高度写死、并让它在交叉轴上居中。 */
+.pop-wrap { align-items: center; align-self: center; }
+.pop-wrap > .btn {
+  height: 30px;
+  padding: 0 14px;
+  align-self: center;
+  white-space: nowrap;
+}

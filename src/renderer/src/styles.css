@@ -2086,9 +2086,12 @@ table.grid img, .roster-card img, .stat img, .card img,
      位移量是图片宽的 1.2 倍（非整数倍）→ 每轮接不上。
      改成 **repeating-linear-gradient + 按像素位移一整个周期**，
      位移量与元素宽度无关，必定无缝。 */
+  /* 中间的白占整个周期(140px)的 70%，即 21px → 119px 之间是纯白，
+     两端各留 15% 做过渡（压暗色 → 白 → 压暗色）。 */
   background-image: repeating-linear-gradient(100deg,
     color-mix(in srgb, var(--pc) 90%, #000000) 0px,
-    #FFFFFF 70px,
+    #FFFFFF 21px,
+    #FFFFFF 119px,
     color-mix(in srgb, var(--pc) 90%, #000000) 140px);
   background-size: auto;
   background-position: 0 0;

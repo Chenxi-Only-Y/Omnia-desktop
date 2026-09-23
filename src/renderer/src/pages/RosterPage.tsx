@@ -541,6 +541,13 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         <div className="toolbar toolbar--fields" style={{ marginBottom: 8 }}>
           <h3 style={{ margin: 0 }}>成员列表（{filtered.length} / {players.length}）</h3>
           <div className="spacer grow" />
+          {/* 提示放在**左边**（用户口径：不希望它出现在右边把按钮挤动）。 */}
+          {locateMsg && (
+            <span className={`hint roster-locate-msg${locateMiss ? ' roster-locate-msg--miss' : ''}`}
+                  style={{ margin: 0 }}>
+              {locateMsg}
+            </span>
+          )}
           {/* 定位框：不是筛选（筛选用上面的搜索），而是**直接滚到那个人并高亮**。
               支持模糊：先按整串包含匹配，不行再按"字符按顺序出现"匹配。 */}
           <label className="field">
@@ -594,12 +601,7 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
               </div>
             )}
           </span>
-          {locateMsg && (
-            <span className={`hint roster-locate-msg${locateMiss ? ' roster-locate-msg--miss' : ''}`}
-                  style={{ margin: 0 }}>
-              {locateMsg}
-            </span>
-          )}
+
           
         </div>
 

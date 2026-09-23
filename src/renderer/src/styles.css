@@ -2335,7 +2335,8 @@ table.grid img, .roster-card img, .stat img, .card img,
    .pop-wrap 作为 toolbar 的 flex 子项会被 align-items 拉伸，
    而它内部的浮层是绝对定位、不参与高度计算 —— 所以按钮跟着容器一起变高。
    这里把高度写死、并让它在交叉轴上居中。 */
-.pop-wrap { align-items: center; align-self: center; }
+/* 与「定位 ID」字段底边对齐（字段上有小标签，所以整体更高） */
+.pop-wrap { align-items: flex-end; align-self: flex-end; }
 .pop-wrap > .btn {
   height: 30px;
   padding: 0 14px;
@@ -2354,9 +2355,8 @@ table.grid img, .roster-card img, .stat img, .card img,
 .theme-light .roster-card.roster-card--found,
 .page-fill .roster-card.roster-card--found,
 .theme-light .page-fill .roster-card.roster-card--found {
-  outline: 2px solid var(--accent) !important;
-  outline-offset: -2px;
-  background: rgba(110, 123, 255, .16) !important;
-  box-shadow: inset 4px 0 0 0 var(--accent) !important;
+  /* 用户口径：不要黑边。去掉 outline 与左侧 inset 阴影，
+     只留底色 —— 既能一眼看到是哪一行，又不会在卡片上多出边线。 */
+  background: rgba(110, 123, 255, .20) !important;
   transition: background .18s ease;
 }

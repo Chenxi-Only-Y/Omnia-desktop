@@ -2360,3 +2360,12 @@ table.grid img, .roster-card img, .stat img, .card img,
   background: rgba(110, 123, 255, .20) !important;
   transition: background .18s ease;
 }
+
+/* ═══ 修「首屏按钮点击没反应」════════════════════════════════
+   实测：elementFromPoint 落在「录入对局与战报」按钮中心时，
+   最顶层元素是 HEADER.topbar（不是按钮自己）——
+   顶栏是一条贯穿整行的透明条，盖在首屏按钮上方把点击吃掉了。
+   修法：顶栏不接收鼠标事件，但里面的折叠按钮单独恢复。
+   ═══════════════════════════════════════════════════════════════ */
+.topbar { pointer-events: none; }
+.topbar .nav-toggle { pointer-events: auto; }

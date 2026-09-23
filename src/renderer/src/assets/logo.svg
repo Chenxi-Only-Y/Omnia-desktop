@@ -1,10 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <!-- 黑底 + 适中的圆角（rx=18/100，不做成过圆的胶囊，也不是直角方块） -->
-  <rect x="0" y="0" width="100" height="100" rx="18" ry="18" fill="#15151A"/>
+  <!-- 应用内使用的版本：**透明底**（侧边导航等）。
+       与 build/icon.svg（打包/任务栏用，黑底圆角）是两份独立资源，
+       改一处务必同步考虑另一处。
+       深色主题下深色描边不可见 → 呈现为白色漩涡；
+       浅色主题下靠这圈 #15151A 细描边保证看得清。 -->
+  <g fill="none" stroke="#15151A" stroke-linecap="round">
+    <path d="M14.29 37.00 A38 38 0 1 1 79.11 74.43" stroke-width="8"/>
+    <path d="M45.66 25.38 A25 25 0 1 1 45.66 74.62" stroke-width="7"/>
+    <path d="M59.96 41.64 A13 13 0 1 1 37.78 54.45" stroke-width="6"/>
+  </g>
   <g fill="none" stroke="#F2EFE9" stroke-linecap="round">
     <path d="M14.29 37.00 A38 38 0 1 1 79.11 74.43" stroke-width="6"/>
     <path d="M45.66 25.38 A25 25 0 1 1 45.66 74.62" stroke-width="5"/>
     <path d="M59.96 41.64 A13 13 0 1 1 37.78 54.45" stroke-width="4"/>
   </g>
-  <circle cx="50" cy="50" r="4.5" fill="#C8A45C"/>
+  <circle cx="50" cy="50" r="4.5" fill="#C8A45C" stroke="#15151A" stroke-width="1"/>
 </svg>

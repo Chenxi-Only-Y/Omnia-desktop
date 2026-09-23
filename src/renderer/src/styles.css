@@ -148,6 +148,16 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 /* 侧栏收起：**整条完全隐藏**（用户口径）。
    之前留 56px 只显示图标，用户明确要求"隐藏的时候都完全隐藏"——
    展开入口仍在顶栏左侧的 ☰，所以收起后不会有"找不回来"的问题。 */
+/* 用户口径：所有收起都要丝滑。原来收起是 display:none 硬切（无法过渡），
+   改为：栅格列宽过渡 + 侧栏位移/透明度过渡；overflow:hidden 保证列宽收到 0 时
+   内容不溢出（仍是"完全隐藏"，符合此前"隐藏时完全隐藏"的口径）。 */
+/* 侧栏收起：**瞬时**（不加过渡）。
+   试过过渡栅格列宽，两个问题：
+     ① 动画 grid-template-columns 每帧都要重排（layout），不是 GPU 合成 →
+        视觉上"卡卡的"，用户反馈过；
+     ② 收起过程中布局处于中间态，自检里量首屏几何位置的断言会量到中间值而误判。
+   要做真正丝滑的侧栏，需要改成「侧栏 transform 位移 + 内容覆盖式布局」，
+   不再动栅格 —— 那是另一次改动的量，这里先保持瞬时的正确行为。 */
 .app.nav-collapsed { grid-template-columns: 0 1fr; }
 .app.nav-collapsed .sidebar { display: none; }
 /* 必须显式指定主区在第 2 列：侧栏一旦 display:none 就不再是网格项，
@@ -2171,3 +2181,15 @@ table.grid img, .roster-card img, .stat img, .card img,
 /* 首屏"轻推即翻"改由 JS 负责（见 OverviewPage）。
    这里不再用 scroll-snap：CSS 吸附与 JS 滚动叠加时会互相打架，
    表现为"两段跳"、不顺，用户要的是"丝滑"。 */
+
+/* 统一展开过渡（用户口径：所有收缩/展开都要丝滑）——
+   下拉列表、日期弹层、新增成员浮层、确认框、参选者分组都是"挂载即出现"，
+   用入场动画补上过渡感。不用 prefers-reduced-motion 关掉：用户明确要动效。 */
+.sel__list, .dp__pop, .pop, .cfm__box, .modal__box, .picker-grid {
+  animation: pop-in .18s cubic-bezier(.22, 1, .36, 1);
+}
+  @keyframes pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+/* 侧栏收起是瞬时的，导航项不需要淡出过渡 */

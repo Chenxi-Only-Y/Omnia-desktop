@@ -148,7 +148,10 @@ export default function CandidateList({
           <button className="btn sm ghost" onClick={() => setShowLeave((v) => !v)}>
             {showLeave ? '收起请假者' : `展开请假者（${leaves.length}）`}
           </button>
-          {showLeave && <div style={{ marginTop: 6 }}>{renderList(leaves)}</div>}
+          {/* 请假者**不再按职业分组**：他们本来就没有职业，
+              分组头会变成一个空职业标签 + 数字，纯属多余（用户反馈）。
+              这里直接平铺列表；外层的「展开请假者」开关保留。 */}
+          {showLeave && <div className="picker-grid" style={{ marginTop: 6 }}>{leaves.map(item)}</div>}
         </div>
       )}
     </>

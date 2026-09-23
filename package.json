@@ -1,6 +1,6 @@
 {
   "name": "omnia-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "万象·Omnia —— 联赛集成系统桌面端（Electron + 本地 SQLite）。All leagues. One universe.",
   "author": "辰兮Only-Y",

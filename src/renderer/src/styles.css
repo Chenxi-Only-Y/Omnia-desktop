@@ -2032,31 +2032,26 @@ table.grid img, .roster-card img, .stat img, .card img,
    现在三层叠加，其中**内发光不会被祖先裁剪**，一定看得见：
      ① 2px 橙色实环    ② 外发光（放大到 22px/4px 扩散、.70）
      ③ 内发光（暖白，让卡片看起来"被点亮"） */
-/* 用户口径：删掉描边环，只保留光效（外发光 + 内发光） */
-.pcard--ow {
-  box-shadow:
-    0 0 22px 4px rgba(240, 164, 74, .70),
-    inset 0 0 24px rgba(255, 246, 230, .30) !important;
-}
-.pcard--ow:hover {
-  box-shadow:
-    0 0 30px 7px rgba(240, 164, 74, .85),
-    inset 0 0 28px rgba(255, 246, 230, .42) !important;
-}
-/* 拖动时不抢戏：保留光晕但收一点 */
-.pcard--ow.pcard--dragging {
-  box-shadow:
-    0 0 14px 2px rgba(240, 164, 74, .55),
-    inset 0 0 18px rgba(255, 246, 230, .24) !important;
-}
-
-/* ═══ 补齐"抬层级"名单：成员列表的编辑行 ═══════════════════════
-   现象：编辑行里的下拉打开后**看不到**（计算样式说它有尺寸、位置也对），
-   但截图里根本没画出来 —— 因为弹层被**后面那几行**（.roster-card）盖住了。
-   之前只给 .toolbar / .card / .stat 等抬了层级，漏了列表行。
+/* ═══ 橙武卡片的「炫彩流光」动效 ═══════════════════════════════
+   用户口径：「橙武可以换个光，动效炫彩？」
+   色相循环（hue-rotate）驱动两层光：
+     ① 内发光（画在卡片内部，不会被祖先 overflow 裁掉，必定可见）
+     ② 卡片自身外发光（没被裁时会一起变色）
+   不依赖 @property（兼容性更稳）；也不受 prefers-reduced-motion 影响 —— 用户明确要动效。
    ═══════════════════════════════════════════════════════════════ */
-.roster-card:has(.sel[open]), .roster-card:has(.dp__pop),
-.roster-card__edit:has(.sel[open]), .roster-card__edit:has(.dp__pop),
-.roster-cards:has(.sel[open]), .roster-cards:has(.dp__pop) {
-  position: relative; z-index: 85;
+.pcard--ow {
+  position: relative;
+  box-shadow: 0 0 22px 4px rgba(240, 164, 74, .70) !important;
+  animation: ow-hue 6s linear infinite;
 }
+.pcard--ow::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: inset 0 0 26px rgba(255, 200, 90, .62);
+  animation: ow-hue 6s linear infinite;
+}
+  @keyframes ow-hue {
+  from { filter: hue-rotate(0deg) saturate(1.15); }
+  to   { filter: hue-rotate(360deg) saturate(1.15); }
+}
+.pcard--ow:hover { box-shadow: 0 0 30px 7px rgba(240, 164, 74, .85) !important; }
+.pcard--ow.pcard--dragging { box-shadow: 0 0 14px 2px rgba(240, 164, 74, .55) !important; }

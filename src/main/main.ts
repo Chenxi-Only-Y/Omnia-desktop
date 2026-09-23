@@ -754,11 +754,12 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           throw new Error('等待超时：' + label);
         };
         await waitFor(() => document.querySelector('.hero') ? true : null, '首页主视觉');
-        // 首页已改「大厂风」：品牌字是 .home-display，职业图标托盘是 .home-brand，按钮是 .home-btn
+        // 首页已改「大厂风」：品牌字是 .home-display，品牌块是 .home-brand，按钮是 .home-btn。
+        // 注意：职业托盘已按用户要求**删除**，所以这里不再断言"12 个职业图标"。
         const heroBrand = document.querySelector('.home-display')?.textContent || '';
-        const heroClasses = document.querySelectorAll('.home-brand').length;
+        const heroBlocks = document.querySelectorAll('.home-brand').length;
         const heroButtons = document.querySelectorAll('.home-btn').length;
-        steps.push('主视觉 品牌字=' + JSON.stringify(heroBrand) + ' 职业图标=' + heroClasses + ' 快捷按钮=' + heroButtons);
+        steps.push('主视觉 品牌字=' + JSON.stringify(heroBrand) + ' 品牌块=' + heroBlocks + ' 快捷按钮=' + heroButtons);
 
         // 看板页渲染
         const navBoard = [...document.querySelectorAll('button.nav-item')].find(b => b.textContent.includes('数据看板'));
@@ -785,7 +786,7 @@ async function runSmokeTest(win: BrowserWindow): Promise<void> {
           && Math.abs(t.statRate - 4 / 5) < 1e-6
           && d.data.classPlayCount.length >= 3
           && d.data.squadUsage.some(s => s.squad === '防守一-1' && s.kind === 'defend')
-          && heroBrand.includes('Omnia') && heroClasses === 12 && heroButtons === 4;
+          && heroBrand.includes('Omnia') && heroBlocks === 1 && heroButtons === 4;
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针5');

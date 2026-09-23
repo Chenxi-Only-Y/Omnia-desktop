@@ -65,6 +65,25 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
   const ready = latestSignups.filter((r) => r.signup === 'JOIN').length;
   const capacity = catalog?.capacity ?? TOTAL_MATCH_SLOTS;
 
+  /* 轻推即翻：在首屏顶部、只要往下推一点点，就直接滑到数据层那一屏。
+     仅靠 CSS 的 scroll-snap proximity 阈值由浏览器决定、偏迟钝，
+     所以这里用 wheel 事件补一个明确的小阈值（|deltaY| > 2 即触发）。
+     只在「滚动位置在顶部」且「数据层存在」时生效，不影响其他页面与数据层内部滚动。 */
+  useEffect(() => {
+    const sc = document.querySelector('.content') as HTMLElement | null;
+    if (!sc) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY <= 2) return;
+      if (sc.scrollTop > 6) return;
+      const cover = document.querySelector('.home-cover') as HTMLElement | null;
+      if (!cover) return;
+      e.preventDefault();
+      const delta = cover.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+      sc.scrollTo({ top: sc.scrollTop + delta, behavior: 'smooth' });
+    };
+    sc.addEventListener('wheel', onWheel, { passive: false });
+    return () => sc.removeEventListener('wheel', onWheel);
+  }, []);
   return (
     <>
       {error && <div className="msg msg--toast error">{error}</div>}

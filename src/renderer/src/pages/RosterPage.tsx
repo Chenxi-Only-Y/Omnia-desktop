@@ -626,17 +626,17 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
                          value={draft.joinedOrder} onChange={(e) => setDraft({ ...draft, joinedOrder: e.target.value })} />
                   <input className="input" placeholder="ID *" style={{ width: 200 }}
                          value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
-                  <Select className="select" value={draft.mic}
+                  <Select className="select" placeholder value={draft.mic}
                           onChange={(e) => setDraft({ ...draft, mic: e.target.value as Player['mic'] })}>
                     <option value="">麦克风</option>
                     <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
                   </Select>
-                  <Select className="select" value={draft.noteRole}
+                  <Select className="select" placeholder value={draft.noteRole}
                           onChange={(e) => setDraft({ ...draft, noteRole: e.target.value as Player['noteRole'] })}>
                     <option value="">备注角色</option>
                     {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
                   </Select>
-                  <Select className="select" value={draft.orangeWeapon}
+                  <Select className="select" placeholder value={draft.orangeWeapon}
                           onChange={(e) => setDraft({ ...draft, orangeWeapon: e.target.value })}>
                     <option value="">橙武</option>
                     <option value="有">有</option>

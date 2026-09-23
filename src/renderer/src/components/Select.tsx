@@ -28,6 +28,8 @@ export default function Select({
   icon?: string;
   /** 职业下拉用：文字与图标配额色（职业色） */
   color?: string;
+  /** 有占位项时置 true：占位项（value 为空）照旧决定按钮文字，但**不出现在展开列表里** */
+  placeholder?: boolean;
   children?: ReactNode;
 }) {
   // 递归收集 <option>：调用点常写成 <>{list.map(...)}</>（Fragment）或包一层组件，
@@ -102,7 +104,7 @@ export default function Select({
       </select>
       {(open || closing) && (
       <div className={'sel__list' + (open ? ' sel__list--in' : ' sel__list--out')}>
-        {opts.map((o) => (
+        {(placeholder ? opts.filter((o) => o.value !== '') : opts).map((o) => (
           <button key={o.value} type="button"
                   className={'sel__opt' + (o.value === curVal ? ' on' : '')}
                   disabled={o.disabled || disabled}

@@ -2193,10 +2193,14 @@ table.grid img, .roster-card img, .stat img, .card img,
      · 从按钮向下"揭开"，读起来是展开/收起；
      · 不用 scaleY（会把文字压扁），也不用 max-height（布局属性、每帧重排）；
      · clip-path + opacity 都是合成器友好的。 */
-.sel__list, .dp__pop, .pop, .cfm__box, .modal__box, .picker-grid {
+.dp__pop, .pop, .cfm__box, .modal__box, .picker-grid {
   transform-origin: top center;
   animation: unfold .22s cubic-bezier(.22, 1, .36, 1);
 }
+/* 下拉：展开/收起两个方向都有动画（Select 已改为受控组件，关闭时保持挂载 180ms） */
+.sel__list { transform-origin: top center; }
+.sel__list--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
+.sel__list--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
   @keyframes unfold {
   from { clip-path: inset(0 0 100% 0 round 12px); opacity: .35; }
   to   { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
@@ -2250,3 +2254,9 @@ table.grid img, .roster-card img, .stat img, .card img,
   transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s linear .3s;
 }
 .app.nav-collapsed .main { width: 100%; margin-left: 0; }
+
+/* 收起：反向"合拢"（与展开同一条路径，读起来才是上下收的） */
+  @keyframes fold {
+  from { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
+  to   { clip-path: inset(0 0 100% 0 round 12px); opacity: 0; }
+}

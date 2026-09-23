@@ -1,4 +1,4 @@
-import { Children, isValidElement, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import { Children, isValidElement, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 /**
  * 原生 <select> 的替身：样式可控的下拉。
@@ -23,7 +23,7 @@ export default function Select({
   disabled?: boolean;
   style?: CSSProperties;
   /** 透传点击（有的调用点会 stopPropagation） */
-  onClick?: (e: MouseEvent) => void;
+  onClick?: (e: ReactMouseEvent) => void;
   /** 职业下拉用：左侧图标 */
   icon?: string;
   /** 职业下拉用：文字与图标配额色（职业色） */
@@ -54,30 +54,64 @@ export default function Select({
     .split(/\s+/)
     .filter((c) => c && c !== 'select' && c !== 'input')
     .join(' ');
+  /* 受控开合：<details> 关闭时内容立刻被浏览器隐藏，纯 CSS 做不出收起动画，
+     所以改成受控 —— open 用状态，关闭时**保持挂载** 180ms 播反向动画。
+     注意：外层 div 仍渲染 `open` 属性（React 会把未知小写属性透传），
+     这样所有既有的 .sel[open] 样式（含 :has(.sel[open]) 抬层级）都不用改。 */
+  const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const timer = useRef(0);
+  const close = () => {
+    setOpen(false);
+    setClosing(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setClosing(false), 180);
+  };
+  // 把开合状态写到 DOM 属性上：既有的 .sel[open] 样式与 :has(.sel[open]) 抬层级
+  // 全部继续生效；同时避开 React 不认 div 的 open 属性的类型问题。
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    if (open || closing) el.setAttribute('open', ''); else el.removeAttribute('open');
+  }, [open, closing]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) close();
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => { document.removeEventListener('mousedown', onDoc); window.clearTimeout(timer.current); };
+  }, [open]);
+
   const curVal = String(value ?? '');
   const cur = opts.find((o) => o.value === curVal) ?? opts[0];
 
   return (
-    <details className={'sel' + (cls ? ' ' + cls : '')} style={style} onClick={onClick}>
-      <summary className="sel__btn" title={title} aria-disabled={disabled || undefined}>
+    <div ref={box} className={'sel' + (cls ? ' ' + cls : '')} style={style} onClick={onClick}>
+      <button type="button" className="sel__btn" title={title} disabled={disabled}
+              onClick={() => (open ? close() : setOpen(true))}>
         {icon && <img className="sel__ico" src={icon} alt="" />}
         <span className="sel__txt" style={color ? { color } : undefined}>{cur ? cur.label : ''}</span>
-      </summary>
+      </button>
       {/* 隐藏的原生 select：只为兼容「set value + dispatch change」的调用方（自检探针等） */}
       <select className="sel__native" value={curVal} tabIndex={-1} aria-hidden
               onChange={(e) => onChange?.({ target: { value: e.target.value } })}>
         {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <div className="sel__list">
+      {(open || closing) && (
+      <div className={'sel__list' + (open ? ' sel__list--in' : ' sel__list--out')}>
         {opts.map((o) => (
           <button key={o.value} type="button"
                   className={'sel__opt' + (o.value === curVal ? ' on' : '')}
                   disabled={o.disabled || disabled}
-                  onClick={() => onChange?.({ target: { value: o.value } })}>
+                  onClick={() => { onChange?.({ target: { value: o.value } }); close(); }}>
             {o.label}
           </button>
         ))}
       </div>
-    </details>
+      )}
+    </div>
   );
 }

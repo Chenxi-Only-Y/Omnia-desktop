@@ -2193,3 +2193,42 @@ table.grid img, .roster-card img, .stat img, .card img,
   to   { opacity: 1; transform: none; }
 }
 /* 侧栏收起是瞬时的，导航项不需要淡出过渡 */
+
+/* ═══ 侧栏：方案 B（保持推开式，但用 transform 动画）═══════════
+   之前动画 grid-template-columns 是**布局属性** → 每帧整页重排 → 卡。
+   现在：
+     · .app 只留一列，布局不动；
+     · .sidebar 绝对定位，用 transform: translateX 滑出（合成器属性 ✓）；
+     · .main 用 transform 同步右移 216px、并把布局宽度设为 100%-216px，
+       视觉上等价于"被侧栏推开"，但动画期间不重排 → 与首屏一样丝滑；
+     · 宽度的切换是**瞬时**的（不在 transition 列表里）：它只在开头/结尾变一次，
+       不是每帧都变，所以不会拖慢动画。
+     · 收起动画走完后把侧栏 visibility 置为 hidden（transition-delay），
+       保证"收起后确实不可见"，同时不打断滑出过程。
+   ═══════════════════════════════════════════════════════════════ */
+.app { display: grid; grid-template-columns: 1fr; height: 100%; position: relative; overflow: hidden; }
+.sidebar {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 216px;
+  z-index: 40;
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s;
+  will-change: transform;
+  background: rgba(19, 19, 23, .86);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+.main {
+  grid-column: 1;
+  width: calc(100% - 216px);
+  transform: translateX(216px);
+  transition: transform .3s cubic-bezier(.4, 0, .2, 1);
+  will-change: transform;
+}
+.app.nav-collapsed { grid-template-columns: 1fr; }
+.app.nav-collapsed .sidebar {
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s linear .3s;
+}
+.app.nav-collapsed .main { width: 100%; transform: translateX(0); }

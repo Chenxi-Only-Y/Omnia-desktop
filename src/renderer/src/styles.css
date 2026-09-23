@@ -2041,12 +2041,12 @@ table.grid img, .roster-card img, .stat img, .card img,
    无动画、无 filter —— 不影响文字与图标。
    ═══════════════════════════════════════════════════════════════ */
 .pcard { background: var(--pc); }
-/* 渐变（用户口径：混黑 25% → 混白 25%）：
-   左端 = 职业色混 25% 黑，右端 = 职业色混 25% 白 */
+/* 渐变（用户口径：混白 15% → 混黑 15%）：
+   左端 = 职业色混 15% 白，右端 = 职业色混 15% 黑 */
 .pcard--ow {
   background: linear-gradient(135deg,
-    color-mix(in srgb, var(--pc) 75%, #000000) 0%,
-    color-mix(in srgb, var(--pc) 75%, #FFFFFF) 100%) !important;
+    color-mix(in srgb, var(--pc) 85%, #FFFFFF) 0%,
+    color-mix(in srgb, var(--pc) 85%, #000000) 100%) !important;
   box-shadow: 0 0 20px 3px color-mix(in srgb, var(--pc) 70%, transparent) !important;
 }
 .pcard--ow:hover {

@@ -2027,13 +2027,27 @@ table.grid img, .roster-card img, .stat img, .card img,
    判据与卡片上的「橙武」徽标同源（playerId → 是否有橙武 的映射），
    两者不会出现"有徽标没光"或"有光没徽标"的不一致。
    ═══════════════════════════════════════════════════════════════ */
+/* 用户反馈「为啥就是个框」——原来只有 2px 环 + 18px 柔光，
+   而柔光被祖先容器的 overflow:hidden 剪掉了，所以看着只剩一圈框。
+   现在三层叠加，其中**内发光不会被祖先裁剪**，一定看得见：
+     ① 2px 橙色实环    ② 外发光（放大到 22px/4px 扩散、.70）
+     ③ 内发光（暖白，让卡片看起来"被点亮"） */
 .pcard--ow {
-  box-shadow: 0 0 0 2px var(--orange), 0 0 18px rgba(240, 164, 74, .55) !important;
+  box-shadow:
+    0 0 0 2px var(--orange),
+    0 0 22px 4px rgba(240, 164, 74, .70),
+    inset 0 0 24px rgba(255, 246, 230, .30) !important;
 }
 .pcard--ow:hover {
-  box-shadow: 0 0 0 2px var(--orange), 0 0 26px rgba(240, 164, 74, .78) !important;
+  box-shadow:
+    0 0 0 2px var(--orange),
+    0 0 30px 7px rgba(240, 164, 74, .85),
+    inset 0 0 28px rgba(255, 246, 230, .42) !important;
 }
 /* 拖动时不抢戏：保留光晕但收一点 */
 .pcard--ow.pcard--dragging {
-  box-shadow: 0 0 0 2px var(--orange), 0 0 12px rgba(240, 164, 74, .45) !important;
+  box-shadow:
+    0 0 0 2px var(--orange),
+    0 0 14px 2px rgba(240, 164, 74, .55),
+    inset 0 0 18px rgba(255, 246, 230, .24) !important;
 }

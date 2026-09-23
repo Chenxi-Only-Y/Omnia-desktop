@@ -2167,3 +2167,15 @@ table.grid img, .roster-card img, .stat img, .card img,
 .hero.home-hero .home-brand .home-display { font-size: clamp(46px, 6.6vw, 96px); }
 .hero.home-hero .home-brand .home-display-en { font-size: 18px; }
 .hero.home-hero .home-brand .home-lede { font-size: 15px; max-width: 720px; }
+
+/* ═══ 首屏：轻轻一滑就翻到下滑页（用户口径）════════════════════
+   滚动容器是 .content（见上面 html,body,.app,.content 那条）。
+   用 scroll-snap 的 proximity（邻近吸附）而不是 mandatory：
+     · 首屏是高 100vh 的钉住层，数据层从下方盖上 —— 不吸附的话
+       要滚满一整屏才看得全，所以"轻轻一滑"没反应；
+     · proximity 只在靠近吸附点时才吸 —— 数据层内部的自由滚动不受影响，
+       若用 mandatory 会把数据层也钉成一屏一屏的，反而不好用。
+   ═══════════════════════════════════════════════════════════════ */
+.content { scroll-snap-type: y proximity; }
+.hero.home-hero { scroll-snap-align: start; scroll-snap-stop: normal; }
+.home-cover { scroll-snap-align: start; }

@@ -75,8 +75,8 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
        ① 处于吸附点时才累计，且**先 preventDefault** 拦住原生滚动
           （否则 scrollTop 会立刻离开吸附点、累计值被清零 —— 上一版栽过）；
        ② 累计满 110px 才吸（滚轮一格约 100px），不神经质；
-       ③ 吸附期间上锁 820ms，避免一次滑动连吸两次；
-       ④ rAF + easeInOutCubic 补间 760ms —— 是"滑"过去，不是"跳"过去。
+       ③ 吸附期间上锁 470ms（与补间时长匹配），避免一次滑动连吸两次；
+       ④ rAF + easeInOutCubic 补间 420ms（用户口径：向上向下都快点）—— 仍顺滑，但更利落。
 
      滚动容器动态解析：能用 .content 就用，否则退回 document.scrollingElement。 */
   useEffect(() => {
@@ -93,7 +93,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       acc = 0;
       const from = sc.scrollTop;
       const t0 = performance.now();
-      const ms = 760;
+      const ms = 420;
       const ease = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
       const step = (now: number) => {
         const k = Math.min(1, (now - t0) / ms);
@@ -102,7 +102,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
       };
       requestAnimationFrame(step);
       window.clearTimeout(timer);
-      timer = window.setTimeout(() => { locked = false; }, 820);
+      timer = window.setTimeout(() => { locked = false; }, 470);
     };
     const onWheel = (e: WheelEvent) => {
       if (locked) return;

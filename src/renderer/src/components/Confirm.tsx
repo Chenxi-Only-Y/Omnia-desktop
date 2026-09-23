@@ -20,15 +20,20 @@ export function confirmDialog(msg: string): Promise<boolean> {
 
 export default function ConfirmHost() {
   const [req, setReq] = useState<Req | null>(null);
+  /* 收起动画：先播 fold，动画走完再 resolve + 卸载 */
+  const [closing, setClosing] = useState(false);
   useEffect(() => {
     push = (r) => setReq(r);
     return () => { push = null; };
   }, []);
   if (!req) return null;
-  const done = (v: boolean) => { req.resolve(v); setReq(null); };
+  const done = (v: boolean) => {
+    setClosing(true);
+    window.setTimeout(() => { req.resolve(v); setReq(null); setClosing(false); }, 180);
+  };
   return (
     <div className="cfm" onClick={() => done(false)}>
-      <div className="cfm__box" onClick={(e) => e.stopPropagation()}>
+      <div className={'cfm__box' + (closing ? ' cfm__box--out' : '')} onClick={(e) => e.stopPropagation()}>
         <div className="cfm__msg">{req.msg}</div>
         <div className="cfm__foot">
           <button type="button" className="btn" onClick={() => done(false)}>取消</button>

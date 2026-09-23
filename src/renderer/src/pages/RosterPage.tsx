@@ -53,6 +53,13 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
   const [filterStatus, setFilterStatus] = useState('');
   /** 新增成员弹层（用户口径：新增改成单独按钮打开） */
   const [showAdd, setShowAdd] = useState(false);
+  /* 浮层收起动画：关闭时保持挂载 180ms */
+  const [addClosing, setAddClosing] = useState(false);
+  const closeAdd = () => {
+    setShowAdd(false);
+    setAddClosing(true);
+    window.setTimeout(() => setAddClosing(false), 180);
+  };
   /** 当前场次：用于判定「未填表」（报名表是分场次的） */
   const [matches, setMatches] = useState<Match[]>([]);
   const [matchId, setMatchId] = useState<number | null>(null);
@@ -543,15 +550,15 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
           {/* 用户口径：定位 ID 与新增成员并在一起，浮层锚在这个按钮下方 */}
           <span className="pop-wrap">
             <button className="btn primary"
-                    onClick={() => { setDraft((d) => ({ ...d, id: '', joinedOrder: '', remark: '' })); setShowAdd((v) => !v); }}>
+                    onClick={() => { if (showAdd) { closeAdd(); return; } setDraft((d) => ({ ...d, id: '', joinedOrder: '', remark: '' })); setShowAdd(true); }}>
               + 新增成员
             </button>
-            {showAdd && (
-              <div className="pop" onClick={(e) => e.stopPropagation()}>
+            {(showAdd || addClosing) && (
+              <div className={'pop' + (showAdd ? ' pop--in' : ' pop--out')} onClick={(e) => e.stopPropagation()}>
                 <div className="pop__head">
                   <h3 style={{ margin: 0 }}>新增成员</h3>
                   <span className="grow" />
-                  <button className="btn ghost sm" onClick={() => setShowAdd(false)}>关闭</button>
+                  <button className="btn ghost sm" onClick={closeAdd}>关闭</button>
                 </div>
                 {/* 字段顺序：入帮序 / ID / 麦克风 / 备注角色 / 橙武 / 备注 */}
                 <div className="toolbar" style={{ marginBottom: 0 }}>

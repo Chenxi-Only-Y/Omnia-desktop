@@ -32,6 +32,13 @@ export default function DatePicker({
     .join(' ');
   const v = String(value ?? '');
   const [open, setOpen] = useState(false);
+  /* 收起动画：关闭时保持挂载 180ms 播 fold，再卸载（与 Select 同一套） */
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    setOpen(false);
+    setClosing(true);
+    window.setTimeout(() => setClosing(false), 180);
+  };
   const [ym, setYm] = useState(() => {
     const m = /^(\d{4})-(\d{2})/.exec(v);
     const now = new Date();
@@ -42,7 +49,7 @@ export default function DatePicker({
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+      if (box.current && !box.current.contains(e.target as Node)) close();
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
@@ -61,7 +68,7 @@ export default function DatePicker({
     const d = new Date(s.y, s.mo + n, 1);
     return { y: d.getFullYear(), mo: d.getMonth() };
   });
-  const pick = (s: string) => { onChange?.({ target: { value: s } }); setOpen(false); };
+  const pick = (s: string) => { onChange?.({ target: { value: s } }); close(); };
   const now = new Date();
   const todayStr = toStr(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -72,8 +79,8 @@ export default function DatePicker({
       </button>
       <input className="dp__native" type="date" value={v} tabIndex={-1} aria-hidden
              onChange={(e) => onChange?.({ target: { value: e.target.value } })} />
-      {open && (
-        <div className="dp__pop">
+      {(open || closing) && (
+        <div className={'dp__pop' + (open ? ' dp__pop--in' : ' dp__pop--out')}>
           <div className="dp__head">
             <span className="dp__month">{ym.y}年{pad(ym.mo + 1)}月</span>
             <span className="dp__sp" />
@@ -92,7 +99,7 @@ export default function DatePicker({
           </div>
           <div className="dp__foot">
             <button type="button" className="dp__lnk"
-                    onClick={() => { onChange?.({ target: { value: '' } }); setOpen(false); }}>清除</button>
+                    onClick={() => { onChange?.({ target: { value: '' } }); close(); }}>清除</button>
             <button type="button" className="dp__lnk" onClick={() => pick(todayStr)}>今天</button>
           </div>
         </div>

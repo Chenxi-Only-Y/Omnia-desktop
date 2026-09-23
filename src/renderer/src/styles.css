@@ -2193,7 +2193,7 @@ table.grid img, .roster-card img, .stat img, .card img,
      · 从按钮向下"揭开"，读起来是展开/收起；
      · 不用 scaleY（会把文字压扁），也不用 max-height（布局属性、每帧重排）；
      · clip-path + opacity 都是合成器友好的。 */
-.dp__pop, .pop, .cfm__box, .modal__box {
+.modal__box {
   transform-origin: top center;
   animation: unfold .22s cubic-bezier(.22, 1, .36, 1);
 }
@@ -2290,3 +2290,8 @@ table.grid img, .roster-card img, .stat img, .card img,
 .picker-grid { transform-origin: top center; }
 .picker-grid--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
 .picker-grid--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
+
+/* 日期弹层 / 新增成员浮层 / 确认框：展开收双向（与 Select 同一套 fold/unfold） */
+.dp__pop, .pop, .cfm__box { transform-origin: top center; }
+.dp__pop--in,  .pop--in,  .cfm__box--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
+.dp__pop--out, .pop--out, .cfm__box--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }

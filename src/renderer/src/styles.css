@@ -2271,3 +2271,17 @@ table.grid img, .roster-card img, .stat img, .card img,
   70% { transform: translateX(-2px); }
   88% { transform: translateX(1px); }
 }
+
+/* ═══ 弹层层级统一抬到侧栏之上 ═══════════════════════════════
+   用户反馈：选人/添加队员弹出的面板**被侧边导航盖住**。
+   侧栏是 position:absolute + z-index:40（在根层叠上下文里），
+   而弹层虽然写了 50，实测仍被压住 —— 不纠结成因，直接把弹层抬到远高于侧栏，
+   并按"遮罩 < 面板"的关系排好，避免以后再加层级时又出现类似问题。
+   ═══════════════════════════════════════════════════════════════ */
+.modal { z-index: 300 !important; }
+.modal__box { position: relative; z-index: 301; }
+.pop { z-index: 310 !important; }
+.cfm { z-index: 400 !important; }
+.cfm__box { position: relative; z-index: 401; }
+/* 下拉/日期弹层仍要低于模态面板，但高于普通内容与侧栏 */
+.sel[open], .dp[open] { z-index: 150; }

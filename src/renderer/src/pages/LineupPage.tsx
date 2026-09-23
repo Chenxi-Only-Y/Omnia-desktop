@@ -281,7 +281,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           rows={our}
           catalog={catalog}
           onPickSlot={(squad, slotIndex) => setCellPick({ squad, slotIndex })}
-          onAssign={(playerIds, squad) => void assign(playerIds, squad)}
+          onAssign={(playerIds, squad, slotIndex) => void assign(playerIds, squad, slotIndex)}
           onUnassign={(playerId) => void unassign(playerId)}
           onRemoveRow={(id) => {
             const row = our.find((r) => r.id === id);

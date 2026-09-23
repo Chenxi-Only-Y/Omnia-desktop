@@ -40,7 +40,7 @@ interface Props extends PageProps {
   onPickSlot: (squadName: string, slotIndex: number) => void;
   onRemoveRow: (rowId: number) => void;
   /** 拖拽落点：把一批队员放进该小队 */
-  onAssign?: (playerIds: number[], squad: string) => void;
+  onAssign?: (playerIds: number[], squad: string, slotIndex?: number) => void;
   /** 拖到「未分配」区：移出小队但保留在名单 */
   onUnassign?: (playerId: number) => void;
   /** 卡片上直接填写技能备注（人 × 场） */
@@ -156,7 +156,19 @@ export default function LineupBoard({
       setHoverSquad(null);
       const payload = readDrag(ev);
       if (!payload || !onAssign) return;
-      onAssign(payload.playerIds, squad);
+      /* 落点 = **离松手位置最近的那个格子**（用户口径）。
+         跨小队拖拽也走这里：目标行的格子列表就是目标小队的格子，
+         所以拖到别队时同样按松手位置落位。 */
+      const row = ev.currentTarget as HTMLElement;
+      const cells = Array.from(row.querySelectorAll<HTMLElement>('.pcard'));
+      let slot: number | undefined;
+      let best = Number.POSITIVE_INFINITY;
+      cells.forEach((c, i) => {
+        const r = c.getBoundingClientRect();
+        const d = Math.abs(ev.clientX - (r.left + r.width / 2));
+        if (d < best) { best = d; slot = i; }
+      });
+      onAssign(payload.playerIds, squad, slot);
     },
   });
 

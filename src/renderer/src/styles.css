@@ -2260,3 +2260,14 @@ table.grid img, .roster-card img, .stat img, .card img,
   from { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
   to   { clip-path: inset(0 0 100% 0 round 12px); opacity: 0; }
 }
+
+/* 单职业时点击职业：轻微抖动一下（用户口径 C）。
+   只在被点的那个 .pcard__cls 上抖，不动整张卡片，幅度很小（±3px）。 */
+.pcard__cls--nudge { animation: nudge .34s cubic-bezier(.36, .07, .19, .97); }
+  @keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  45% { transform: translateX(3px); }
+  70% { transform: translateX(-2px); }
+  88% { transform: translateX(1px); }
+}

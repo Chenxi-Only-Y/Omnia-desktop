@@ -452,11 +452,19 @@ function PlayerCard({
            位置说明：这里在三元分支内，注释必须是裸的块注释，
            不能写成花括号包起来的表达式容器，否则 TS 会报语法错。 */
         <div className="pcard__cls"
-             onClick={() => {
+             onClick={(e) => {
                const cur = cls || row.mainClass || row.subClass;
                const alt = cur === row.mainClass ? row.subClass : row.mainClass;
                if (alt && alt !== cur) { onChangeClass(row.playerId, alt); return; }
-               onPickSlot(squad.name, slotIndex);
+               /* 用户口径 C：只有单职业时"没有可切换的目标"——
+                  不弹任何选择器，只轻微抖动一下作为反馈。
+                  用 DOM 类 + animation 实现，不引入 React 状态（改动最小）。
+                  offsetWidth 那一句是强制回流，保证连续点击也能重播动画。 */
+               const el = e.currentTarget;
+               el.classList.remove('pcard__cls--nudge');
+               void el.offsetWidth;
+               el.classList.add('pcard__cls--nudge');
+               window.setTimeout(() => el.classList.remove('pcard__cls--nudge'), 340);
              }}
              title={row.subClass && row.subClass !== row.mainClass
                ? '点击切换职业（' + row.mainClass + ' ⇄ ' + row.subClass + '）'

@@ -435,10 +435,20 @@ function PlayerCard({
           排表时可以选择职业）。没有报名数据时退化为纯文字。
           两栏填同一个职业时（样本里确实有）只出现一个选项，不重复。 */}
       {onChangeClass && (row.mainClass || row.subClass) ? (
-        /* 不用原生 <Select>：展开列表由操作系统绘制，<option> 的样式一律无效
-           （那个蓝色高亮改不掉）。改成 <details> 自绘下拉，无需额外状态。 */
-        <div className="pcard__cls" onClick={() => onPickSlot(squad.name, slotIndex)}
-             title="点击换人 / 放入队员">
+        /* 点职业 = 在主职与二职之间切换（用户口径 B）。
+           两个职业都存在且不同时才切；否则退回 换人 / 放入队员。
+           位置说明：这里在三元分支内，注释必须是裸的块注释，
+           不能写成花括号包起来的表达式容器，否则 TS 会报语法错。 */
+        <div className="pcard__cls"
+             onClick={() => {
+               const cur = cls || row.mainClass || row.subClass;
+               const alt = cur === row.mainClass ? row.subClass : row.mainClass;
+               if (alt && alt !== cur) { onChangeClass(row.playerId, alt); return; }
+               onPickSlot(squad.name, slotIndex);
+             }}
+             title={row.subClass && row.subClass !== row.mainClass
+               ? '点击切换职业（' + row.mainClass + ' ⇄ ' + row.subClass + '）'
+               : '点击换人 / 放入队员'}>
           {icon && <img className="pcard__icon" src={icon} alt="" />}
           {cls || '未登记职业'}
         </div>

@@ -2141,10 +2141,20 @@ table.grid img, .roster-card img, .stat img, .card img,
   align-items: center;
   gap: 14px;
   margin: 0;
-  /* 用户口径：往下点、别贴着顶边 */
-  padding-top: 56px;
+  /* 用户口径：与「收起导航栏」的按钮对齐同一条线。
+     实测：导航按钮 top=8 高=30 中心=23；
+     这里取 top=7 高=32 → 中心 23，完全对齐，且不贴顶边。 */
+  padding-top: 7px;
 }
 /* 左下角：品牌块。margin-top:auto 把它推到剩余空间的底部 */
+/* 按钮尺寸对齐导航按钮（高 30~32），否则无法在同一条线上 */
+.hero.home-hero .home-cta .home-btn {
+  height: 32px;
+  padding: 0 18px;
+  font-size: 14px;
+  border-radius: 16px;
+}
+
 .hero.home-hero .home-brand {
   margin-top: auto;
   align-self: flex-start;

@@ -513,44 +513,6 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
         
       </div>
 
-      {showAdd && (
-        <div className="modal" onClick={() => setShowAdd(false)}>
-          <div className="modal__box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal__head">
-              <h3 style={{ margin: 0 }}>新增成员</h3>
-              <span className="grow" />
-              <button className="btn ghost sm" onClick={() => setShowAdd(false)}>关闭</button>
-            </div>
-            {/* 字段顺序按用户口径：入帮序 / ID / 麦克风 / 备注角色 / 橙武 / 备注 */}
-            <div className="toolbar" style={{ marginBottom: 0 }}>
-              <input className="input" placeholder="入帮序" style={{ width: 90 }}
-                     value={draft.joinedOrder} onChange={(e) => setDraft({ ...draft, joinedOrder: e.target.value })} />
-              <input className="input" placeholder="ID *" style={{ width: 200 }}
-                     value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
-              <Select className="select" value={draft.mic}
-                      onChange={(e) => setDraft({ ...draft, mic: e.target.value as Player['mic'] })}>
-                <option value="">麦克风</option>
-                <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
-              </Select>
-              <Select className="select" value={draft.noteRole}
-                      onChange={(e) => setDraft({ ...draft, noteRole: e.target.value as Player['noteRole'] })}>
-                <option value="">备注角色</option>
-                {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
-              </Select>
-              <Select className="select" value={draft.orangeWeapon}
-                      onChange={(e) => setDraft({ ...draft, orangeWeapon: e.target.value })}>
-                <option value="">橙武</option>
-                <option value="有">有</option>
-              </Select>
-              <input className="input" placeholder="备注（技能/装备标签）" style={{ width: 200 }}
-                     value={draft.remark} onChange={(e) => setDraft({ ...draft, remark: e.target.value })} />
-              <span className="grow" />
-              <button className="btn primary" onClick={() => { void handleCreate(); setShowAdd(false); }}>添加</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {wizard && (
         <ImportWizard
           classes={classes}
@@ -566,10 +528,6 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
             底边对齐才不会让标题和说明文字浮在半空 */}
         <div className="toolbar toolbar--fields" style={{ marginBottom: 8 }}>
           <h3 style={{ margin: 0 }}>成员列表（{filtered.length} / {players.length}）</h3>
-          <button className="btn primary"
-                  onClick={() => { setDraft((d) => ({ ...d, id: '', joinedOrder: '', remark: '' })); setShowAdd(true); }}>
-            + 新增成员
-          </button>
           <div className="spacer grow" />
           {/* 定位框：不是筛选（筛选用上面的搜索），而是**直接滚到那个人并高亮**。
               支持模糊：先按整串包含匹配，不行再按"字符按顺序出现"匹配。 */}
@@ -582,6 +540,48 @@ export default function RosterPage({ classes, classMap, onCount, onOpenDetail }:
               onKeyDown={(e) => { if (e.key === 'Enter') locateNext(locateQ, false); }}
             />
           </label>
+          {/* 用户口径：定位 ID 与新增成员并在一起，浮层锚在这个按钮下方 */}
+          <span className="pop-wrap">
+            <button className="btn primary"
+                    onClick={() => { setDraft((d) => ({ ...d, id: '', joinedOrder: '', remark: '' })); setShowAdd((v) => !v); }}>
+              + 新增成员
+            </button>
+            {showAdd && (
+              <div className="pop" onClick={(e) => e.stopPropagation()}>
+                <div className="pop__head">
+                  <h3 style={{ margin: 0 }}>新增成员</h3>
+                  <span className="grow" />
+                  <button className="btn ghost sm" onClick={() => setShowAdd(false)}>关闭</button>
+                </div>
+                {/* 字段顺序：入帮序 / ID / 麦克风 / 备注角色 / 橙武 / 备注 */}
+                <div className="toolbar" style={{ marginBottom: 0 }}>
+                  <input className="input" placeholder="入帮序" style={{ width: 90 }}
+                         value={draft.joinedOrder} onChange={(e) => setDraft({ ...draft, joinedOrder: e.target.value })} />
+                  <input className="input" placeholder="ID *" style={{ width: 200 }}
+                         value={draft.id} onChange={(e) => setDraft({ ...draft, id: e.target.value })} />
+                  <Select className="select" value={draft.mic}
+                          onChange={(e) => setDraft({ ...draft, mic: e.target.value as Player['mic'] })}>
+                    <option value="">麦克风</option>
+                    <option value="有">有</option><option value="无">无</option><option value="无需作答">无需作答</option>
+                  </Select>
+                  <Select className="select" value={draft.noteRole}
+                          onChange={(e) => setDraft({ ...draft, noteRole: e.target.value as Player['noteRole'] })}>
+                    <option value="">备注角色</option>
+                    {['指挥', '统战', 'K龙', '替补指挥', '长期请假'].map((r) => <option key={r} value={r}>{r}</option>)}
+                  </Select>
+                  <Select className="select" value={draft.orangeWeapon}
+                          onChange={(e) => setDraft({ ...draft, orangeWeapon: e.target.value })}>
+                    <option value="">橙武</option>
+                    <option value="有">有</option>
+                  </Select>
+                  <input className="input" placeholder="备注（技能/装备标签）" style={{ width: 200 }}
+                         value={draft.remark} onChange={(e) => setDraft({ ...draft, remark: e.target.value })} />
+                  <span className="grow" />
+                  <button className="btn primary" onClick={() => { void handleCreate(); setShowAdd(false); }}>添加</button>
+                </div>
+              </div>
+            )}
+          </span>
           {locateMsg && (
             <span className={`hint roster-locate-msg${locateMiss ? ' roster-locate-msg--miss' : ''}`}
                   style={{ margin: 0 }}>

@@ -421,7 +421,8 @@ function PlayerCard({
       className={`pcard${dragging ? ' pcard--dragging' : ''}${def ? '' : ' pcard--noclass'}${OW.get(row.playerId) ? ' pcard--ow' : ''}`}
       /* 卡片底色 = 职业色；文字统一白色（用户口径），
          浅色职业底由 CSS 的压暗层保证可读 */
-      style={def ? { background: def.color } : undefined}
+      // 职业色交给 CSS 变量 --pc：底色、渐变、外光晕都从它派生
+      style={def ? ({ ['--pc']: def.color } as React.CSSProperties) : undefined}
       title={`${cls || '未登记职业'} · 拖动可换小队`}
       {...dragProps([row.playerId], row.name)}
     >

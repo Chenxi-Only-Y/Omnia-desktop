@@ -41,20 +41,6 @@ function glide(el: HTMLElement, delta: number): void {
   st.raf = requestAnimationFrame(step);
 }
 
-function pickScroller(): HTMLElement {
-  const c = document.querySelector('.content') as HTMLElement | null;
-  if (c && c.scrollHeight > c.clientHeight + 4) return c;
-  return (document.scrollingElement as HTMLElement) || document.documentElement;
-}
-
-/** 首屏吸附区：交给 OverviewPage，本身不插手 */
-function inHomeSnapZone(sc: HTMLElement): boolean {
-  const cover = document.querySelector('.home-cover') as HTMLElement | null;
-  if (!cover) return false;
-  const coverTop = cover.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop;
-  return sc.scrollTop <= coverTop + 6;
-}
-
 let bound = false;
 
 function onWheel(e: WheelEvent): void {
@@ -68,12 +54,9 @@ function onWheel(e: WheelEvent): void {
     glide(inner, e.deltaY);
     return;
   }
-  // ② 页面主体
-  const sc = pickScroller();
-  if (sc.scrollHeight <= sc.clientHeight + 4) return;
-  if (inHomeSnapZone(sc)) return;
-  e.preventDefault();
-  glide(sc, e.deltaY);
+  // ② 页面主体：**不接管**（用户口径：全站页面滚动不要平滑，改回原生）。
+  //    只保留上面那段"下拉/日期弹层内部"的平滑。
+  //    pickScroller / inHomeSnapZone 保留给将来需要时用，这里不再调用。
 }
 
 export function installSmoothScroll(): void {

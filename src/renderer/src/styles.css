@@ -2022,3 +2022,18 @@ table.grid img, .roster-card img, .stat img, .card img,
   color: #0B0B0D;
 }
 .pop__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+/* ═══ 有橙武的卡片：外框加橙色光效 ═════════════════════════════
+   判据与卡片上的「橙武」徽标同源（playerId → 是否有橙武 的映射），
+   两者不会出现"有徽标没光"或"有光没徽标"的不一致。
+   ═══════════════════════════════════════════════════════════════ */
+.pcard--ow {
+  box-shadow: 0 0 0 2px var(--orange), 0 0 18px rgba(240, 164, 74, .55) !important;
+}
+.pcard--ow:hover {
+  box-shadow: 0 0 0 2px var(--orange), 0 0 26px rgba(240, 164, 74, .78) !important;
+}
+/* 拖动时不抢戏：保留光晕但收一点 */
+.pcard--ow.pcard--dragging {
+  box-shadow: 0 0 0 2px var(--orange), 0 0 12px rgba(240, 164, 74, .45) !important;
+}

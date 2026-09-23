@@ -407,7 +407,7 @@ function PlayerCard({
 
   return (
     <div
-      className={`pcard${dragging ? ' pcard--dragging' : ''}${def ? '' : ' pcard--noclass'}`}
+      className={`pcard${dragging ? ' pcard--dragging' : ''}${def ? '' : ' pcard--noclass'}${OW.get(row.playerId) ? ' pcard--ow' : ''}`}
       /* 卡片底色 = 职业色；文字统一白色（用户口径），
          浅色职业底由 CSS 的压暗层保证可读 */
       style={def ? { background: def.color } : undefined}

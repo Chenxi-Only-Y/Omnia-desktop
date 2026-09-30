@@ -3,12 +3,12 @@ import { useToastAutoClear } from '../lib/useToast';
 import type {
   SignupBoard, SignupImportPreview, SignupImportRow, SignupReview, SignupStatus,
 } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
-import ClassChip from '../components/ClassChip';
 import { SIGNUP_LABEL } from '@shared/types';
 import { PART_STATE_LABEL } from '@shared/domain';
 import Select from '../components/Select';
+import ManualAddPlayer from '../components/ManualAddPlayer';
 import { confirmDialog } from '../components/Confirm';
 
 interface Props extends PageProps {
@@ -57,6 +57,11 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
   const [importError, setImportError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /* 手动加人（用户口径 2026-09：「报名请假这里我可以手动新增加人」）——
+     表单本体在 ManualAddPlayer（排表页的「添加成员」共用同一个组件，
+     两处字段与行为永远一致）；这里只留一个"开/关浮层"的状态。 */
+  const [addOpen, setAddOpen] = useState(false);
+
   const load = useCallback(async () => {
     try {
       const b = await api.signup.board(matchId);
@@ -64,7 +69,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       setReview(await api.signup.review(matchId));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, [matchId]);
 
@@ -76,25 +81,41 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       setError(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
-  /** 一键给所有"在队但未报名"的人标成参加（线下确认过的情况很常见） */
+  /**
+   * 就地修正报名表里的职业（主职 / 二职）。
+   * 用户口径：导入进来的职业名可能是错的，之前只能删掉重新导入。
+   * 只传要改的那一列，不传 status —— 仓储层会沿用原状态，不会把报名状态改掉。
+   */
+  async function setClass(playerId: number, patch: { mainClass?: string; subClass?: string }) {
+    try {
+      await api.signup.set({ matchId, playerId, ...patch });
+      setError(null);
+      await load();
+    } catch (err) {
+      setError(errText(err));
+    }
+  }
+
+  /** 一键给所有"在帮但未报名"的人标成参加（线下确认过的情况很常见） */
   async function markAllPendingJoin() {
     if (!board) return;
     const pending = board.rows.filter((r) => r.status === 'active' && r.signup === null);
-    if (!pending.length) { setNotice('没有未报名的在队成员'); return; }
-    if (!await confirmDialog(`把 ${pending.length} 名未报名的在队成员标为「参加」？`)) return;
+    if (!pending.length) { setNotice('没有未报名的在帮成员'); return; }
+    if (!await confirmDialog(`把 ${pending.length} 名未报名的在帮成员标为「参加」？`)) return;
     try {
       for (const r of pending) await api.signup.set({ matchId, playerId: r.playerId, status: 'JOIN' });
       setNotice(`已标记 ${pending.length} 人为参加`);
       setError(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
+
 
   /** 选报名表 xlsx → 解析出预览（不入库；行可编辑） */
   async function handleSignupFile(file: File | undefined) {
@@ -111,7 +132,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
     } catch (err) {
       setImportRows(null);
       setImportMeta(null);
-      setError(`解析报名表失败：${err instanceof ApiError ? err.message : String(err)}`);
+      setError(`解析报名表失败：${errText(err)}`);
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -174,7 +195,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       onChanged?.();
     } catch (err) {
       // 服务端拒绝（重复报名等）就在弹窗里说清楚，不飘到角落
-      setImportError(err instanceof ApiError ? err.message : String(err));
+      setImportError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -193,7 +214,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       await load();
       onChanged?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -211,7 +232,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       await load();
       onChanged?.();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -271,6 +292,35 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
           <div className="spacer grow" />
           <input ref={fileRef} type="file" accept=".xlsx" style={{ display: 'none' }}
                  onChange={(e) => void handleSignupFile(e.target.files?.[0])} />
+          {/* 手动加人：浮层锚在这个按钮下方（与成员主档的「+ 新增成员」同一套样式） */}
+          <span className="pop-wrap">
+            <button className="btn" onClick={() => setAddOpen((v) => !v)}>
+              ＋ 手动加人
+            </button>
+            {addOpen && (
+              <div className="pop pop--in" onClick={(e) => e.stopPropagation()}>
+                <div className="pop__head">
+                  <h3 style={{ margin: 0 }}>手动加人（本场报名）</h3>
+                  <span className="grow" />
+                  <button className="btn ghost sm" onClick={() => setAddOpen(false)}>关闭</button>
+                </div>
+                {/* 表单本体抽成 ManualAddPlayer —— 排表页的「添加成员」用的是同一个组件，
+                    两处行为/字段永远一致（用户口径：「和报名那个同步」）。 */}
+                <ManualAddPlayer
+                  matchId={matchId}
+                  classes={classes}
+                  submitLabel="加入本场"
+                  autoFocus
+                  onAdded={(_pid, info) => {
+                    setNotice(`${info.created ? `已建档「${info.gameId}」并` : `已把「${info.gameId}」`}标为${SIGNUP_LABEL[info.status]}`);
+                    setAddOpen(false);
+                    void load();
+                    onChanged?.();
+                  }}
+                />
+              </div>
+            )}
+          </span>
           <button className="btn primary" disabled={busy} onClick={() => fileRef.current?.click()}>
             {busy ? '处理中…' : '导入报名表 xlsx'}
           </button>
@@ -293,7 +343,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
           <div className="v" style={{ color: 'var(--warn)' }}>{s.leave}</div></div>
         <div className="stat"><div className="k">未报名</div>
           <div className="v" style={{ color: s.none ? 'var(--warn)' : 'var(--text-faint)' }}>{s.none}</div>
-          <div className="hint" style={{ marginTop: 4 }}>其中在队 {s.pending} 人</div>
+          <div className="hint" style={{ marginTop: 4 }}>其中在帮 {s.pending} 人</div>
         </div>
       </div>
 
@@ -337,17 +387,40 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                     {r.gameId}
                     {r.status !== 'active' && (
                       <span className="badge-state inactive" style={{ marginLeft: 6 }}>
-                        {r.status === 'left' ? '离队' : '暂离'}
+                        {r.status === 'left' ? '离帮' : '暂离'}
                       </span>
                     )}
                     {matchId && r.signup === null && (
-                      <span className="badge-flag" style={{ marginLeft: 6 }}>未填表</span>
+                      <span className="badge-flag badge-flag--warn" style={{ marginLeft: 6 }}>未填表</span>
                     )}
                   </td>
-                  <td><ClassChip name={r.mainClass} classMap={classMap} /></td>
-                  <td>{r.subClass && r.subClass !== r.mainClass
-                    ? <ClassChip name={r.subClass} classMap={classMap} />
-                    : <span style={{ color: 'var(--text-faint)' }}>—</span>}</td>
+                  {/* 主职 / 副职**就地可改**（用户口径：导入后职业填错了要能直接修，
+                      不必删掉重新导入）。用与导入预览同一个 Select，风格一致。
+                      左侧保留职业色条，颜色信息不丢。 */}
+                  <td>
+                    <div className="cls-cell">
+                      <span className="cls-cell__bar"
+                            style={{ background: classMap.get(r.mainClass)?.color ?? 'transparent' }} />
+                      <Select className="select select--cls" value={r.mainClass}
+                              title="可改：本场报名表里的主职业"
+                              onChange={(e) => void setClass(r.playerId, { mainClass: e.target.value })}>
+                        <option value="">—</option>
+                        {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                      </Select>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="cls-cell">
+                      <span className="cls-cell__bar"
+                            style={{ background: classMap.get(r.subClass)?.color ?? 'transparent' }} />
+                      <Select className="select select--cls" value={r.subClass}
+                              title="可改：本场报名表里的二职"
+                              onChange={(e) => void setClass(r.playerId, { subClass: e.target.value })}>
+                        <option value="">—</option>
+                        {classes.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                      </Select>
+                    </div>
+                  </td>
                   <td>{r.noteRole ? <span className="badge-note">{r.noteRole}</span> : '—'}</td>
                   <td><span className="badge-mic">{r.mic || '—'}</span></td>
                   <td>
@@ -451,9 +524,9 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                         </Select>
                       </td>
                       <td>
-                        <Select className="select" value={r.mic} disabled={r.status === 'LEAVE'}
+                        <Select className="select" placeholder value={r.mic} disabled={r.status === 'LEAVE'}
                                 onChange={(e) => patchImportRow(i, { mic: e.target.value })}>
-                          <option value="">—</option>
+                          <option value="">麦</option>
                           <option value="有">有</option>
                           <option value="无">无</option>
                         </Select>
@@ -474,7 +547,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                       </td>
                       <td>{rosterIds.has(r.gameId.trim())
                         ? <span style={{ color: 'var(--text-faint)' }}>是</span>
-                        : <span className="badge-flag">缺档</span>}</td>
+                        : <span className="badge-flag badge-flag--warn">缺档</span>}</td>
                       <td>
                         <button className="btn sm ghost" title="删掉这一行（不导入）"
                                 onClick={() => removeImportRow(i)}>×</button>
@@ -527,7 +600,7 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
                     && <span className="hint">… 等 {review.inRosterNotSigned.length} 人</span>}
                 </div>
               )
-              : <span className="hint">没有遗漏 —— 在队成员都已填表</span>}
+              : <span className="hint">没有遗漏 —— 在帮成员都已填表</span>}
           </div>
 
           <div>

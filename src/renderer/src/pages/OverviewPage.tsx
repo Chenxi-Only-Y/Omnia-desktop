@@ -9,20 +9,20 @@
  * 一旦拿到立绘，只需把图片放到 src/renderer/public/hero/ 并填 HERO_IMAGE 即可切换。
  */
 import { useCallback, useEffect, useState } from 'react';
-import type { AppInfo, Player, SignupRow, SquadCatalog } from '@shared/types';
-import { api, ApiError } from '../api';
+import type { Player, SignupRow, SquadCatalog } from '@shared/types';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
 import { CLASSES, TOTAL_MATCH_SLOTS, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import { classIconSrc } from '../lib/assets';
 type Target = 'roster' | 'match' | 'board' | 'settings';
 
 interface Props extends PageProps {
-  info: AppInfo | null;
+  /** 「关于 / 运行环境」已移到设置页，首页不再需要 AppInfo */
   onCount: (n: number) => void;
   onGo: (k: Target) => void;
 }
 
-export default function OverviewPage({ onCount, onGo, info }: Props) {
+export default function OverviewPage({ onCount, onGo }: Props) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
   /** 最近一场的报名表：职业只存在于报名记录里，所以职业分布按它统计 */
@@ -32,24 +32,25 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const [rows, cat, matches] = await Promise.all([
-        api.player.list(), api.meta.squads(), api.match.list(),
-      ]);
+      const [rows, matches] = await Promise.all([api.player.list(), api.match.list()]);
       setPlayers(rows);
-      setCatalog(cat);
       onCount(rows.length);
       if (matches.length) {
         const m = matches[0];
-        const board = await api.signup.board(m.id);
+        /* 建制已按场次独立（用户口径），总览的"可上阵槽位"要按**最近一场**统计，
+           不能再拿一份全局建制（那会与实际排表页对不上）。 */
+        const [board, cat] = await Promise.all([api.signup.board(m.id), api.meta.squads(m.id)]);
+        setCatalog(cat);
         setLatestSignups(board.rows.filter((r) => r.signup !== null));
         setLatestMatchLabel(`${m.date} 第 ${m.indexInDay} 场`);
       } else {
+        setCatalog(null);
         setLatestSignups([]);
         setLatestMatchLabel('');
       }
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, [onCount]);
 
@@ -149,13 +150,9 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
             ② 品牌块（eyebrow / 万象·Omnia / 英文 / 说明）挪到**左下角**
             ③ **职业托盘整个删掉** */}
         <div className="hero__body">
-          <div className="home-cta">
-            <button className="home-btn" onClick={() => onGo('match')}>录入对局与战报</button>
-            <button className="home-btn home-btn--ghost" onClick={() => onGo('roster')}>成员主档</button>
-            <button className="home-btn home-btn--ghost" onClick={() => onGo('board')}>数据看板</button>
-            <button className="home-btn home-btn--ghost" onClick={() => onGo('settings')}>战斗组与小队</button>
-          </div>
-
+          {/* 用户口径 2026-09：首屏**不放按钮**。
+              所有页面入口都在顶栏常驻导航里，首屏只留品牌块
+              （原先这里有一行按钮，与顶栏导航重复）。 */}
           <div className="home-brand">
             <span className="home-eyebrow">All leagues · One universe</span>
             <h1 className="home-display">
@@ -185,7 +182,7 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
         <div className="stat">
           <div className="k">成员总数</div>
           <div className="v">{players.length}<small> 人</small></div>
-          <div className="hint" style={{ marginTop: 4 }}>在队 {active} · 本场报名 {latestSignups.length}</div>
+          <div className="hint" style={{ marginTop: 4 }}>在帮 {active} · 本场报名 {latestSignups.length}</div>
         </div>
         <div className="stat">
           <div className="k">本场可上阵</div>
@@ -208,25 +205,9 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
         </div>
       </div>
 
-      {/* 媒体展示区（照 seedance2_0 的视频卡阵）——
-          目前用旧表抽出来的立绘占位；有真视频时把 <img> 换成 <video src autoplay muted loop playsinline /> */}
-      <div className="home-section" style={{ paddingBottom: 8 }}>
-        <span className="home-eyebrow">Showcase</span>
-        <h2 className="home-h2">实战画面</h2>
-        <p className="home-lede">
-          一场对局从报名到结算的完整链路，都在同一屏里跑完。
-        </p>
-        <div className="home-media">
-          <div className="home-media__frame">
-            <img src={`${import.meta.env.BASE_URL}guide/image26.png`} alt="防守半区" />
-            <span className="home-media__cap">防守半区</span>
-          </div>
-          <div className="home-media__frame">
-            <img src={`${import.meta.env.BASE_URL}guide/image22.png`} alt="进攻半区" />
-            <span className="home-media__cap">进攻半区</span>
-          </div>
-        </div>
-      </div>
+      
+      {/* 原先这里有一块「实战画面」（Showcase + 两张攻略图）。
+          用户口径 2026-09：不需要这块，整体删除。 */}
 
       <div className="card" style={{ marginTop: 12 }}>
         <h3>职业分布（按本场报名表）{latestMatchLabel ? ` · ${latestMatchLabel}` : ''}</h3>
@@ -244,7 +225,12 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
               const iconSrc = classIconSrc(c.name);
               return (
                 <div key={c.name} style={{ display: 'grid', gridTemplateColumns: '104px 1fr 52px', alignItems: 'center', gap: 10 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: c.color, fontSize: 12 }}>
+                  {/* 职业名用**主色文字**，颜色只留给图标/色点。
+                      职业色是高饱和亮色（实测白底对比度：妙音 1.70、惊鸿 1.76、
+                      潮光 1.89），直接当字色会看不清 —— 12 个里 11 个不达 4.5。
+                      这与 ClassChip 的既有口径一致（见 components/ClassChip.tsx：
+                      职业色只用于色点与描边，标签文字统一用主色）。 */}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--text)', fontSize: 12 }}>
                     {iconSrc
                       ? <img src={iconSrc} alt="" style={{ width: 17, height: 17, objectFit: 'contain' }} />
                       : <i style={{ width: 7, height: 7, borderRadius: '50%', background: c.color, display: 'inline-block' }} />}
@@ -262,31 +248,8 @@ export default function OverviewPage({ onCount, onGo, info }: Props) {
         
       </div>
 
-      <div className="card">
-        <h3>关于</h3>
-        <div style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--text-dim)' }}>
-          <div style={{ fontSize: 15, color: 'var(--text)', letterSpacing: '.3px' }}>
-            万象<span style={{ color: 'var(--accent)' }}>·</span>Omnia
-          </div>
-          <div style={{ fontStyle: 'italic' }}>All leagues. One universe.</div>
-          <div>万象归一，联赛集成。</div>
-        </div>
-      </div>
-
-      <div className="card">
-        <h3>运行环境</h3>
-        {info ? (
-          <div style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--text-dim)' }}>
-            <div>应用版本：{info.version}</div>
-            <div>Electron {info.electron} · Chromium {info.chrome} · Node {info.node}</div>
-            <div>平台：{info.platform}</div>
-            <div style={{ wordBreak: 'break-all' }}>数据库：{info.dbPath}</div>
-          </div>
-        ) : (
-          <div className="hint">读取中…</div>
-        )}
-        
-      </div>
+      {/* 用户口径 2026-09：「关于」与「运行环境」已移到**设置页 → 数据与兼容**，
+          首页只保留数据相关内容，这里不再渲染这两块。 */}
       </div>
     </>
   );

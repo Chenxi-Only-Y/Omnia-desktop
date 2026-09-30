@@ -35,8 +35,6 @@ export const CLASSES: readonly ClassDef[] = [
   { name: '潮光', color: '#2BCBFF', coef: 0.95, role: 'DPS', aliases: [] },
 ] as const;
 
-export const CLASS_NAMES: readonly string[] = CLASSES.map((c) => c.name);
-
 /**
  * 职业图标映射。
  *
@@ -83,17 +81,12 @@ export function findClass(name: string | null | undefined): ClassDef | undefined
   return CLASSES.find((c) => c.name === n || c.aliases.includes(n));
 }
 
-export const CLASS_COEF: Record<string, number> = Object.fromEntries(
-  CLASSES.map((c) => [c.name, c.coef]),
-);
-
 // ── 战术类型与小队结构（D9 / D10） ───────────────────────────────
 export type Tactic = '塔后拆' | '塔前拆' | '保镖' | '防守' | '未定';
 export const TACTICS: readonly Tactic[] = ['塔后拆', '塔前拆', '保镖', '防守', '未定'] as const;
 
 /** 战斗组类别：防守 / 进攻 */
 export type GroupKind = 'defend' | 'attack';
-export const GROUP_KIND_LABEL: Record<GroupKind, string> = { defend: '防守', attack: '进攻' };
 
 export type SquadGroup = '防守一' | '防守二' | '进攻一' | '进攻二';
 
@@ -159,8 +152,9 @@ export const TOTAL_MATCH_SLOTS = DEFAULT_SQUAD_CAPACITY;
 
 // ── 备注角色与附加分（D18） ───────────────────────────────────────
 export type NoteRole = '指挥' | '统战' | 'K龙' | '替补指挥' | '长期请假' | '';
-export const NOTE_ROLES: readonly NoteRole[] = [
-  '指挥', '统战', 'K龙', '替补指挥', '长期请假', '',
+/** 备注角色的**非空**取值（从备注文本里识别用；含空串会永远先命中空串） */
+export const NOTE_ROLE_VALUES: readonly Exclude<NoteRole, ''>[] = [
+  '指挥', '统战', 'K龙', '替补指挥', '长期请假',
 ] as const;
 
 export const BONUS_POINTS: Record<string, number> = {
@@ -192,12 +186,6 @@ export interface PersonalWeights {
   fountain: number; bone: number; heal: number; taken: number; revive: number;
 }
 
-export const DEFAULT_PERSONAL_WEIGHTS: Record<RoleKey, PersonalWeights> = {
-  DPS: { kill: 1.2, dmg: 0.5, tower: 1.2, assist: 0.3, fountain: 0.2, bone: 0.2, heal: 0, taken: 0, revive: 0 },
-  T: { kill: 0, dmg: 0, tower: 0, assist: 0.8, fountain: 0, bone: 0, heal: 0, taken: 1.8, revive: 0 },
-  HEAL: { kill: 0, dmg: 0, tower: 0, assist: 0.2, fountain: 0, bone: 0, heal: 0.8, taken: 0.3, revive: 0.5 },
-};
-
 // ── 团队执行分权重（D9/D14）—— 首版拟定值，待真实对局数据回归微调 ──
 export interface ExecWeights {
   /** 推塔型：对局共享项（塔进度 + 大旗）与小队表现项 */
@@ -205,12 +193,6 @@ export interface ExecWeights {
   guard: { kill: number; taken: number; lowDeath: number };
   defend: { keepRate: number; kill: number; lowDeath: number };
 }
-
-export const DEFAULT_EXEC_WEIGHTS: ExecWeights = {
-  push: { progress: 0.6 * (7 / 9), flag: 0.6 * (2 / 9), tower: 0.25, kill: 0.15 },
-  guard: { kill: 0.5, taken: 0.3, lowDeath: 0.2 },
-  defend: { keepRate: 0.55, kill: 0.25, lowDeath: 0.2 },
-};
 
 export function tacticKind(t: Tactic | string): 'push' | 'guard' | 'defend' {
   if (t === '保镖') return 'guard';

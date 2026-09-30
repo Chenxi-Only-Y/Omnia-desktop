@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DashboardData } from '@shared/types';
-import { api, ApiError } from '../api';
-import type { PageProps } from '../App';
+import { api, errText } from '../api';
 import { MATCH_RESULT_LABEL } from '@shared/domain';
 import Select from '../components/Select';
 
 type Tab = 'attendance' | 'completeness' | 'lineup';
 
-export default function BoardPage(_props: PageProps) {
-  // 不再用 classMap：出勤明细里的职业列已按用户口径移除（职业只在单场视图显示）
+/** 数据看板：只读取看板数据，不需要页面级 props（原来挂了未使用的 PageProps） */
+export default function BoardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('attendance');
@@ -19,7 +18,7 @@ export default function BoardPage(_props: PageProps) {
       setData(await api.dashboard.data());
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, []);
 
@@ -110,7 +109,7 @@ export default function BoardPage(_props: PageProps) {
                       {r.gameId !== r.name && <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>{r.gameId}</span>}
                       {r.status !== 'active' && (
                         <span className="badge-state inactive" style={{ marginLeft: 6 }}>
-                          {r.status === 'left' ? '离队' : '暂离'}
+                          {r.status === 'left' ? '离帮' : '暂离'}
                         </span>
                       )}
                     </td>

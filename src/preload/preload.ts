@@ -6,12 +6,22 @@
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import {
-  IPC, type AssignInput, type CombatStat, type GroupInput, type ImportPreview, type IpcResult,
-  type JoinMode, type MatchInput, type ParticipationInput, type PlayerInput, type RuleSetInput,
-  type SeasonInput, type SignupInput, type SquadInput,
+  type AssignInput, type CombatStat, type GroupInput, type ImportPreview, type IpcResult,
+  type JoinMode, type MatchInput, type OmniaApi, type OppImportMode, type ParticipationInput,
+  type PlayerInput, type RuleSetInput,
+  type SignupInput, type SquadInput,
 } from '../shared/types';
 
-function invoke<T>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
+/**
+ * 调用主进程的 IPC 通道。
+ *
+ * 为什么默认类型实参是 `never`：不加时 TS 推成 `unknown`，于是下面 `satisfies OmniaApi`
+ * 处处不匹配（`unknown` 不能赋给 `AppInfo`）。用 `never` 当默认值，未显式指定的调用
+ * 仍能通过契约校验 —— 代价是**返回值类型没有真正被校验**，这里实际校验的是
+ * 「方法有没有漏、名字对不对、参数个数与类型是否与 OmniaApi 一致」。
+ * 想连返回值一起校验，就给每处调用补上 `invoke<AppInfo>('app:info')` 这样的类型实参。
+ */
+function invoke<T = never>(channel: string, ...args: unknown[]): Promise<IpcResult<T>> {
   return ipcRenderer.invoke(channel, ...args) as Promise<IpcResult<T>>;
 }
 
@@ -30,20 +40,25 @@ const api = {
     wallpaperTranscode: () => invoke('meta:wallpaper-transcode'),
     export: () => invoke('player:export'),
     detail: (playerId: number) => invoke('player:detail', playerId),
+    pickBg: () => invoke('player:pick-bg'),
+    setBg: (id: number, srcPath: string) => invoke('player:set-bg', id, srcPath),
+    clearBg: (id: number) => invoke('player:clear-bg', id),
   },
   meta: {
     classes: () => invoke('meta:classes'),
     settings: () => invoke('meta:settings'),
-    listWallpapers: (dir?: string) => invoke('meta:list-wallpapers', dir),
-    wallpaperTranscode: () => invoke('meta:wallpaper-transcode'),
     setSetting: (key: string, value: string) => invoke('meta:setting:set', key, value),
-    squads: () => invoke('meta:squads'),
-    createGroup: (input: GroupInput) => invoke('meta:group:create', input),
-    removeGroup: (id: number) => invoke('meta:group:remove', id),
-    createSquad: (input: SquadInput) => invoke('meta:squad:create', input),
-    appendSquad: (groupId: number) => invoke('meta:squad:append', groupId),
-    removeSquad: (id: number) => invoke('meta:squad:remove', id),
-    setSquadTactic: (id: number, tactic: string) => invoke('meta:squad:tactic', id, tactic),
+    /* 建制全部按场次独立：matchId 为首参 */
+    squads: (matchId: number) => invoke('meta:squads', matchId),
+    createGroup: (matchId: number, input: GroupInput) => invoke('meta:group:create', matchId, input),
+    removeGroup: (matchId: number, groupName: string) => invoke('meta:group:remove', matchId, groupName),
+    createSquad: (matchId: number, input: SquadInput) => invoke('meta:squad:create', matchId, input),
+    appendSquad: (matchId: number, groupName: string) => invoke('meta:squad:append', matchId, groupName),
+    removeSquad: (matchId: number, squadName: string) => invoke('meta:squad:remove', matchId, squadName),
+    setSquadTactic: (matchId: number, squadName: string, tactic: string) =>
+      invoke('meta:squad:tactic', matchId, squadName, tactic),
+    setSquadSize: (matchId: number, squadName: string, size: number) =>
+      invoke('meta:squad:size', matchId, squadName, size),
     /**
      * 截取排表功能区（完整）。
      * 参数一律**不走 IPC**：要截的矩形先写进 app_setting.captureRect，
@@ -52,8 +67,6 @@ const api = {
      */
     captureRegion: () => invoke('app:capture-region'),
     captureRect: () => invoke('app:capture-rect'),
-    captureMaxWin: () => invoke('app:capture-maxwin'),
-    captureRestoreWin: () => invoke('app:capture-restorewin'),
     xlsxSheets: (data: Uint8Array) => invoke('meta:xlsx:sheets', data),
     xlsxGrid: (data: Uint8Array, sheet: string | number, headerRow?: number) =>
       invoke('meta:xlsx:grid', data, sheet, headerRow),
@@ -68,20 +81,22 @@ const api = {
     upsertParticipation: (input: ParticipationInput) => invoke('match:participation:upsert', input),
     assignBulk: (input: AssignInput) => invoke('match:assign:bulk', input),
     unassign: (matchId: number, playerId: number) => invoke('match:unassign', matchId, playerId),
+    copyLineup: (fromMatchId: number, toMatchId: number, overwrite?: boolean) =>
+      invoke('match:copy-lineup', fromMatchId, toMatchId, overwrite),
     setSkillNote: (matchId: number, playerId: number, note: string) =>
       invoke('match:skill:note', matchId, playerId, note),
     removeParticipation: (id: number) => invoke('match:participation:remove', id),
     saveStat: (participationId: number, stat: Partial<CombatStat>) =>
       invoke('match:stat:save', participationId, stat),
+    clearStats: (matchId: number, side: 'our' | 'opp' = 'our') =>
+      invoke('match:stat:clear', matchId, side),
+    clearStatRow: (participationId: number) => invoke('match:stat:clear-row', participationId),
     importPreview: (text: string, mode: JoinMode = 'roster') =>
       invoke('match:import:preview', text, mode),
-    importCommit: (matchId: number, preview: ImportPreview) =>
-      invoke('match:import:commit', matchId, preview),
+    importCommit: (matchId: number, preview: ImportPreview, opts?: { opp?: OppImportMode }) =>
+      invoke('match:import:commit', matchId, preview, opts),
     runScore: (matchId: number, ruleSetId?: number) => invoke('match:score:run', matchId, ruleSetId),
     scores: (matchId: number, ruleSetId?: number) => invoke('match:score:list', matchId, ruleSetId),
-  },
-  shell: {
-    openExternal: (url: string) => invoke('shell:openExternal', url),
   },
   dashboard: {
     data: () => invoke('dashboard:data'),
@@ -107,19 +122,21 @@ const api = {
     remove: (id: number) => invoke('rules:remove', id),
     validate: (input: RuleSetInput) => invoke('rules:validate', input),
   },
-  season: {
-    list: () => invoke('season:list'),
-    active: () => invoke('season:active'),
-    create: (input: SeasonInput) => invoke('season:create', input),
-    update: (id: number, patch: Partial<SeasonInput>) => invoke('season:update', id, patch),
-    setActive: (id: number) => invoke('season:setActive', id),
-    remove: (id: number) => invoke('season:remove', id),
-    assignMatches: (seasonId: number, matchIds: number[]) => invoke('season:assignMatches', seasonId, matchIds),
+  /** 帮会（一帮会一个库文件）；open 会切换当前库，之后其它接口都读写这个帮会的数据 */
+  guild: {
+    list: () => invoke('guild:list'),
+    active: () => invoke('guild:active'),
+    create: (name: string, note?: string) => invoke('guild:create', name, note),
+    open: (id: string) => invoke('guild:open', id),
+    update: (id: string, patch: { name?: string; note?: string }) => invoke('guild:update', id, patch),
+    remove: (id: string) => invoke('guild:remove', id),
+    setCover: (id: string, srcPath: string) => invoke('guild:set-cover', id, srcPath),
+    pickCover: () => invoke('guild:pick-cover'),
   },
-  /** 通道常量透出，便于渲染层调试时核对 */
-  channels: IPC,
 };
 
-contextBridge.exposeInMainWorld('omnia', api);
+/* satisfies 而不是注解：签名以 types.ts 的 OmniaApi 为准，
+   一旦实现与契约不一致（少一个方法、返回类型变了），类型检查当场报错 ——
+   这正是当初"手抄契约悄悄漂移"没被发现的原因。 */
+contextBridge.exposeInMainWorld('omnia', api satisfies OmniaApi);
 
-export type OmniaPreloadApi = typeof api;

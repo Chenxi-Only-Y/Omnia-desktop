@@ -27,7 +27,7 @@ async function refreshOW(): Promise<void> {
 }
 void refreshOW();
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ParticipationRow, SquadCatalog, SquadRow } from '@shared/types';
 import type { PageProps } from '../App';
 import { classIconSrc } from '../lib/assets';
@@ -47,11 +47,11 @@ interface Props extends PageProps {
   /** 卡片上直接填写技能备注（人 × 场） */
   onSkillNote?: (playerId: number, note: string) => void;
   /** 给某组再加一队（每组队数不固定，按需加） */
-  onAddSquad?: (groupId: number) => void;
+  onAddSquad?: (groupName: string) => void;
   /** 删掉某一队（有历史记录时后端会拒绝） */
-  onRemoveSquad?: (squadId: number, name: string) => void;
+  onRemoveSquad?: (squadName: string) => void;
   /** 就地改战术（队名列里直接改） */
-  onChangeTactic?: (squadId: number, tactic: string) => void;
+  onChangeTactic?: (squadName: string, tactic: string) => void;
   /** 就地改本场职业（主职 / 二职二选一） */
   onChangeClass?: (playerId: number, cls: string) => void;
 }
@@ -129,8 +129,10 @@ export default function LineupBoard({
   const defendGroups = groups.filter((g) => g.kind === 'defend');
   const attackGroups = groups.filter((g) => g.kind === 'attack');
 
-  /** 拖拽中：记录被拖的队员，拖完清理高亮 */
-  const dragProps = (playerIds: number[], label: string) => ({
+  /** 拖拽中：记录被拖的队员，拖完清理高亮。
+   *  用 useCallback 固定引用 —— 它作为 prop 一路传到每张卡片，
+   *  身份一变就让卡片的 memo 全部失效（用户反馈的"排表反应慢"）。 */
+  const dragProps = useCallback((playerIds: number[], label: string) => ({
     draggable: true,
     onDragStart: (ev: React.DragEvent) => {
       dragIds.current = playerIds;
@@ -142,14 +144,17 @@ export default function LineupBoard({
       setHoverSquad(null);
       setHoverUnassign(false);
     },
-  });
+  }), []);
 
-  const dropProps = (squad: string) => ({
+  const dropProps = useCallback((squad: string) => ({
     onDragOver: (ev: React.DragEvent) => {
       if (!onAssign) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = 'move';
-      setHoverSquad(squad);
+      // 只在**真的换了目标行**时才 setState。dragover 每秒触发几十次，
+      // 每次都写状态就会让整个看板跟着重渲染 —— 这是拖动卡顿的主因。
+      // 用函数式更新拿到当前值，避免把 hoverSquad 变成依赖。
+      setHoverSquad((cur) => (cur === squad ? cur : squad));
     },
     onDragLeave: () => setHoverSquad((cur) => (cur === squad ? null : cur)),
     onDrop: (ev: React.DragEvent) => {
@@ -171,7 +176,9 @@ export default function LineupBoard({
       });
       onAssign(payload.playerIds, squad, slot);
     },
-  });
+    // onAssign 由父层固定引用；hoverSquad 走函数式更新，不进依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [onAssign]);
 
   return (
     <div className="board">
@@ -245,7 +252,8 @@ export default function LineupBoard({
   );
 }
 
-function Half({
+/** 半区（防守 / 进攻）：组 → 小队行。memo 后可挡住 hover 引起的整板重渲染。 */
+const Half = memo(function Half({
   title, groups, squads, bySquad, classMap, onPickSlot, onRemoveRow, onSkillNote,
   dragProps, dropProps, hoverSquad, draggingIds, onAddSquad, onRemoveSquad, onChangeTactic,
   onChangeClass,
@@ -263,11 +271,11 @@ function Half({
   hoverSquad: string | null;
   draggingIds: number[];
   /** 给该组再加一队（队数不固定，按需加） */
-  onAddSquad?: (groupId: number) => void;
+  onAddSquad?: (groupName: string) => void;
   /** 删掉某一队（有历史记录的会被后端拒绝） */
-  onRemoveSquad?: (squadId: number, name: string) => void;
+  onRemoveSquad?: (squadName: string) => void;
   /** 就地改战术（队名列里直接改） */
-  onChangeTactic?: (squadId: number, tactic: string) => void;
+  onChangeTactic?: (squadName: string, tactic: string) => void;
   /** 就地改本场职业（主职 / 二职二选一） */
   onChangeClass?: (playerId: number, cls: string) => void;
 }) {
@@ -275,14 +283,15 @@ function Half({
     <div className="half">
       <div className="half__title">{title}</div>
       {groups.map((g) => {
-        const list = squads.filter((s) => s.groupId === g.id);
+        // 建制改为按场次独立后，组与队都用**名字**作键（不再有自增 id）
+        const list = squads.filter((s) => s.groupName === g.name);
         return (
-          <div className="half__group" key={g.id}>
+          <div className="half__group" key={g.name}>
             <div className="half__groupname">
               {g.name}
               <span className="half__groupcount">{list.length} 队</span>
               {onAddSquad && (
-                <button className="btn sm ghost half__addbtn" onClick={() => onAddSquad(g.id)}
+                <button className="btn sm ghost half__addbtn" onClick={() => onAddSquad(g.name)}
                         title={`给「${g.name}」再加一队（第 ${list.length + 1} 队）`}>
                   ＋ 加一队
                 </button>
@@ -291,7 +300,7 @@ function Half({
             {list.length === 0 && <div className="half__emptygroup">该战斗组下还没有小队</div>}
             <div className="half__row">
               {list.map((s) => (
-                <SquadRowView key={s.id} squad={s} members={bySquad.get(s.name) ?? []}
+                <SquadRowView key={s.name} squad={s} members={bySquad.get(s.name) ?? []}
                               classMap={classMap} onPickSlot={onPickSlot} onRemoveRow={onRemoveRow}
                               onSkillNote={onSkillNote} onRemoveSquad={onRemoveSquad} onChangeTactic={onChangeTactic}
                       onChangeClass={onChangeClass}
@@ -304,10 +313,11 @@ function Half({
       })}
     </div>
   );
-}
+});
 
-/** 一支小队 = 一整行：队名 + 6 张卡片横排铺开 */
-function SquadRowView({
+/** 一支小队 = 一整行：队名 + 6 张卡片横排铺开
+ *  memo：hover 只影响目标那一行（hovered 变），其余行不必重渲染。 */
+const SquadRowView = memo(function SquadRowView({
   squad, members, classMap, onPickSlot, onRemoveRow, onSkillNote,
   dragProps, dropProps, hovered, draggingIds, onRemoveSquad, onChangeTactic, onChangeClass,
 }: {
@@ -321,9 +331,9 @@ function SquadRowView({
   dropProps: (squad: string) => Record<string, unknown>;
   hovered: boolean;
   draggingIds: number[];
-  onRemoveSquad?: (squadId: number, name: string) => void;
+  onRemoveSquad?: (squadName: string) => void;
   /** 就地改战术（队名列里直接改） */
-  onChangeTactic?: (squadId: number, tactic: string) => void;
+  onChangeTactic?: (squadName: string, tactic: string) => void;
   /** 就地改本场职业（主职 / 二职二选一） */
   onChangeClass?: (playerId: number, cls: string) => void;
 }) {
@@ -359,7 +369,7 @@ function SquadRowView({
             className="squadrow__tactic squadrow__tactic--edit"
             value={squad.tactic || ''}
             title="点击可直接改战术"
-            onChange={(e) => onChangeTactic(squad.id, e.target.value)}
+            onChange={(e) => onChangeTactic(squad.name, e.target.value)}
             onClick={(e) => e.stopPropagation()}
           >
             <option value="">未定</option>
@@ -370,7 +380,7 @@ function SquadRowView({
         )}
         {onRemoveSquad && (
           <button className="squadrow__del" title={`删掉「${squad.name}」这一队（有历史记录时会被拒绝）`}
-                  onClick={(e) => { e.stopPropagation(); onRemoveSquad(squad.id, squad.name); }}>
+                  onClick={(e) => { e.stopPropagation(); onRemoveSquad(squad.name); }}>
             ×
           </button>
         )}
@@ -385,10 +395,12 @@ function SquadRowView({
       </div>
     </div>
   );
-}
+});
 
-/** 一张队员卡片：标题=角色 ID 名 / 第一行=职业 / 第二行=技能备注（可编辑） */
-function PlayerCard({
+/** 一张队员卡片：标题=角色 ID 名 / 第一行=职业 / 第二行=技能备注（可编辑）
+ *  memo：拖动时每次 dragover 都会让看板重渲染，卡片 props 全稳定（回调已 useCallback、
+ *  dragging 是布尔），memo 后 60 张卡不会跟着重渲染 —— 这是"反应慢"的主要修法。 */
+const PlayerCard = memo(function PlayerCard({
   row, slotIndex, squad, classMap, onPickSlot, onRemoveRow, onSkillNote, onChangeClass,
   dragProps, dragging,
 }: {
@@ -431,7 +443,7 @@ function PlayerCard({
 
   return (
     <div
-      className={`pcard${dragging ? ' pcard--dragging' : ''}${def ? '' : ' pcard--noclass'}${OW.get(row.playerId) ? ' pcard--ow' : ''}`}
+      className={`pcard${dragging ? ' pcard--dragging' : ''}${def ? '' : ' pcard--noclass'}${OW.get(row.playerId) ? ' pcard--ow' : ''}${row.noteRole ? ' pcard--hasnote' : ''}`}
       /* 卡片底色 = 职业色；文字统一白色（用户口径），
          浅色职业底由 CSS 的压暗层保证可读 */
       // 职业色交给 CSS 变量 --pc：底色、渐变、外光晕都从它派生
@@ -480,8 +492,24 @@ function PlayerCard({
           {cls || '未登记职业'}
         </div>
       )}
-      {/* 橙武徽标：有就显示、没有不显示（用户口径，字号比职业小 2px） */}
-      {OW.get(row.playerId) && <span className="pcard__ow">橙武</span>}
+      {/* 徽标组：「橙武」+「备注角色」，**与职业那一行对齐**（用户口径：
+          「橙武标和这个标放下面点，放在和职业名称对齐」）。
+          用负上边距把它提回职业行，再用负下边距把后续（技能备注）的位置还回去，
+          所以整卡排版不受影响、名字也不用再让宽度。
+          刻意放在职业 div **之外**：点徽标不会触发"切换职业"。 */}
+      {(OW.get(row.playerId) || row.noteRole) && (
+        <div className="pcard__badges">
+          {OW.get(row.playerId) && <span className="pcard__ow">橙武</span>}
+          {row.noteRole && <span className="pcard__noterole">{row.noteRole}</span>}
+        </div>
+      )}
+      {/* 橙武卡片右侧 30% 的职业大图（用户口径：「右侧 30% 添加职业图片，
+          有效图像左下角的 66%」）—— 尺寸与对齐全在 CSS 里，纯装饰、不挡点击。 */}
+      {OW.get(row.playerId) && icon && (
+        <span className="pcard__owart" aria-hidden>
+          <img src={icon} alt="" />
+        </span>
+      )}
       {/* 技能备注：单行、无框，看起来就是一行普通文字（用户口径） */}
       <input
         className="pcard__note"
@@ -504,4 +532,4 @@ function PlayerCard({
       />
     </div>
   );
-}
+});

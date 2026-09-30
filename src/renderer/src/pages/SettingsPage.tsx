@@ -1,19 +1,37 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
-import type { AppInfo, SquadCatalog } from '@shared/types';
-import { api, ApiError } from '../api';
+import { localUrl } from '../lib/localFile';
+import type { AppInfo } from '@shared/types';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
-import Select from '../components/Select';
+import RulesPage from './RulesPage';
 
 /** 中缝图片上限：会存成 dataURL 进 app_setting，太大既慢又占库，这里挡一下 */
 const DIVIDER_IMAGE_MAX_MB = 3;
+
+/**
+ * 设置页的页签。
+ *
+ * 用户口径 2026-09：「设置」与「权重与规则」合并成一个页 —— 导航项只留「设置」，
+ * 进来用页签分块。复用全站既有的 `.tab` 样式（与对局详情页签同源），不新造控件。
+ */
+type SettingsTab = 'rules' | 'wallpaper' | 'data' | 'info';
+
+const SETTINGS_TABS: { key: SettingsTab; label: string }[] = [
+  { key: 'rules', label: '权重与规则' },
+  { key: 'wallpaper', label: '壁纸' },
+  { key: 'data', label: '数据与兼容' },
+  /* 用户口径：「关于 / 运行环境」单独列一项「全部信息」 */
+  { key: 'info', label: '全部信息' },
+];
 
 interface Props extends PageProps {
   info: AppInfo | null;
 }
 
-export default function SettingsPage({ info }: Props) {
-  const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
+export default function SettingsPage({ info, classes, classMap }: Props) {
+  /** 当前页签：默认「权重与规则」（评分参数是最常来设置页改的东西） */
+  const [tab, setTab] = useState<SettingsTab>('rules');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // 壁纸库：地址由用户填入 → 扫描 → 缩略图选（静态/动态都可）
@@ -77,13 +95,22 @@ export default function SettingsPage({ info }: Props) {
   }, []);
   // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
   useToastAutoClear(notice, setNotice);
-  const [newGroup, setNewGroup] = useState({ name: '', kind: 'attack' as 'attack' | 'defend' });
   /** 半区中缝图片（dataURL）；空 = 显示默认的竖排「万象」 */
   const [dividerImage, setDividerImage] = useState('');
 
   useEffect(() => {
     void api.meta.settings()
-      .then((s) => setDividerImage(s.dividerImage ?? ''))
+      .then((s) => {
+        setDividerImage(s.dividerImage ?? '');
+        // 壁纸四项状态也要从库读回：原先只写了 useState 默认值，从没读库 ——
+        // 于是库里存着 contain，界面却显示「铺满裁剪」，用户以为设置没生效。
+        if (s.wallpaperImage) setWallCur(s.wallpaperImage);
+        if (s.wallpaperRenderMode) setWallMode(s.wallpaperRenderMode);
+        if (s.wallpaperFit) setWallFit(s.wallpaperFit);
+        if (s.wallpaperMuted) setWallMuted(s.wallpaperMuted !== '0');
+        // 库里的壁纸库地址回填输入框（默认值只覆盖「从没设过」的情况）
+        if (s.wallpaperLibrary) setWallPath(s.wallpaperLibrary);
+      })
       .catch(() => { /* 读不到就保持默认 */ });
   }, []);
 
@@ -111,10 +138,9 @@ export default function SettingsPage({ info }: Props) {
 
   const load = useCallback(async () => {
     try {
-      setCatalog(await api.meta.squads());
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, []);
 
@@ -128,128 +154,37 @@ export default function SettingsPage({ info }: Props) {
       await load();
     } catch (err) {
       setNotice(null);
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
-  const groups = catalog?.groups ?? [];
-  const squads = catalog?.squads ?? [];
 
   return (
     <>
       {error && <div className="msg msg--toast error">{error}</div>}
       {notice && <div className="msg msg--toast ok">{notice}</div>}
 
-      <div className="card">
-        <h3>战斗组（可新增）</h3>
-        {/* 名称与类别都用 .field 包一层：原来名称是裸 input、只有「类别」带标签，
-            两者顶边不在一条线上，按钮也吊在半空 —— 用户反馈「对齐一下」。 */}
-        <div className="toolbar toolbar--fields">
-          <label className="field"><span>战斗组名称</span>
-            <input className="input" style={{ width: 180 }} placeholder="如 演练组"
-                   value={newGroup.name} onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })} />
-          </label>
-          <label className="field"><span>类别</span>
-            <Select className="select" value={newGroup.kind}
-                    onChange={(e) => setNewGroup({ ...newGroup, kind: e.target.value as 'attack' | 'defend' })}>
-              <option value="attack">进攻</option>
-              <option value="defend">防守</option>
-            </Select>
-          </label>
-          <button className="btn primary" disabled={!newGroup.name.trim()}
-                  onClick={() => void run(
-                    () => api.meta.createGroup({ name: newGroup.name.trim(), kind: newGroup.kind }),
-                    `已新增战斗组「${newGroup.name.trim()}」`,
-                  ).then(() => setNewGroup({ name: '', kind: newGroup.kind }))}>
-            新增战斗组
+      {/* 页签：与「对局详情」用同一套 .tab 样式，全站一致 */}
+      <div className="tabs" role="tablist">
+        {SETTINGS_TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`tab${tab === t.key ? ' active' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
           </button>
-          
-        </div>
-
-        <div className="table-wrap">
-          <table className="grid">
-            <thead>
-              <tr>
-                <th style={{ width: 160 }}>战斗组</th>
-                <th style={{ width: 80 }}>类别</th>
-                <th className="num" style={{ width: 90 }}>小队数</th>
-                <th className="num" style={{ width: 100 }}>槽位</th>
-                <th>小队</th>
-                <th style={{ width: 90 }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groups.length === 0 && <tr><td className="empty" colSpan={6}>还没有战斗组</td></tr>}
-              {groups.map((g) => {
-                const list = squads.filter((s) => s.groupId === g.id);
-                return (
-                  <tr key={g.id}>
-                    <td>{g.name}</td>
-                    <td style={{ color: g.kind === 'defend' ? 'var(--kind-defend)' : 'var(--kind-attack)' }}>
-                      {g.kind === 'defend' ? '防守' : '进攻'}
-                    </td>
-                    <td className="num">{list.length}</td>
-                    <td className="num">{list.reduce((n, s) => n + s.size, 0)}</td>
-                    <td style={{ color: 'var(--text-dim)' }}>
-                      {list.length ? list.map((s) => s.name).join('、') : '—'}
-                    </td>
-                    <td className="actions">
-                      <div className="row-edit" style={{ justifyContent: 'flex-end' }}>
-                        <button className="btn sm" onClick={() => void run(
-                          () => api.meta.createSquad({ groupId: g.id }),
-                          `已在「${g.name}」新增小队`,
-                        )}>加一队</button>
-                        <button className="btn sm danger" disabled={list.length > 0}
-                                title={list.length ? '请先删掉该组下的小队' : '删除战斗组'}
-                                onClick={() => void run(() => api.meta.removeGroup(g.id), `已删除「${g.name}」`)}>
-                          删除
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        ))}
       </div>
 
-      <div className="card">
-        <h3>小队明细</h3>
-        <div className="table-wrap" style={{ maxHeight: '40vh' }}>
-          <table className="grid">
-            <thead>
-              <tr>
-                <th style={{ width: 150 }}>小队</th>
-                <th style={{ width: 110 }}>战斗组</th>
-                <th style={{ width: 110 }}>战术</th>
-                <th className="num" style={{ width: 70 }}>人数</th>
-                <th className="num" style={{ width: 70 }}>序号</th>
-                <th style={{ width: 90 }}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {squads.length === 0 && <tr><td className="empty" colSpan={6}>还没有小队</td></tr>}
-              {squads.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td style={{ color: 'var(--text-dim)' }}>{s.groupName}</td>
-                  <td style={{ color: 'var(--text-dim)' }}>{s.tactic || '—'}</td>
-                  <td className="num">{s.size}</td>
-                  <td className="num">{s.indexInGroup}</td>
-                  <td className="actions">
-                    <button className="btn sm danger" onClick={() => void run(
-                      () => api.meta.removeSquad(s.id), `已删除小队「${s.name}」`,
-                    )}>删除</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-      </div>
+      {/* 权重与规则：直接复用原独立页的面板（它自带卡片与提示条） */}
+      {tab === 'rules' && <RulesPage classes={classes} classMap={classMap} />}
 
+
+      {tab === 'wallpaper' && (
+      <>
       <div className="card">
         <h3>壁纸</h3>
         <div className="toolbar toolbar--fields" style={{ marginBottom: 10 }}>
@@ -262,13 +197,17 @@ export default function SettingsPage({ info }: Props) {
         {wallErr && <div className="msg error">{wallErr}</div>}
         <div className="wall-grid">
           {wallList.map((w) => (
-            <button key={w.file}
+            /* key 用 kind|file：只用 w.file 会撞 —— WE 场景型作品目录里只有
+               preview.jpg，多个作品各有一张，早期扫描器还可能同时收录
+               preview.jpg 与 preview.gif，于是出现重复 key（React 警告
+               在 SettingsPage.tsx:265）。 */
+            <button key={w.kind + '|' + w.file}
               className={'wall-item' + (wallCur === w.file ? ' wall-item--on' : '')}
               title={w.name + '（' + (w.kind === 'video' ? '动态' : '静态') + '）'}
               onClick={() => void useWall(w)}>
               {w.kind === 'video'
-                ? <video src={'file:///' + w.file.replace(/\\/g, '/')} muted loop playsInline preload="metadata" />
-                : <img src={'file:///' + w.file.replace(/\\/g, '/')} alt="" loading="lazy" />}
+                ? <video src={localUrl(w.file)} muted loop playsInline preload="metadata" />
+                : <img src={localUrl(w.file)} alt="" loading="lazy" />}
               <span className="wall-item__tag">{w.kind === 'video' ? '动态' : '静态'}</span>
             </button>
           ))}
@@ -294,7 +233,43 @@ export default function SettingsPage({ info }: Props) {
           )}
         </div>
       </div>
+      </>
+      )}
 
+      {/* 用户口径 2026-09：「关于」「运行环境」单独归到「全部信息」页签，
+          不再混在「数据与兼容」里。 */}
+      {tab === 'info' && (
+      <>
+      <div className="card">
+        <h3>关于</h3>
+        <div style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--text-dim)' }}>
+          <div style={{ fontSize: 15, color: 'var(--text)', letterSpacing: '.3px' }}>
+            万象<span style={{ color: 'var(--accent)' }}>·</span>Omnia
+          </div>
+          <div style={{ fontStyle: 'italic' }}>All leagues. One universe.</div>
+          <div>万象归一，联赛集成。</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>运行环境</h3>
+        {info ? (
+          <div style={{ display: 'grid', gap: 4, fontSize: 12, color: 'var(--text-dim)' }}>
+            <div>应用版本：{info.version}</div>
+            <div>Electron {info.electron} · Chromium {info.chrome} · Node {info.node}</div>
+            <div>平台：{info.platform}</div>
+            <div style={{ wordBreak: 'break-all' }}>数据库：{info.dbPath}</div>
+            <div>数据库结构版本：v{info.schemaVersion}</div>
+          </div>
+        ) : (
+          <div className="hint">读取中…</div>
+        )}
+      </div>
+      </>
+      )}
+
+      {tab === 'data' && (
+      <>
       <div className="card">
         <h3>数据与兼容</h3>
         <div className="stat-grid">
@@ -302,10 +277,8 @@ export default function SettingsPage({ info }: Props) {
             <div className="k">数据库文件</div>
             <div className="v" style={{ fontSize: 12, wordBreak: 'break-all' }}>{info?.dbPath ?? '—'}</div>
           </div>
-          <div className="stat">
-            <div className="k">建制容量</div>
-            <div className="v">{catalog?.capacity ?? 0}<small> 槽（{squads.length} 队）</small></div>
-          </div>
+          {/* 「建制容量」那一格已删：建制按场次独立（用户口径），
+              容量各场不同，放在全局设置页里没有意义 —— 排表页会显示本场槽位。 */}
           <div className="stat">
             <div className="k">数据库版本</div>
             <div className="v">v{info?.schemaVersion ?? '—'}<small> schema 迁移</small></div>
@@ -343,6 +316,8 @@ export default function SettingsPage({ info }: Props) {
           </div>
         )}
       </div>
+      </>
+      )}
     </>
   );
 }

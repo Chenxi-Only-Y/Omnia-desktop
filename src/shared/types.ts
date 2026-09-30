@@ -19,22 +19,53 @@ export interface Player {
   gameId: string;
   /** 与 gameId 同值（保留列以兼容旧数据；界面只显示一个「ID」） */
   name: string;
+  /**
+   * 历史用名（改名前用过的 ID）。
+   *
+   * 用户口径：改名后旧战报/旧报名里的旧名必须还能对上人，
+   * 否则导入会「认不出」甚至阻止入库；导入到新名字时自动把旧名收进这里。
+   * 存于 player_alias 表（见迁移 v14）。
+   */
+  aliases: string[];
   /** 入帮排序（原表 A 列） */
   joinedOrder: number | null;
   mic: '有' | '无' | '无需作答' | '';
   noteRole: NoteRole;
+  /** 个人主页背景：成员设置里上传的 mp4 / 图片的绝对路径；空 = 用默认背景（全局壁纸） */
+  bgMedia: string;
+  /** 个性签名（与介绍分开）：个人主页第 1 屏的一句；空 = 不显示 */
+  signature: string;
+  /** 介绍（与个性签名是**两个**字段）：个人主页第 1 屏的一行说明；空 = 不显示 */
+  intro: string;
   /** 橙武（空 = 没有，界面显示「-」） */
   orangeWeapon: string;
   /** 注意：职业不在这里 —— 职业只从报名表来，存在 signup（人 × 场）上 */
   status: string;
   remark: string;
+  /**
+   * 对方帮会成员（迁移 v15，用户口径选项 A）。
+   *
+   * 战报导出里"不在我主档"的行会被存下来并标记为对手：
+   * 他们**不进成员主档 / 报名 / 出勤**，也**不参与评分**（participation.side='opp'），
+   * 只是留作对比数据。默认的 player.list() 不会返回他们。
+   */
+  isOpp?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface PlayerInput {
+  /** 自定义介绍（个人主页显示；留空不显示） */
+  signature?: string;
+  /** 介绍（个人主页显示；留空不显示） */
+  intro?: string;
   gameId: string;
   name?: string;
+  /**
+   * 历史用名。传入即**整份覆盖**该成员的别名表（与 gameId 变更时的自动追加共用同一张表）。
+   * 不传 = 不动别名。
+   */
+  aliases?: string[];
   joinedOrder?: number | null;
   mic?: Player['mic'];
   noteRole?: NoteRole;
@@ -46,7 +77,6 @@ export interface PlayerInput {
 
 export interface Match {
   id: number;
-  seasonId: number | null;
   /** ISO 日期 YYYY-MM-DD */
   date: string;
   /** 同日场次号，如 1 / 2 */
@@ -60,6 +90,11 @@ export interface Match {
   state: string;
   ruleSetId: number | null;
   remark: string;
+  /**
+   * 分数是否已过期（战报被改/被清、参战记录被删之后置 1；算分时清零）。
+   * 评分页据此提示「数据已变，请重算」——不自动重算，避免录一半刷出没意义的分。
+   */
+  scoreStale: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -74,23 +109,6 @@ export interface MatchInput {
   oppTowersLeft?: number;
   state?: string;
   remark?: string;
-}
-
-export interface Participation {
-  id: number;
-  matchId: number;
-  playerId: number;
-  playerName: string;
-  playerGameId: string;
-  classUsed: string;
-  role: RoleKey | '';
-  squad: string;
-  group: SquadGroup | '';
-  tactic: Tactic | '';
-  noteRole: NoteRole;
-  mic: Player['mic'];
-  state: PartState;
-  stat: CombatStat;
 }
 
 export interface ParticipationInput {
@@ -159,32 +177,15 @@ export interface SignupReview {
   inRosterNotSigned: { playerId: number; gameId: string; status: string }[];
 }
 
-// ── 评分引擎（M1 占位，算法待定） ────────────────────────────────
-export interface ScoreBreakdown {
-  personalRaw: number;
-  personalRatio: number;
-  personalScore: number;
-  teamScore: number;
-  bonus: number;
-  deathPenalty: number;
-  total: number;
-  /** 逐项中间量，用于审计与调试 */
-  detail: Record<string, number | string>;
-  /** 引擎标识，便于算法迭代后区分历史分数 */
-  engine: string;
-}
-
-export interface ScoreEngine {
-  readonly id: string;
-  readonly label: string;
-  scoreMatch(matchId: number): ScoreBreakdown[];
-}
-
 // ── 对局与战报（M3） ─────────────────────────────────────────────
 export interface MatchSummary extends Match {
   /** 我方参战人数（state=PLAY） */
   ourCount: number;
   oppCount: number;
+  /** 我方**已排进小队**的人数（排表概览用；ourCount 是不管有没有排的都算） */
+  ourAssigned: number;
+  /** 用到了几个小队 */
+  squadsUsed: number;
   /** 已录入战报的人数（有任意非零指标或显式保存过） */
   statFilled: number;
 }
@@ -229,6 +230,8 @@ export interface ValidationIssue {
     | 'NOT_IN_ROSTER'
     | 'DUPLICATE_IN_MATCH'
     | 'NAME_MISMATCH'
+    | 'ALIAS_MATCH'
+    | 'HEADER_NOT_FOUND'
     | 'INVALID_NUMBER'
     | 'NEGATIVE_VALUE'
     | 'DEATH_WITH_ZERO_KILLS'
@@ -267,22 +270,56 @@ export interface ImportPreview {
 
 export type JoinMode = 'roster' | 'full';
 
-// ── 战斗组 / 小队建制（可新增，运行时以库为准） ──────────────────
+/**
+ * 战报导入时「不在我主档」的行怎么处理（用户口径选项 A，2026-09）。
+ *
+ *  · 'store' —— 当成**对方帮会**存下来（player.is_opp=1 + participation.side='opp'）：
+ *              不进主档/报名/出勤，也不参与评分，只作纯数据对比。界面里默认这一项。
+ *  · 'skip'  —— 直接丢掉（界面上取消勾选时的行为）。
+ *  · 'block' —— 老语义：只要有对不上的行就整批拦住。IPC 的默认值，
+ *              给"不认识对方帮会这回事"的旧调用方保留原有行为。
+ *
+ * 注意：只有**严格模式**下「不在成员主档（NOT_IN_ROSTER）」这类 error 行才算对方；
+ * 完整模式下同一行的 NOT_IN_ROSTER 只是 warn，语义是"自动建档成自己人"。
+ */
+export type OppImportMode = 'block' | 'skip' | 'store';
+
+export interface ImportCommitResult {
+  /** 我方写入的参战记录数 */
+  written: number;
+  /** 我方自动建档人数（完整模式） */
+  created: number;
+  /** 对方帮会写入的参战记录数 */
+  oppWritten: number;
+  /** 对方帮会新建档人数 */
+  oppCreated: number;
+  /** 被跳过的对方行数（opp='skip' 时） */
+  skipped: number;
+}
+
+/* ── 战斗组 / 小队建制（**按场次独立**）────────────────────────────
+   用户口径 2026-09：「不同场次的队伍数量啥的彼此独立，而不是改一个另外的
+   一样会被改」。所以建制不再是全局一张表，而是挂在每场对局下：
+     · 组与队用 **名字** 作业务键（沿用项目既有口径：participation.squad
+       本来就是文本存名字），所以没有自增 id，也就不会出现"复制到别的场次
+       后 id 全变"的问题。
+     · 每场首次进入时，若该场还没有建制，会**从全局默认模板复制一份**；
+       模板由 combat_group / squad 两张旧表承载，设置页不再管理它们。
+     · 任何改动（加组/加队/删队/人数/战术）只写该场的 match_squad。 */
 export interface CombatGroupRow {
-  id: number;
   name: string;
   kind: GroupKind;
   sortOrder: number;
-  remark: string;
 }
 
 export interface SquadRow {
-  id: number;
-  groupId: number;
+  /** 所属场次 —— 建制的归属，所有改动都限定在这一场 */
+  matchId: number;
+  /** 组名，如 防守二 */
   groupName: string;
   kind: GroupKind;
   indexInGroup: number;
-  /** 组名-序号，如 防守二-3 */
+  /** 组名-序号，如 防守二-3（与 participation.squad 的文本口径一致） */
   name: string;
   tactic: Tactic | '';
   size: number;
@@ -290,6 +327,7 @@ export interface SquadRow {
 }
 
 export interface SquadCatalog {
+  matchId: number;
   groups: CombatGroupRow[];
   squads: SquadRow[];
   /** 建制总容量 = Σ 小队人数 */
@@ -299,11 +337,11 @@ export interface SquadCatalog {
 export interface GroupInput {
   name: string;
   kind: GroupKind;
-  remark?: string;
 }
 
 export interface SquadInput {
-  groupId: number;
+  /** 组名（不再用自增 id） */
+  groupName: string;
   indexInGroup?: number;
   tactic?: string;
   size?: number;
@@ -378,9 +416,24 @@ export interface SignupStats {
 export interface SignupInput {
   matchId: number;
   playerId: number;
-  /** JOIN=参加 / LEAVE=请假 / BENCH=替补 / NONE=清除报名 */
-  status: SignupStatus;
+  /**
+   * JOIN=参加 / LEAVE=请假 / BENCH=替补 / NONE=清除报名。
+   * 不传 = 不改状态（用于"只修正职业"的调用）。
+   */
+  status?: SignupStatus;
   remark?: string;
+  /**
+   * 可选的职业修正：报名导入后允许在名单里直接改主职 / 二职
+   * （导入进来的职业名可能是错的，之前只能删掉重导）。
+   * 只有显式传入才会写；不传则保持原值。空串表示清掉。
+   */
+  mainClass?: string;
+  subClass?: string;
+  /**
+   * 本场麦克风（可选，手动加人时一并写）。
+   * 不传 = 保持原值。面板显示口径是 `signup.mic || player.mic`，所以写这里就够了。
+   */
+  mic?: string;
 }
 
 // ── 评分规则集（M4：只做参数管理，算法待定） ─────────────────────
@@ -420,7 +473,6 @@ export interface RuleSetInput {
 
 export interface RuleSet extends RuleSetInput {
   id: number;
-  seasonId: number | null;
   version: number;
   active: boolean;
   createdAt: string;
@@ -429,32 +481,6 @@ export interface RuleSet extends RuleSetInput {
 export interface RuleSetValidation {
   ok: boolean;
   issues: { level: 'error' | 'warn'; field: string; message: string }[];
-}
-
-// ── 赛季 ─────────────────────────────────────────────────────────
-export interface Season {
-  id: number;
-  name: string;
-  startedAt: string;
-  endedAt: string;
-  remark: string;
-}
-
-export interface SeasonInput {
-  name: string;
-  startedAt?: string;
-  endedAt?: string;
-  remark?: string;
-}
-
-export interface SeasonSummary extends Season {
-  active: boolean;
-  /** 归属该赛季的对局数 */
-  matchCount: number;
-  /** 归属该赛季的规则集数 */
-  ruleSetCount: number;
-  firstDate: string;
-  lastDate: string;
 }
 
 // ── 评分结果 ─────────────────────────────────────────────────────
@@ -632,6 +658,28 @@ export interface AppInfo {
   platform: string;
   /** 数据库 schema 版本：自检与排障用，界面也可显示，避免"库是旧的"这种问题靠猜 */
   schemaVersion: number;
+  /** 当前所在的帮会（单库模式是一个虚拟帮会）；一个帮会都没有时为 null */
+  guild: GuildMeta | null;
+  /** 帮会总数（界面判断"要不要引导新建帮会"用） */
+  guildCount: number;
+}
+
+/**
+ * 一个帮会（= 一套完全独立的数据库文件）。
+ *
+ * 用户口径：「点击什么帮会才能进入某帮会整个数据库」「不同帮会的数据库独立存放」。
+ * 存储位置见 src/main/guilds.ts 的注释。
+ */
+export interface GuildMeta {
+  /** 内部 id，同时是库文件名（guilds/<id>.db）；用时间戳生成，避免中文名进路径 */
+  id: string;
+  /** 显示名（可改） */
+  name: string;
+  /** 备注 / 简介（帮会首页介绍用） */
+  note: string;
+  createdAt: string;
+  /** 封面图绝对路径（已拷进 guilds/<id>/cover.png）；没有就是 null，界面用帮会名大字底 */
+  cover: string | null;
 }
 
 export interface ClassInfo {
@@ -659,28 +707,40 @@ export interface OmniaApi {
     create(input: PlayerInput): Promise<IpcResult<Player>>;
     update(id: number, patch: Partial<PlayerInput>): Promise<IpcResult<Player>>;
     remove(id: number): Promise<IpcResult<true>>;
-    import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number }>>;
+    import(rows: PlayerInput[]): Promise<IpcResult<{ inserted: number; updated: number; skipped: number; errors: string[] }>>;
     export(): Promise<IpcResult<PlayerInput[]>>;
     /** 按给定 id 顺序重排成员：序 = 下标 + 1（拖拽换位后调用） */
     reorder(playerIds: number[]): Promise<IpcResult<true>>;
     /** 个人详情（历史 + 汇总 + 雷达） */
     detail(playerId: number): Promise<IpcResult<PlayerDetail>>;
+    /** 选一段 mp4 / 一张图当个人主页背景（返回所选路径，取消为 null） */
+    pickBg(): Promise<IpcResult<string | null>>;
+    /** 设置背景：把文件拷进应用目录并写库 */
+    setBg(id: number, srcPath: string): Promise<IpcResult<Player>>;
+    /** 移除背景（回到默认） */
+    clearBg(id: number): Promise<IpcResult<Player>>;
+    /** 壁纸库：扫描用户设置的目录（静态图 + 动态视频都收） */
+    listWallpapers(dir?: string): Promise<IpcResult<WallpaperItem[]>>;
+    /** 把动态壁纸抽一帧存成图（ffmpeg），返回图片绝对路径 */
+    wallpaperTranscode(): Promise<IpcResult<string>>;
   };
   meta: {
     classes(): Promise<IpcResult<ClassInfo[]>>;
     settings(): Promise<IpcResult<AppSettings>>;
     /** 写单个设置项（导航栏折叠状态之类的界面偏好） */
     setSetting(key: string, value: string): Promise<IpcResult<true>>;
-    /** 战斗组 / 小队建制（可新增） */
-    squads(): Promise<IpcResult<SquadCatalog>>;
-    createGroup(input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
-    removeGroup(id: number): Promise<IpcResult<true>>;
-    createSquad(input: SquadInput): Promise<IpcResult<SquadRow>>;
-    /** 给某组再加一队（序号自动取组内最大 +1，所以能加到「防守一-5」） */
-    appendSquad(groupId: number): Promise<IpcResult<SquadRow>>;
-    removeSquad(id: number): Promise<IpcResult<true>>;
+    /** 战斗组 / 小队建制：**按场次独立**，全部以 matchId 为首参 */
+    squads(matchId: number): Promise<IpcResult<SquadCatalog>>;
+    createGroup(matchId: number, input: GroupInput): Promise<IpcResult<CombatGroupRow>>;
+    removeGroup(matchId: number, groupName: string): Promise<IpcResult<{ removed: boolean }>>;
+    createSquad(matchId: number, input: SquadInput): Promise<IpcResult<SquadRow>>;
+    /** 给某组再加一队（序号自动取该场该组内最大 +1，所以能加到「防守一-5」） */
+    appendSquad(matchId: number, groupName: string): Promise<IpcResult<SquadRow>>;
+    removeSquad(matchId: number, squadName: string): Promise<IpcResult<true>>;
     /** 只改某小队的战术（塔后拆/塔前拆/保镖/防守），不碰名称与人数 */
-    setSquadTactic(id: number, tactic: string): Promise<IpcResult<SquadRow>>;
+    setSquadTactic(matchId: number, squadName: string, tactic: string): Promise<IpcResult<SquadRow>>;
+    /** 改某队人数（不能小于该队已排人数） */
+    setSquadSize(matchId: number, squadName: string, size: number): Promise<IpcResult<SquadRow>>;
     /**
      * 触发「截取排表功能区」并保存为 PNG。区域由渲染层分块截图后拼合
      * （capturePage 只截可见区域，必须分块），主进程只负责落盘。
@@ -690,12 +750,6 @@ export interface OmniaApi {
      * 分块截图，返回 PNG dataURL。
      * 要截的矩形先写进 app_setting.captureRect —— 这批 IPC 传不了实参。
      */
-    captureRect(): Promise<IpcResult<string>>;
-    /** 把窗口临时撑到屏幕最大，返回内容区尺寸（截图用，拿最大可见区域） */
-    captureMaxWin(): Promise<IpcResult<{ w: number; h: number }>>;
-    /** 还原窗口尺寸 */
-    captureRestoreWin(): Promise<IpcResult<true>>;
-    /** 分块截图，返回 PNG dataURL；矩形先写进 app_setting.captureRect */
     captureRect(): Promise<IpcResult<string>>;
     /** 读取 xlsx：先列工作表，再取某个工作表的网格与表头探测 */
     xlsxSheets(data: Uint8Array): Promise<IpcResult<SheetList>>;
@@ -713,12 +767,20 @@ export interface OmniaApi {
     assignBulk(input: AssignInput): Promise<IpcResult<{ moved: number }>>;
     /** 移出小队但保留在名单 */
     unassign(matchId: number, playerId: number): Promise<IpcResult<true>>;
+    /** 把另一场的**排表**沿用过来（小队 / 落位 / 职业；不带战报、不带评分、不带对方数据） */
+    copyLineup(fromMatchId: number, toMatchId: number, overwrite?: boolean):
+      Promise<IpcResult<{ copied: number; skipped: number; squadsAdded: number }>>;
     /** 只改本场技能备注，不碰小队/状态（排表页卡片上直接填） */
     setSkillNote(matchId: number, playerId: number, note: string): Promise<IpcResult<true>>;
     removeParticipation(id: number): Promise<IpcResult<true>>;
     saveStat(participationId: number, stat: Partial<CombatStat>): Promise<IpcResult<true>>;
+    /** 清空某场某一方的战报数值（our 保留参战记录、opp 连参战记录一起删） */
+    clearStats(matchId: number, side?: 'our' | 'opp'): Promise<IpcResult<{ cleared: number }>>;
+    /** 清空单条参战记录的战报数值 */
+    clearStatRow(participationId: number): Promise<IpcResult<true>>;
     importPreview(text: string, mode?: JoinMode): Promise<IpcResult<ImportPreview>>;
-    importCommit(matchId: number, preview: ImportPreview): Promise<IpcResult<{ written: number; created: number }>>;
+    importCommit(matchId: number, preview: ImportPreview, opts?: { opp?: OppImportMode }):
+      Promise<IpcResult<ImportCommitResult>>;
     /** 按规则集重算并保存某场分数 */
     runScore(matchId: number, ruleSetId?: number): Promise<IpcResult<ScoreRunSummary>>;
     /** 读取已保存的分数 */
@@ -726,6 +788,22 @@ export interface OmniaApi {
   };
   dashboard: {
     data(): Promise<IpcResult<DashboardData>>;
+  };
+  /**
+   * 帮会（一帮会一个库文件）。
+   * `open` 会**切换当前库**（不重启应用）：切完之后其它接口读写的都是这个帮会的数据。
+   */
+  guild: {
+    list(): Promise<IpcResult<GuildMeta[]>>;
+    active(): Promise<IpcResult<GuildMeta | null>>;
+    create(name: string, note?: string): Promise<IpcResult<GuildMeta>>;
+    open(id: string): Promise<IpcResult<GuildMeta>>;
+    update(id: string, patch: { name?: string; note?: string }): Promise<IpcResult<GuildMeta>>;
+    remove(id: string): Promise<IpcResult<true>>;
+    /** 把本地图片拷进 guilds/<id>/cover.png 并记为封面 */
+    setCover(id: string, srcPath: string): Promise<IpcResult<GuildMeta>>;
+    /** 弹系统选图框，返回所选路径（用户取消则 null） */
+    pickCover(): Promise<IpcResult<string | null>>;
   };
   signup: {
     /** 某场的报名面板（含未报名的人） */
@@ -757,16 +835,6 @@ export interface OmniaApi {
     /** 校验但不保存（界面实时提示用） */
     validate(input: RuleSetInput): Promise<IpcResult<RuleSetValidation>>;
   };
-  season: {
-    list(): Promise<IpcResult<SeasonSummary[]>>;
-    active(): Promise<IpcResult<Season>>;
-    create(input: SeasonInput): Promise<IpcResult<Season>>;
-    update(id: number, patch: Partial<SeasonInput>): Promise<IpcResult<Season>>;
-    setActive(id: number): Promise<IpcResult<Season>>;
-    remove(id: number): Promise<IpcResult<true>>;
-    /** 把若干对局划到某赛季 */
-    assignMatches(seasonId: number, matchIds: number[]): Promise<IpcResult<{ moved: number }>>;
-  };
 }
 
 export const IPC = {
@@ -781,6 +849,9 @@ export const IPC = {
   metaListWallpapers: 'meta:list-wallpapers',
   playerExport: 'player:export',
   playerDetail: 'player:detail',
+  playerPickBg: 'player:pick-bg',
+  playerSetBg: 'player:set-bg',
+  playerClearBg: 'player:clear-bg',
   metaClasses: 'meta:classes',
   metaSettings: 'meta:settings',
   metaSettingSet: 'meta:setting:set',
@@ -790,15 +861,13 @@ export const IPC = {
   metaSquadCreate: 'meta:squad:create',
   metaSquadAppend: 'meta:squad:append',
   metaSquadRemove: 'meta:squad:remove',
+  /** 改某队人数（按场次独立） */
+  metaSquadSize: 'meta:squad:size',
   metaSquadTactic: 'meta:squad:tactic',
   /** 截取窗口内某个区域的图片（排表功能区导出用） */
   captureRegion: 'app:capture-region',
   /** 分块截图（三块：左半区 / 中缝 / 右半区）；矩形走 app_setting.captureRect */
   captureRect: 'app:capture-rect',
-  /** 截图前把窗口临时撑到屏幕最大（拿最大可见区域） */
-  captureMaxWin: 'app:capture-maxwin',
-  /** 截图后还原窗口尺寸 */
-  captureRestoreWin: 'app:capture-restorewin',
   metaXlsxSheets: 'meta:xlsx:sheets',
   metaXlsxGrid: 'meta:xlsx:grid',
 
@@ -812,6 +881,7 @@ export const IPC = {
   matchParticipationUpsert: 'match:participation:upsert',
   matchAssignBulk: 'match:assign:bulk',
   matchUnassign: 'match:unassign',
+  matchCopyLineup: 'match:copy-lineup',
   matchSkillNote: 'match:skill:note',
 
   // 报名 / 请假
@@ -838,20 +908,25 @@ export const IPC = {
   rulesRemove: 'rules:remove',
   rulesValidate: 'rules:validate',
 
-  // 赛季
-  seasonList: 'season:list',
-  seasonActive: 'season:active',
-  seasonCreate: 'season:create',
-  seasonUpdate: 'season:update',
-  seasonSetActive: 'season:setActive',
-  seasonRemove: 'season:remove',
-  seasonAssignMatches: 'season:assignMatches',
   matchParticipationRemove: 'match:participation:remove',
   matchStatSave: 'match:stat:save',
+  matchStatClear: 'match:stat:clear',
+  matchStatClearRow: 'match:stat:clear-row',
   matchImportPreview: 'match:import:preview',
   matchImportCommit: 'match:import:commit',
   matchRunScore: 'match:score:run',
   matchScores: 'match:score:list',
+
+  // 帮会（一帮会一个库文件）
+  guildList: 'guild:list',
+  guildActive: 'guild:active',
+  guildCreate: 'guild:create',
+  guildOpen: 'guild:open',
+  guildUpdate: 'guild:update',
+  guildRemove: 'guild:remove',
+  guildSetCover: 'guild:set-cover',
+  /** 弹系统选图框挑封面（返回路径，不落库） */
+  guildPickCover: 'guild:pick-cover',
 
   // M6 看板
   dashboardData: 'dashboard:data',

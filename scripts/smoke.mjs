@@ -12,6 +12,9 @@ import process from 'node:process';
 
 const ROOT = process.cwd();
 const isWin = process.platform === 'win32';
+/* 见文件头注释：父进程若带 ELECTRON_RUN_AS_NODE=1，Electron 会退化成纯 Node */
+delete process.env.ELECTRON_RUN_AS_NODE;
+
 const electronBin = path.join(ROOT, 'node_modules', 'electron', 'dist', isWin ? 'electron.exe' : 'electron');
 
 if (!fs.existsSync(electronBin)) {

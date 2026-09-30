@@ -7,11 +7,12 @@
  *   participation = 排表结果（上场 / 替补 / 请假）
  * 两者允许不一致（人工调整阵容时就会出现差异），页面会同时显示。
  */
-import type { SqlDatabase, SqlValue } from '../db';
+import type { SqlDatabase } from '../db';
 import type {
   PartState, Player, SignupBoard, SignupImportPreview, SignupImportRow, SignupInput,
   SignupReview, SignupRow, SignupStats, SignupStatus,
 } from '../../shared/types';
+import { findPlayerIdByKey } from './playerLookup';
 
 interface BoardDbRow {
   id: number; game_id: string; name: string; note_role: string;
@@ -22,7 +23,21 @@ interface BoardDbRow {
 }
 
 export class SignupRepo {
-  constructor(private db: SqlDatabase) {}
+  /* 库连接用"取当前连接"的函数而不是固定连接：多帮会模式下切帮会只换句柄，
+     仓储实例不用重建（见 src/main/guilds.ts）。 */
+  constructor(private getDb: () => SqlDatabase) {}
+
+  private get db(): SqlDatabase { return this.getDb(); }
+
+  /**
+   * 报名表「角色id」列可能填的是角色名（表头也可能叫「ID名」）。
+   * 主档改过名以后 game_id 已经是新名，旧名只留在 player_alias ——
+   * 解析规则（game_id → name → 历史用名，限我方成员）的唯一实现在 playerLookup，
+   * 这里只是转发，避免第二份实现再漂移。
+   */
+  private findPlayerId(key: string): number | undefined {
+    return findPlayerIdByKey(this.db, key, 'our');
+  }
 
   /** 某场的报名面板：全量成员左连接报名与上场状态 */
   board(matchId: number): SignupBoard {
@@ -32,11 +47,12 @@ export class SignupRepo {
     const raw = this.db.prepare(`
       SELECT pl.id, pl.game_id, pl.name, pl.note_role, pl.mic, pl.status, pl.joined_order,
              sg.main_class AS sg_main, sg.sub_class AS sg_sub, sg.mic AS sg_mic,
-             sg.status AS signup_status, sg.updated_at AS signup_at, sg.remark AS signup_remark,
+             sg.status AS signup_status, COALESCE(NULLIF(sg.submitted_at, ''), sg.updated_at) AS signup_at, sg.remark AS signup_remark,
              p.state AS part_state, p.squad AS squad
       FROM player pl
       LEFT JOIN signup sg ON sg.player_id = pl.id AND sg.match_id = ?
       LEFT JOIN participation p ON p.player_id = pl.id AND p.match_id = ? AND p.side = 'our'
+      WHERE pl.is_opp = 0
       ORDER BY (pl.status <> 'active'), pl.joined_order IS NULL, pl.joined_order, pl.id
     `).all(matchId, matchId) as unknown as BoardDbRow[];
 
@@ -72,7 +88,11 @@ export class SignupRepo {
     return { matchId, rows, stats };
   }
 
-  /** 设置报名状态；status='NONE' 表示撤回（删除报名记录） */
+  /**
+   * 设置报名状态；status='NONE' 表示撤回（删除报名记录）。
+   * 另支持只改主职 / 二职（报名导入后修正职业用）：传了 mainClass / subClass
+   * 就一并写入，且**不影响已有状态**（不传 status 则沿用库里原值）。
+   */
   set(input: SignupInput): SignupRow {
     const { matchId, playerId } = input;
     if (!this.db.prepare('SELECT 1 FROM match WHERE id = ?').get(matchId)) {
@@ -82,17 +102,47 @@ export class SignupRepo {
       throw new Error(`成员不存在：id=${playerId}`);
     }
 
-    if (input.status === 'NONE') {
+    // 职业修正：只有显式传了才动。空串是合法值（表示"清掉二职"），
+    // 所以判据用 !== undefined 而不是真值判断。
+    const hasMain = input.mainClass !== undefined;
+    const hasSub = input.subClass !== undefined;
+    // 麦克风同理：只有显式传了才动（手动加人时写本场的麦）
+    const hasMic = input.mic !== undefined;
+    const existing = this.db.prepare(
+      'SELECT status, remark, main_class, sub_class, mic, submitted_at FROM signup WHERE match_id = ? AND player_id = ?',
+    ).get(matchId, playerId) as {
+      status: string; remark: string; main_class: string; sub_class: string;
+      mic: string; submitted_at: string;
+    } | undefined;
+
+    // 只改职业、且本来没有报名记录时：建一条记录，状态沿用「参加」（表单默认口径）
+    const status = input.status
+      ?? (existing?.status as SignupStatus | undefined)
+      ?? (hasMain || hasSub ? 'JOIN' : undefined);
+    if (status === undefined) throw new Error('缺少报名状态');
+
+    if (status === 'NONE') {
       this.db.prepare('DELETE FROM signup WHERE match_id = ? AND player_id = ?').run(matchId, playerId);
     } else {
+      // 职业为空串时不要用 excluded 覆盖掉库里的值 —— 那会把"只改状态"的调用
+      // （报名页每点一次状态都会走这里）顺手把职业清空。
       this.db.prepare(
-        `INSERT INTO signup (match_id, player_id, status, remark)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO signup (match_id, player_id, status, remark, main_class, sub_class, mic)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(match_id, player_id) DO UPDATE SET
            status = excluded.status,
            remark = excluded.remark,
+           main_class = CASE WHEN ? THEN excluded.main_class ELSE signup.main_class END,
+           sub_class  = CASE WHEN ? THEN excluded.sub_class  ELSE signup.sub_class  END,
+           mic        = CASE WHEN ? THEN excluded.mic        ELSE signup.mic        END,
            updated_at = datetime('now','localtime')`,
-      ).run(matchId, playerId, input.status, (input.remark ?? '').trim());
+      ).run(
+        matchId, playerId, status, (input.remark ?? existing?.remark ?? '').trim(),
+        hasMain ? String(input.mainClass) : (existing?.main_class ?? ''),
+        hasSub ? String(input.subClass) : (existing?.sub_class ?? ''),
+        hasMic ? String(input.mic ?? '') : (existing?.mic ?? ''),
+        hasMain ? 1 : 0, hasSub ? 1 : 0, hasMic ? 1 : 0,
+      );
     }
 
     const row = this.board(matchId).rows.find((r) => r.playerId === playerId);
@@ -211,9 +261,8 @@ export class SignupRepo {
     this.db.exec('BEGIN');
     try {
       for (const r of rows) {
-        const pl = this.db.prepare('SELECT id FROM player WHERE game_id = ?')
-          .get(r.gameId) as { id: number } | undefined;
-        if (!pl) { unmatched.push(r.gameId); continue; }
+        const pid = this.findPlayerId(r.gameId);
+        if (!pid) { unmatched.push(r.gameId); continue; }
         this.db.prepare(
           `INSERT INTO signup (match_id, player_id, status, remark, main_class, sub_class, mic, submitted_at)
            VALUES (?, ?, ?, '', ?, ?, ?, ?)
@@ -224,7 +273,7 @@ export class SignupRepo {
              mic = excluded.mic,
              submitted_at = excluded.submitted_at,
              updated_at = datetime('now','localtime')`,
-        ).run(matchId, pl.id, r.status, r.mainClass, r.subClass, r.mic, r.submittedAt);
+        ).run(matchId, pid, r.status, r.mainClass, r.subClass, r.mic, r.submittedAt);
         imported += 1;
       }
       this.db.exec('COMMIT');
@@ -268,7 +317,7 @@ export class SignupRepo {
       const arr = JSON.parse(row.value) as SignupImportRow[];
       // 已经补建过的不再列为问题
       return arr
-        .filter((r) => !this.db.prepare('SELECT 1 FROM player WHERE game_id = ?').get(r.gameId))
+        .filter((r) => this.findPlayerId(r.gameId) === undefined)
         .map((r) => ({ gameId: r.gameId, status: r.status, mainClass: r.mainClass, subClass: r.subClass }));
     } catch {
       return [];
@@ -291,9 +340,7 @@ export class SignupRepo {
     this.db.exec('BEGIN');
     try {
       for (const r of want) {
-        const exists = this.db.prepare('SELECT id FROM player WHERE game_id = ?')
-          .get(r.gameId) as { id: number } | undefined;
-        let pid = exists?.id;
+        let pid = this.findPlayerId(r.gameId);
         if (!pid) {
           // 补建时把报名表里的麦克风一并写进主档（职业仍只留在报名表）
           const info = this.db.prepare(
@@ -323,10 +370,5 @@ export class SignupRepo {
       throw err;
     }
     return { created, signups };
-  }
-
-  /** 兼容旧字段（未使用） */
-  static val(v: unknown): SqlValue {
-    return v as SqlValue;
   }
 }

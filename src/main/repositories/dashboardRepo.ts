@@ -11,8 +11,6 @@ import type {
 } from '../../shared/types';
 import { EMPTY_COMBAT_STAT, deriveEffective } from '../../shared/domain';
 
-export type { AttendanceRow, DashboardData, MatchRowStat };
-
 /** 雷达图的六个维度：取"能体现个人职责"的项，T/治疗也各有关注点 */
 const RADAR_DEF: { key: string; label: string; pick: (m: PlayerMatchRow) => number }[] = [
   { key: 'kill', label: '有效击杀', pick: (m) => m.effKills },
@@ -40,7 +38,11 @@ const METRIC_LABELS: { key: string; label: string }[] = [
 ];
 
 export class DashboardRepo {
-  constructor(private db: SqlDatabase) {}
+  /* 库连接用"取当前连接"的函数而不是固定连接：多帮会模式下切帮会只换句柄，
+     仓储实例不用重建（见 src/main/guilds.ts）。 */
+  constructor(private getDb: () => SqlDatabase) {}
+
+  private get db(): SqlDatabase { return this.getDb(); }
 
   /**
    * 个人详情：逐场记录 + 汇总 + 六维雷达（对比团队人均）。
@@ -195,10 +197,17 @@ export class DashboardRepo {
         id: pl.id,
         gameId: pl.game_id,
         name: pl.name,
+        // 历史用名（用户口径）：详情页要能看到这个人改名前叫什么
+        aliases: (this.db.prepare(
+          'SELECT alias FROM player_alias WHERE player_id = ? ORDER BY created_at ASC, alias ASC',
+        ).all(pl.id) as unknown as { alias: string }[]).map((r) => r.alias),
         joinedOrder: pl.joined_order,
         mic: (pl.mic || '') as PlayerDetail['player']['mic'],
         noteRole: (pl.note_role || '') as PlayerDetail['player']['noteRole'],
         orangeWeapon: (pl as { orange_weapon?: string }).orange_weapon || '',
+        bgMedia: (pl as { bg_media?: string }).bg_media || '',
+        signature: (pl as { signature?: string }).signature || '',
+        intro: (pl as { intro?: string }).intro || '',
         status: pl.status || 'active',
         remark: pl.remark || '',
         createdAt: pl.created_at,
@@ -218,12 +227,14 @@ export class DashboardRepo {
     };
 
     const matches = sc('SELECT COUNT(*) AS c FROM match');
-    const players = sc('SELECT COUNT(*) AS c FROM player');
-    const participations = sc('SELECT COUNT(*) AS c FROM participation');
+    // 成员数 / 参战记录都只算我方：对方帮会的数据（迁移 v15，side='opp'）不算进统计口径
+    const players = sc('SELECT COUNT(*) AS c FROM player WHERE is_opp = 0');
+    const participations = sc("SELECT COUNT(*) AS c FROM participation WHERE side = 'our'");
     const statFilled = sc(`
       SELECT COUNT(*) AS c FROM participation p
       JOIN combat_stat cs ON cs.participation_id = p.id
-      WHERE (cs.kills + cs.fountain_kills + cs.assists + cs.resource + cs.dmg_player
+      WHERE p.side = 'our'
+        AND (cs.kills + cs.fountain_kills + cs.assists + cs.resource + cs.dmg_player
              + cs.dmg_player_armor + cs.dmg_building + cs.dmg_building_armor + cs.healing
              + cs.damage_taken + cs.deaths + cs.revives + cs.bone_burn) > 0`);
     const statSlots = sc("SELECT COUNT(*) AS c FROM participation WHERE side = 'our' AND state = 'PLAY'");
@@ -237,7 +248,7 @@ export class DashboardRepo {
                             + cs.damage_taken + cs.deaths + cs.revives + cs.bone_burn) > 0
                       THEN 1 ELSE 0 END) AS stat_cnt
       FROM match m
-      LEFT JOIN participation p ON p.match_id = m.id
+      LEFT JOIN participation p ON p.match_id = m.id AND p.side = 'our'
       LEFT JOIN combat_stat cs ON cs.participation_id = p.id
       GROUP BY m.id
       ORDER BY m.date DESC, m.index_in_day DESC
@@ -277,6 +288,7 @@ export class DashboardRepo {
       FROM player pl
       LEFT JOIN participation p ON p.player_id = pl.id AND p.side = 'our'
       LEFT JOIN combat_stat cs ON cs.participation_id = p.id
+      WHERE pl.is_opp = 0
       GROUP BY pl.id
       ORDER BY plays DESC, pl.joined_order IS NULL, pl.joined_order, pl.id
     `).all() as unknown as {
@@ -295,7 +307,10 @@ export class DashboardRepo {
       plays: Number(r.plays),
       benches: Number(r.benches),
       leaves: Number(r.leaves),
-      rate: matches > 0 ? Number(r.plays) / matches : 0,
+      /* 分母必须是**该成员自己的**场次数（r.matches，来自 COUNT(p.id)），
+         不是外层的全库对局数 matches（COUNT(*) FROM match）——
+         否则只出场 1 次的人会被算成 1/3 并标红（审计 2026-09-30）。 */
+      rate: Number(r.matches) > 0 ? Number(r.plays) / Number(r.matches) : 0,
       filled: Number(r.filled),
     }));
 
@@ -319,10 +334,15 @@ export class DashboardRepo {
 
     const squadUsage = (this.db.prepare(`
       SELECT p.squad, COUNT(*) AS c,
-             COALESCE(g.kind, '') AS kind,
-             COALESCE(g.name, '') AS group_name
+             COALESCE(NULLIF(ms.group_kind, ''), g.kind, '') AS kind,
+             COALESCE(NULLIF(ms.group_name, ''), g.name, '') AS group_name
       FROM participation p
-      LEFT JOIN squad s ON s.name = p.squad
+      /* 用户口径/审计 2026-09-30：v13 起"每场建制"存在 match_squad（带 group_name/group_kind），
+         而全局 squad/combat_group 只是**模板** —— 原来只 join 模板，导致新增的队
+         （演练组-1、防守一-5 等）在「阵容与职业」里 group/kind 为空。
+         这里优先取该场建制，取不到再退回模板（保留老数据兜底）。 */
+       LEFT JOIN match_squad ms ON ms.match_id = p.match_id AND ms.name = p.squad
+       LEFT JOIN squad s ON s.name = p.squad
       LEFT JOIN combat_group g ON g.id = s.group_id
       WHERE p.side = 'our' AND p.state = 'PLAY' AND p.squad <> ''
       GROUP BY p.squad ORDER BY c DESC

@@ -3,7 +3,7 @@ import { useToastAutoClear } from '../lib/useToast';
 import type {
   CombatStat, Match, ParticipationRow, SignupRow, SquadCatalog,
 } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
 import ClassChip from '../components/ClassChip';
 import LineupBoard from '../components/LineupBoard';
@@ -11,6 +11,7 @@ import CellPicker from '../components/CellPicker';
 import AddPlayerPicker from '../components/AddPlayerPicker';
 import StatImportPanel from '../components/StatImportPanel';
 import ScoringPanel from '../components/ScoringPanel';
+import OppCompare from '../components/OppCompare';
 import SignupPage from './SignupPage';
 import Select from '../components/Select';
 import DatePicker from '../components/DatePicker';
@@ -25,7 +26,7 @@ interface Props extends PageProps {
   onChanged: () => void;
 }
 
-type TabKey = 'lineup' | 'stats' | 'import' | 'signup' | 'score';
+type TabKey = 'lineup' | 'stats' | 'import' | 'signup' | 'score' | 'opp';
 
 /** 小队下拉选项来自建制（组件内用 catalog 计算） */
 
@@ -71,7 +72,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
         api.match.get(matchId),
         api.match.participations(matchId),
         api.signup.board(matchId),
-        api.meta.squads(),
+        api.meta.squads(matchId),
       ]);
       setMatch(m);
       setRows(ps);
@@ -82,13 +83,15 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       setDirty(new Set());
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, [matchId]);
 
   useEffect(() => { void load(); }, [load]);
 
   const our = useMemo(() => rows.filter((r) => r.side === 'our'), [rows]);
+  /** 对方帮会的参战数据（导入战报时按"存下对方数据"写进来的，只作对比、不评分） */
+  const opp = useMemo(() => rows.filter((r) => r.side === 'opp'), [rows]);
   const playing = useMemo(() => our.filter((r) => r.state === 'PLAY'), [our]);
   const stats = useMemo(() => {
     const filled = playing.filter((r) => r.statFilled).length;
@@ -117,7 +120,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       setError(null);
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -134,7 +137,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -146,7 +149,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       setError(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -160,7 +163,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -172,7 +175,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -187,7 +190,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
         ? `已把队员放入「${squad}」`
         : `已把队员放到「${squad}」第 ${slotIndex + 1} 格`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -210,9 +213,57 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setSaving(false);
+    }
+  }
+
+  /* ── 清空 / 删除（用户口径：「战报录入为啥没有清空或者删除又或者更改的」）──
+     「更改」就是表里直接改数字（上面的输入框）+ 保存全部改动；
+     这里补「清空」（数值归零、队员保留）与「移除」（把这条参战记录从本场删掉）。 */
+
+  /** 清空本场我方战报：14 项指标全部归零，队员仍在名单里 */
+  async function clearOurStats() {
+    const n = playing.length;
+    if (!await confirmDialog(`清空本场我方战报？\n${n} 名队员的 14 项指标会全部归零（队员保留在名单里）。`)) return;
+    try {
+      const r = await api.match.clearStats(matchId, 'our');
+      setNotice(`已清空 ${r.cleared} 条我方战报（队员保留）`
+        + `；已保存的分数是快照，需要更新请到「本场评分」点重算`);
+      setError(null);
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(errText(err));
+    }
+  }
+
+  /** 清空某一行 */
+  async function clearOneStat(row: ParticipationRow) {
+    if (!await confirmDialog(`清空「${row.name}」这一行的战报数值？`)) return;
+    try {
+      await api.match.clearStatRow(row.id);
+      setNotice(`已清空「${row.name}」的战报`);
+      setError(null);
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(errText(err));
+    }
+  }
+
+  /** 清空本场对方数据（连对方参战记录一起删） */
+  async function clearOppStats() {
+    if (!await confirmDialog(`清空本场的对方数据？\n${opp.length} 条对方参战记录会被删除（对方本来就不参与评分）。`)) return;
+    try {
+      const r = await api.match.clearStats(matchId, 'opp');
+      setNotice(`已清空 ${r.cleared} 条对方数据`);
+      setError(null);
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(errText(err));
     }
   }
 
@@ -293,10 +344,17 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
       </div>
 
       <div className="tabs">
-        {([['lineup', `阵容编排（${stats.assigned}/${capacityHint}）`], ['stats', `战报录入（${stats.filled}/${playing.length}）`], ['signup', '报名 / 请假'], ['score', '本场评分'], ['import', '批量导入战报']] as const)
-          .map(([k, label]) => (
-            <button key={k} className={`tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{label}</button>
-          ))}
+        {([
+          ['lineup', `阵容编排（${stats.assigned}/${capacityHint}）`],
+          ['stats', `战报录入（${stats.filled}/${playing.length}）`],
+          ['signup', '报名 / 请假'],
+          ['score', '本场评分'],
+          ['import', '批量导入战报'],
+          // 有对方数据时才出现：它是导入战报时的副产品，没数据就不占位置
+          ...(opp.length ? [['opp', `对方数据（${opp.length}）`]] : []),
+        ] as [TabKey, string][]).map(([k, label]) => (
+          <button key={k} className={`tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{label}</button>
+        ))}
       </div>
 
       {tab === 'lineup' && (
@@ -316,7 +374,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
               onUnassign={async (playerId) => {
@@ -326,7 +384,7 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
               onRemoveRow={(id) => {
@@ -340,29 +398,29 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
-              onAddSquad={async (groupId) => {
+              onAddSquad={async (groupName) => {
                 try {
-                  const s = await api.meta.appendSquad(groupId);
-                  setNotice(`已加一队「${s.name}」`);
+                  const s = await api.meta.appendSquad(matchId, groupName);
+                  setNotice(`已在本场「${groupName}」加一队：${s.name}`);
                   setError(null);
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
-              onChangeTactic={async (squadId, tactic) => {
+              onChangeTactic={async (squadName, tactic) => {
                 try {
-                  await api.meta.setSquadTactic(squadId, tactic);
-                  setNotice(`战术已改为「${tactic || '未定'}」`);
+                  await api.meta.setSquadTactic(matchId, squadName, tactic);
+                  setNotice(`本场「${squadName}」战术已改为「${tactic || '未定'}」`);
                   setError(null);
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
               onChangeClass={async (playerId, cls) => {
@@ -374,18 +432,18 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
-              onRemoveSquad={async (squadId, name) => {
+              onRemoveSquad={async (squadName) => {
                 try {
-                  await api.meta.removeSquad(squadId);
-                  setNotice(`已删掉「${name}」`);
+                  await api.meta.removeSquad(matchId, squadName);
+                  setNotice(`已在本场删掉「${squadName}」`);
                   setError(null);
                   await load();
                   onChanged();
                 } catch (err) {
-                  setError(err instanceof ApiError ? err.message : String(err));
+                  setError(errText(err));
                 }
               }}
             />
@@ -398,6 +456,9 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
               candidates={signupRows}
               rows={our}
               classMap={classMap}
+              matchId={matchId}
+              classes={classes}
+              onAdded={(msg) => setNotice(msg)}
               onClose={() => setCellPick(null)}
               onAssign={async (playerId, targetSquad, subClass) => {
                 // 点的是第几格就放第几格
@@ -497,7 +558,13 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
             <button className="btn primary" onClick={() => void saveAll()} disabled={saving || dirty.size === 0}>
               保存全部改动{dirty.size ? `（${dirty.size}）` : ''}
             </button>
-            
+            {/* 清空 / 删除（用户口径）：改数字是「更改」，这里是「清空」与「移除」 */}
+            <button className="btn" disabled={saving || playing.length === 0}
+                    title="14 项指标全部归零，队员保留在名单里"
+                    onClick={() => void clearOurStats()}>
+              清空本场战报
+            </button>
+            <span className="hint" style={{ margin: 0 }}>单元格可直接改数字，改完点「保存全部改动」</span>
           </div>
           <div className="table-wrap" style={{ maxHeight: '56vh' }}>
             <table className="grid">
@@ -508,11 +575,12 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                   {GRID_FIELDS.map((f) => <th key={f.key} className="num" style={{ minWidth: 76 }}>{f.label}</th>)}
                   <th className="num" style={{ minWidth: 90 }}>有效人伤</th>
                   <th className="num" style={{ minWidth: 90 }}>有效塔伤</th>
+                  <th className="col-act" style={{ width: 96 }}>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {playing.length === 0 && (
-                  <tr><td className="empty" colSpan={GRID_FIELDS.length + 4}>先在上一个页签里把人排进小队。</td></tr>
+                  <tr><td className="empty" colSpan={GRID_FIELDS.length + 5}>先在上一个页签里把人排进小队。</td></tr>
                 )}
                 {playing.map((r) => {
                   const st = drafts[r.id] ?? r.stat;
@@ -539,6 +607,16 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
                       ))}
                       <td className="num" style={{ color: 'var(--text-dim)' }}>{eff.effDmg.toLocaleString()}</td>
                       <td className="num" style={{ color: 'var(--text-dim)' }}>{eff.effTower.toLocaleString()}</td>
+                      <td className="col-act">
+                        <span className="row-edit">
+                          <button className="btn sm" disabled={saving || !r.statFilled}
+                                  title="把这一行的 14 项指标清空（队员保留）"
+                                  onClick={() => void clearOneStat(r)}>清空</button>
+                          <button className="btn sm danger" disabled={saving}
+                                  title="把这条参战记录从本场删掉"
+                                  onClick={() => void removeRow(r)}>移除</button>
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -547,6 +625,65 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
           </div>
           
         </div>
+      )}
+
+      {tab === 'opp' && (
+        <>
+          {/* 对比视图放最上面：进这个页签多半就是想看"我们跟对面差多少" */}
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>本场对比（我方 vs 对方）</h3>
+            <OppCompare rows={rows} classMap={classMap} />
+          </div>
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="toolbar">
+              <h3 style={{ margin: 0 }}>对方帮会数据（{opp.length}）</h3>
+              <span className="hint" style={{ margin: 0 }}>
+                导入战报时"存下对方数据"写进来的，只作对比基准：不进成员主档 / 报名 / 出勤，也不参与评分
+              </span>
+            <div className="spacer grow" />
+            <button className="btn danger" disabled={saving || opp.length === 0}
+                    onClick={() => void clearOppStats()}>清空本场对方数据</button>
+          </div>
+          <div className="table-wrap" style={{ maxHeight: '56vh' }}>
+            <table className="grid">
+              <thead>
+                <tr>
+                  <th style={{ width: 130 }}>对方成员</th>
+                  <th style={{ width: 88 }}>职业</th>
+                  {GRID_FIELDS.map((f) => <th key={f.key} className="num" style={{ minWidth: 76 }}>{f.label}</th>)}
+                  <th className="num" style={{ minWidth: 90 }}>有效人伤</th>
+                  <th className="num" style={{ minWidth: 90 }}>有效塔伤</th>
+                  <th className="col-act" style={{ width: 70 }}>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opp.length === 0 && (
+                  <tr><td className="empty" colSpan={GRID_FIELDS.length + 4}>本场没有对方数据。</td></tr>
+                )}
+                {opp.map((r) => {
+                  const eff = deriveEffective(r.stat);
+                  return (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td><ClassChip name={r.classUsed} classMap={classMap} showIcon={false} /></td>
+                      {GRID_FIELDS.map((f) => (
+                        <td key={f.key} className="num">{(r.stat[f.key] || 0).toLocaleString()}</td>
+                      ))}
+                      <td className="num" style={{ color: 'var(--text-dim)' }}>{eff.effDmg.toLocaleString()}</td>
+                      <td className="num" style={{ color: 'var(--text-dim)' }}>{eff.effTower.toLocaleString()}</td>
+                      <td className="col-act">
+                        <button className="btn sm" disabled={saving || !r.statFilled}
+                                title="清空这一条对方数据（14 项归零）"
+                                onClick={() => void clearOneStat(r)}>清空</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          </div>
+        </>
       )}
 
       {tab === 'signup' && (
@@ -560,7 +697,15 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
         />
       )}
 
-      {tab === 'score' && <ScoringPanel matchId={matchId} playerCount={playing.length} />}
+      {tab === 'score' && (
+        <ScoringPanel
+          matchId={matchId}
+          playerCount={playing.length}
+          scoreStale={!!match.scoreStale}
+          /* 重算完把对局重新取一遍：score_stale 在算分时被清零，横幅要跟着消失 */
+          onRescored={() => { void load(); onChanged(); }}
+        />
+      )}
 
       {tab === 'import' && (
         <StatImportPanel

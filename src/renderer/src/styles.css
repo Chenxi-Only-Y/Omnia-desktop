@@ -1,57 +1,30 @@
-/* ─────────────────────────────────────────────────────────────
-   万象·Omnia —— 桌面端主题
-   All leagues. One universe. / 万象归一，联赛集成
-
-   主色板（用户指定，取自设计稿 5 个圆点，逐像素提取的精确值）：
-     1 #4A4459  按钮与正文        → --fg / --btn / --line-strong
-     2 #E6E0F0  次级面/边框        → --surface-2
-     3 #E6E1E6  背景主色          → --bg
-     4 #E9E0EA  分隔/次级          → --surface-3
-     5 #FCF8FD  卡片             → --surface
-   整套灰阶共用一个紫调底（B 通道略高），相邻档只差 3~6 个数值，
-   所以层次靠**边框 + 极轻阴影**撑，而不是靠色差 —— 这是这类单色板的关键。
-
-   职业色板仍取自原表「下滑预选」（12 职业）。⚠️ 这些是高饱和亮色，
-   浅底上只用于**小块**（色点、图标、细条、左边线），不铺大面积、不做正文色；
-   唯一的例外是排表看板的职业色块：那里文字固定用深色 #10121A，浅底亮底都成立。
-   ───────────────────────────────────────────────────────────── */
 :root {
-  /* —— 深色骨色阶（大厂风，见根目录 DESIGN.md）—— */
-  --bg: #0B0B0D;           /* 页面底（近黑） */
-  --surface: #131317;      /* 卡片 / 抬升面 */
-  --surface-2: #1C1C22;    /* 次级面 / 嵌套托盘 */
-  --surface-3: #1C1C22;    /* 分隔 / 次级 */
-  --fg: #FFFFFF;           /* 标题与主文 */
+  --bg: #0B0B0D;
+  --surface: #131317;
+  --surface-2: #1C1C22;
+  --surface-3: #1C1C22;
+  --fg: #FFFFFF;
   --line: #26262E;
   --line-strong: #3B3B46;
   --hover: #1F1F26;
-
-  /* —— 文本（同一支浅色，靠明度分层）—— */
   --text: #FFFFFF;
   --text-dim: #A8A8B4;
   --text-faint: #6E6E7A;
-
-  /* —— 语义色：深底上的低饱和亮色 —— */
   --accent: #6E7BFF;
-  --accent-soft: rgba(110, 123, 255, .20);
+  --accent-soft: rgba(110, 123, 255, .2);
   --danger: #FF6B6B;
   --danger-soft: rgba(255, 107, 107, .14);
   --warn: #F2C94C;
   --warn-soft: rgba(242, 201, 76, .14);
-  /* 橙武标记专用橙：深底上要能一眼跳出来 */
   --orange: #F0A44A;
   --orange-soft: rgba(240, 164, 74, .18);
   --ok: #3FD68C;
   --ok-soft: rgba(63, 214, 140, .14);
-
-  /* 兼容旧变量名（早期代码里用过 --bg-panel / --border 等） */
   --bg-panel: var(--surface);
   --bg-panel-2: var(--surface-3);
   --bg-hover: var(--hover);
   --border: var(--line);
   --border-strong: var(--line-strong);
-
-  /* 12 职业色（原表「下滑预选」，不改——用户明确要求图标不变色） */
   --c-素问: #EF949F;
   --c-妙音: #A4D663;
   --c-惊鸿: #F0BC06;
@@ -64,320 +37,435 @@
   --c-碎梦: #27C3CD;
   --c-沧澜: #91AADF;
   --c-潮光: #2BCBFF;
-
-  /* 排表看板职业色块上的固定深色字（浅底亮底都可读） */
   --on-class: #10121A;
-  /* 攻/防类别文字色（浅底上降饱和的蓝/橙，比亮青亮橙可读） */
   --kind-defend: #3A5C8A;
   --kind-attack: #8A5630;
-  /* 图标托底：职业图标保持原色（用户要求），靠一层托底 + 描边提可读性 */
   --icon-plate: transparent;
   --icon-plate-bg: transparent;
-  /* 卡片文字色：白字（用户口径，不做描边/阴影等处理） */
   --ink-on-class: #FFFFFF;
-
   --radius: 18px;
   --radius-sm: 5px;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .30), 0 2px 12px rgba(0, 0, 0, .24);
-  --shadow-lift: 0 10px 32px rgba(0, 0, 0, .48);
-}
-
-* { box-sizing: border-box; }
-
-/* ═══════════════════════════════════════════════════════════════
-   全页面壁纸（用户口径：非卡片区域都是壁纸）
-   —— 壁纸铺在最底层、固定不动；卡片保持不透明浮在上面；
-      侧栏/顶栏/内容区一律透明，露出壁纸。
-   壁纸可被 --wallpaper-image 换成真图（dataURL / file:// URL）：
-     :root { --wallpaper-image: url("..."); }
-   未设置时用默认的深色电影感渐变当壁纸。
-   ═══════════════════════════════════════════════════════════════ */
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 2px 12px rgba(0, 0, 0, .24);
+  --shadow-lift: 0 10px 32px rgba(0, 0, 0, .48)}
+* {
+  box-sizing:border-box}
 :root {
   --wallpaper-image: none;
-  --wallpaper-fallback:
-    radial-gradient(1200px 800px at 82% -12%, rgba(110, 123, 255, .30), transparent 62%),
-    radial-gradient(900px 720px at 2% 108%,  rgba(192, 132, 252, .24), transparent 62%),
-    radial-gradient(700px 520px at 56% 122%, rgba(34, 211, 238, .18), transparent 60%),
-    linear-gradient(178deg, #0B0B0D 0%, #15151B 52%, #0B0B0D 100%);
-}
-html { background: var(--bg); }
-/* body 必须透明：CSS 绘制顺序是「根背景 → 负 z-index 子元素 → 普通块盒背景」，
-   body 一旦有自己的背景就会画在 z-index:-1 的壁纸层之上，把壁纸整个盖掉
-   （这就是「点了壁纸没反应」的根因）。 */
-body { background: transparent; }
-/* 壁纸铺在每一层全屏容器上：卡片画在它们之上 → 空隙一定露壁纸。
-   background-attachment:fixed 保证切页/滚动都不动。 */
-html, body, .app, .content {
-  background-image: var(--wallpaper-image, none);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-}
-/* 壳与内容区透明 → 露出壁纸 */
-.app, .main, .content, .topbar, .sidebar { background: transparent; }
-/* 卡片仍是不透明面，浮在壁纸上（保持可读） */
-.card, .stat, .modal, .msg, .roster-card, .home-card, .picker-item,
-.roster-cards__head, .board, .field .input, .field .select,
-.toolbar > .input, .toolbar > .select {
-  background-color: var(--surface);
-}
-
-html, body, #root { height: 100%; margin: 0; }
-/* 内容层抬到壁纸层（z-index:0）之上 */
-#root { position: relative; z-index: 1; }
-
+  --wallpaper-fallback: radial-gradient(1200px 800px at 82% -12%, rgba(110, 123, 255, .3), transparent 62%), radial-gradient(900px 720px at 2% 108%, rgba(192, 132, 252, .24), transparent 62%), radial-gradient(700px 520px at 56% 122%, rgba(34, 211, 238, .18), transparent 60%), linear-gradient(178deg, #0B0B0D 0%, #15151B 52%, #0B0B0D 100%)}
+html {
+  background:var(--bg)}
 body {
-  background: var(--bg);
-  color: var(--text);
-  font: 13px/1.55 "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC",
-        -apple-system, "Segoe UI", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-}
-
-button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
-
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; border: 2px solid var(--bg); }
-::-webkit-scrollbar-thumb:hover { background: #A79CB4; }
-::-webkit-scrollbar-track { background: transparent; }
-
-/* ── 布局 ─────────────────────────────────────────────────── */
-.app { display: grid; grid-template-columns: 216px 1fr; height: 100%; }
-/* 侧栏收起：**整条完全隐藏**（用户口径）。
-   之前留 56px 只显示图标，用户明确要求"隐藏的时候都完全隐藏"——
-   展开入口仍在顶栏左侧的 ☰，所以收起后不会有"找不回来"的问题。 */
-/* 用户口径：所有收起都要丝滑。原来收起是 display:none 硬切（无法过渡），
-   改为：栅格列宽过渡 + 侧栏位移/透明度过渡；overflow:hidden 保证列宽收到 0 时
-   内容不溢出（仍是"完全隐藏"，符合此前"隐藏时完全隐藏"的口径）。 */
-/* 侧栏收起：**瞬时**（不加过渡）。
-   试过过渡栅格列宽，两个问题：
-     ① 动画 grid-template-columns 每帧都要重排（layout），不是 GPU 合成 →
-        视觉上"卡卡的"，用户反馈过；
-     ② 收起过程中布局处于中间态，自检里量首屏几何位置的断言会量到中间值而误判。
-   要做真正丝滑的侧栏，需要改成「侧栏 transform 位移 + 内容覆盖式布局」，
-   不再动栅格 —— 那是另一次改动的量，这里先保持瞬时的正确行为。 */
-.app.nav-collapsed { grid-template-columns: 0 1fr; }
-.app.nav-collapsed .sidebar { display: none; }
-/* 必须显式指定主区在第 2 列：侧栏一旦 display:none 就不再是网格项，
-   .main 会自动落到第 1 列（0px）→ 内容被挤成一条竖排文字。实测踩过。 */
-.main { grid-column: 2; }
-
-.sidebar {
-  background: var(--bg-panel);
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column; min-height: 0;
-  transition: none;
-}
-.brand {
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid var(--border);
-}
-.brand h1 { margin: 0; font-size: 16px; letter-spacing: .5px; }
-.brand h1 .dot-sep { color: var(--accent); margin: 0 1px; }
-.brand .sub { color: var(--text-faint); font-size: 11px; margin-top: 3px; }
-.brand .sub:first-of-type { color: var(--text-dim); font-style: italic; }
-
-.nav { padding: 10px 8px; overflow-y: auto; flex: 1; }
-.nav-group-title {
-  color: var(--text-faint); font-size: 11px; padding: 10px 10px 5px;
-  letter-spacing: .5px;
-}
-.nav-item {
-  display: flex; align-items: center; gap: 9px;
-  width: 100%; text-align: left;
-  background: transparent; border: 0; cursor: pointer;
-  padding: 8px 10px; border-radius: var(--radius-sm);
-  color: var(--text-dim); margin-bottom: 2px;
-}
-.nav-item:hover { background: var(--bg-hover); color: var(--text); }
-/* 选中项：浅色高亮 + 左侧主色细条（浅底上靠底色反差，不用亮青） */
-.nav-item.active {
-  background: var(--surface-2); color: var(--text); font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--fg);
-}
-.nav-item .ico { width: 16px; text-align: center; opacity: .85; }
-.nav-item .badge {
-  margin-left: auto; font-size: 10px; color: var(--text-faint);
-  border: 1px solid var(--border-strong); border-radius: 999px; padding: 0 6px;
-}
-
-.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.topbar {
-  height: 46px; display: flex; align-items: center; gap: 12px;
-  padding: 0 18px; border-bottom: 1px solid var(--border);
-  background: var(--bg-panel); flex: 0 0 auto;
-}
-.topbar h2 { margin: 0; font-size: 14px; font-weight: 600; }
-.topbar .spacer { flex: 1; }
-.topbar .meta { color: var(--text-faint); font-size: 11px; }
-
-/* 导航栏折叠按钮：常驻顶栏左侧，折叠后变成汉堡图标 */
-.icon-btn {
-  padding: 3px 8px; font-size: 15px; line-height: 1.1;
-  color: var(--text-dim); min-width: 30px;
-}
-.icon-btn:hover { color: var(--text); }
-.nav-toggle { margin-right: 2px; }
-
-/* 内容区是 flex 列：页面根元素（.page-fill）可以撑满高度，
-   排表看板因此能"填满整页"而不是缩在上半部分 */
+  background:transparent}
+html,body,.app,.content {
+  background-image:var(--wallpaper-image, none);
+  background-size:cover;
+  background-position:center;
+  background-repeat:no-repeat;
+  background-attachment:fixed}
+.app,.main,.content,.topbar {
+  background:transparent}
+.card,.stat,.modal,.msg,.roster-card,.home-card,.picker-item,.roster-cards__head,.board,.field .input,.field .select,.toolbar>.input,.toolbar>.select {
+  background-color:var(--surface)}
+html,body,#root {
+  height:100%;
+  margin:0}
+#root {
+  position:relative;
+  z-index:1}
+body {
+  background:var(--bg);
+  color:var(--text);
+  font:13px/1.55 Microsoft YaHei UI,Microsoft YaHei,PingFang SC,-apple-system,Segoe UI,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden}
+button,input,select,textarea {
+  font-family:inherit;
+  font-size:inherit;
+  color:inherit}
+:focus-visible {
+  outline:2px solid color-mix(in srgb,var(--text) 70%,transparent);
+  outline-offset:2px;
+  border-radius:6px}
+.topbar .nav-item:focus-visible {
+  outline:2px solid #FFFFFF;
+  outline-offset:2px}
+.content::-webkit-scrollbar {
+  width:0;
+  height:0}
 .content {
-  flex: 1 1 auto; overflow: auto; padding: 16px 18px 28px;
-  min-height: 0; display: block;
-}
-/* 首页：首屏要渐变铺满，而 sticky 元素**不能超出包含块内容框的上边缘**，
-   那 16px 上内边距靠负边距是盖不掉的（实测 sticky 下 margin-top 完全无效）。
-   所以这一页直接去掉上内边距。 */
-.content--flush-top { padding-top: 0; }
-/* 参与撑满的页面根节点 */
-.page-fill { display: flex; flex-direction: column; gap: 12px; flex: 0 0 auto; }
-/* 看板卡不再撑满高度：由内容决定高度，纵向滚整页 */
-.card--fill { display: flex; flex-direction: column; flex: 0 0 auto; }
-
-/* ── 通用控件 ─────────────────────────────────────────────── */
+  scrollbar-width:none}
+::-webkit-scrollbar {
+  width:10px;
+  height:10px}
+::-webkit-scrollbar-corner {
+  background:transparent}
+::-webkit-scrollbar-track {
+  background:transparent}
+::-webkit-scrollbar-thumb {
+  background:var(--line-strong);
+  border-radius:6px;
+  border:2px solid transparent;
+  background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover {
+  background:color-mix(in srgb,var(--line-strong) 70%,var(--text))}
+.sb-track {
+  position:fixed;
+  top:2px;
+  right:2px;
+  bottom:2px;
+  width:10px;
+  z-index:30;
+  border-radius:6px;
+  background:transparent;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .18s ease}
+body.sb-near .sb-track,body.sb-dragging .sb-track {
+  opacity:1;
+  background:color-mix(in srgb,var(--line-strong) 45%,transparent)}
+.sb-thumb {
+  width:100%;
+  border-radius:6px;
+  background:var(--line-strong);
+  pointer-events:auto;
+  cursor:default;
+  will-change:transform}
+.sb-thumb:hover,body.sb-dragging .sb-thumb {
+  background:color-mix(in srgb,var(--line-strong) 70%,var(--text))}
+body.sb-dragging {
+  -webkit-user-select:none;
+  user-select:none}
+.app {
+  display:grid;
+  grid-template-columns:1fr;
+  height:100%}
+.app.nav-collapsed {
+  grid-template-columns:1fr}
+.main {
+  grid-column:1}
+.topbar .nav {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0 auto;
+  overflow-x:auto;
+  scrollbar-width:none}
+.topbar .nav::-webkit-scrollbar {
+  display:none}
+.topbar .nav-item.home-btn {
+  padding:6px 14px;
+  font-size:13px;
+  font-weight:600;
+  white-space:nowrap;
+  margin:0;
+  background:#fff;
+  color:#0b0b0d;
+  border:1px solid #FFFFFF}
+.topbar .nav-item.home-btn--ghost {
+  background:transparent;
+  color:#fff;
+  border:1px solid rgba(255,255,255,.38)}
+.topbar .nav-item.home-btn--ghost:hover {
+  background:#ffffff1f;
+  border-color:#ffffff8c;
+  transform:none;
+  box-shadow:none}
+.topbar .nav-item.active {
+  box-shadow:none}
+.brand {
+  padding:18px 18px 14px;
+  border-bottom:1px solid var(--border)}
+.brand h1 {
+  margin:0;
+  font-size:16px;
+  letter-spacing:.5px}
+.brand h1 .dot-sep {
+  color:var(--accent);
+  margin:0 1px}
+.brand .sub {
+  color:var(--text-faint);
+  font-size:11px;
+  margin-top:3px}
+.brand .sub:first-of-type {
+  color:var(--text-dim);
+  font-style:italic}
+.main {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:0}
+.topbar {
+  height:52px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 18px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg-panel);
+  flex:0 0 auto;
+  position:relative}
+.topbar h2 {
+  margin:0;
+  font-size:14px;
+  font-weight:600}
+.topbar .spacer {
+  flex:1}
+.topbar .meta {
+  color:var(--text-faint);
+  font-size:11px}
+.nav-toggle {
+  margin-right:2px}
+.content {
+  flex:1 1 auto;
+  overflow:auto;
+  padding:16px 18px 28px;
+  min-height:0;
+  display:block}
+.content--flush-top {
+  padding-top:0;
+  padding-bottom:0}
+.page-fill {
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  flex:0 0 auto}
+.card--fill {
+  display:flex;
+  flex-direction:column;
+  flex:0 0 auto}
 .btn {
-  background: var(--bg-panel-2); border: 1px solid var(--border-strong);
-  color: var(--text); padding: 6px 12px; border-radius: var(--radius-sm);
-  cursor: pointer; white-space: nowrap;
-}
-.btn:hover { background: var(--bg-hover); border-color: var(--line-strong); }
-.btn:disabled { opacity: .45; cursor: not-allowed; }
-/* 主按钮＝第 1 个色（深紫灰）实心，正文用卡片色反白 */
-.btn.primary { background: var(--fg); border-color: var(--fg); color: var(--surface); }
-.btn.primary:hover { background: #3B3648; border-color: #3B3648; }
-.btn.ghost { background: transparent; }
-.btn.danger { border-color: var(--danger); color: var(--danger); }
-.btn.danger:hover { background: var(--danger-soft); }
-.btn.sm { padding: 3px 8px; font-size: 12px; }
-/* 禁用态必须压住主按钮/危险按钮配色：同优先级下后者写在后面，否则「不能点」的按钮还是红的/蓝的，
-   看起来像能点。禁用时统一退成灰底灰字 + 更低的透明度。 */
-.btn.primary:disabled, .btn.danger:disabled {
-  background: var(--bg-panel-2); border-color: var(--border-strong);
-  color: var(--text-dim); opacity: .5;
-}
-.btn:disabled:hover { background: var(--bg-panel-2); border-color: var(--border-strong); }
-
-.input, .select {
-  background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); padding: 5px 9px; min-width: 0;
-}
-.input:focus, .select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.input::placeholder { color: var(--text-faint); }
-
-.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
-/* 工具栏里有「标签+控件」字段块时，一律**底对齐**：
-   字段块 50px 高（标签 20 + 控件 30），而按钮 30px 高，居中会让按钮
-   比输入框高出 10px（实测 块顶198/控件顶218/按钮顶208）。底对齐后
-   按钮与输入框底边齐平（都落在 248）。 */
-.toolbar:has(.field) { align-items: flex-end; }
-.toolbar .grow { flex: 1; }
-
-/* ── 卡片 / 表格 ──────────────────────────────────────────── */
+  background:var(--bg-panel-2);
+  border:1px solid var(--border-strong);
+  color:var(--text);
+  padding:6px 12px;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  white-space:nowrap}
+.btn:hover {
+  background:var(--bg-hover);
+  border-color:var(--line-strong)}
+.btn:disabled {
+  opacity:.45;
+  cursor:not-allowed}
+.btn.primary {
+  background:var(--fg);
+  border-color:var(--fg);
+  color:var(--surface)}
+.btn.primary:hover {
+  background:#3b3648;
+  border-color:#3b3648}
+.btn.ghost {
+  background:transparent}
+.btn.danger {
+  border-color:var(--danger);
+  color:var(--danger)}
+.btn.danger:hover {
+  background:var(--danger-soft)}
+.btn.sm {
+  padding:5px 10px;
+  font-size:12px}
+.btn.primary:disabled,.btn.danger:disabled {
+  background:var(--bg-panel-2);
+  border-color:var(--border-strong);
+  color:var(--text-dim);
+  opacity:.5}
+.btn:disabled:hover {
+  background:var(--bg-panel-2);
+  border-color:var(--border-strong)}
+.input,.select {
+  background:var(--surface);
+  border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm);
+  padding:5px 9px;
+  min-width:0}
+.input:focus,.select:focus {
+  outline:none;
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+.input::placeholder {
+  color:var(--text-faint)}
+.toolbar {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom:12px}
+.toolbar:has(.field) {
+  align-items:flex-end}
+.toolbar .grow {
+  flex:1}
 .card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px 16px;
-  box-shadow: var(--shadow);
-}
-.card + .card { margin-top: 12px; }
-.card h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
-.card .hint { color: var(--text-faint); font-size: 11px; margin-top: 6px; }
-
-.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  box-shadow:var(--shadow)}
+.card+.card {
+  margin-top:12px}
+.card h3 {
+  margin:0 0 10px;
+  font-size:13px;
+  font-weight:600}
+.card .hint {
+  color:var(--text-faint);
+  font-size:11px;
+  margin-top:6px}
+.stat-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:10px}
 .stat {
-  background: var(--bg-panel-2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 12px 14px;
-}
-.stat .k { color: var(--text-faint); font-size: 11px; }
-.stat .v { font-size: 22px; font-weight: 600; margin-top: 3px; font-variant-numeric: tabular-nums; }
-.stat .v small { font-size: 12px; color: var(--text-faint); font-weight: 400; }
-
-.table-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: auto; }
-table.grid { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-table.grid th, table.grid td {
-  padding: 6px 9px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap;
-}
+  background:var(--bg-panel-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px 14px}
+.stat .k {
+  color:var(--text-faint);
+  font-size:11px}
+.stat .v {
+  font-size:22px;
+  font-weight:600;
+  margin-top:3px;
+  font-variant-numeric:tabular-nums}
+.stat .v small {
+  font-size:12px;
+  color:var(--text-faint);
+  font-weight:400}
+.table-wrap {
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:auto}
+table.grid {
+  width:100%;
+  border-collapse:collapse;
+  font-variant-numeric:tabular-nums}
+table.grid th,table.grid td {
+  padding:6px 9px;
+  border-bottom:1px solid var(--border);
+  text-align:left;
+  white-space:nowrap}
 table.grid thead th {
-  background: var(--bg-panel-2); color: var(--text-dim); font-weight: 600;
-  position: sticky; top: 0; z-index: 1; font-size: 12px;
-}
-table.grid tbody tr:hover { background: var(--bg-hover); }
-table.grid td.num { text-align: right; }
-/* 数值列的表头也要右对齐：原来只有 td.num 有规则，表头一律左对齐，
-   于是「序号/场次/上场…」这些列的表头与内容对不上（用户反馈"序号没对准"）。 */
-table.grid th.num { text-align: right; }
-table.grid td.actions { text-align: right; }
-table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px; }
-
-/* ── 标签 ─────────────────────────────────────────────────── */
+  background:var(--bg-panel-2);
+  color:var(--text-dim);
+  font-weight:600;
+  position:sticky;
+  top:0;
+  z-index:1;
+  font-size:12px}
+table.grid tbody tr:hover {
+  background:var(--bg-hover)}
+table.grid td.num,table.grid th.num,table.grid td.actions {
+  text-align:right}
+table.grid .empty {
+  text-align:center;
+  color:var(--text-faint);
+  padding:28px}
 .chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  border-radius: 999px; padding: 1px 9px; font-size: 12px;
-  border: 1px solid var(--border-strong); background: var(--surface);
-  /* 职业名不能被拆成两行（"妙音"曾断成 妙/音），chip 一律不换行 */
-  white-space: nowrap; flex: 0 0 auto;
-}
-.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); }
-/* 职业图标保持原色（用户要求不变色）。浅底上给一层白托底 + 细描边，
-   否则金色/浅色图标（惊鸿、玄机）在浅背景上几乎看不见。 */
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  border-radius:999px;
+  padding:1px 9px;
+  font-size:12px;
+  border:1px solid var(--border-strong);
+  background:var(--surface);
+  white-space:nowrap;
+  flex:0 0 auto}
+.chip .dot {
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--text-faint)}
 .chip .chip-icon {
-  width: 15px; height: 15px; object-fit: contain;
-  background: var(--icon-plate-bg); border-radius: 3px; padding: 1px;
-}
-.chip.class { border-color: currentColor; }
-.badge-state { border-radius: 4px; padding: 1px 7px; font-size: 11px; border: 1px solid; }
-.badge-state.active { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
-.badge-state.inactive { color: var(--text-faint); border-color: var(--border-strong); }
-.badge-state.left { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
-/* 本场未排表：中性灰，不当作异常 */
-.badge-state.none { color: var(--text-faint); border-color: var(--line-strong); }
-.badge-mic { font-size: 11px; color: var(--text-dim); }
-.badge-note { font-size: 11px; color: var(--warn); }
-
-/* ── 提示条 ───────────────────────────────────────────────── */
-.msg { border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 12px; font-size: 12px; }
-.msg.error { background: var(--danger-soft); border: 1px solid var(--danger); color: var(--danger); }
-.msg.ok { background: var(--ok-soft); border: 1px solid var(--ok); color: var(--ok); }
-.msg.warn { background: var(--warn-soft); border: 1px solid var(--warn); color: var(--warn); }
-
-/* ── 浮动小提示（页面级瞬时提示）─────────────────────────────
-   用户口径：这些提示"不要"，但报错不能丢。所以不再用占版面的横幅，
-   改成浮在角落、成功类 2.5 秒自动消失（由 useToastAutoClear 清 state）。
-   弹窗里的 .msg 属于就地提示（关键报错挤进原地），不加 msg--toast，保持原样。 */
+  width:15px;
+  height:15px;
+  object-fit:contain;
+  background:var(--icon-plate-bg);
+  border-radius:3px;
+  padding:1px}
+.chip.class {
+  border-color:currentColor}
+.badge-state {
+  border-radius:4px;
+  padding:1px 7px;
+  font-size:11px;
+  border:1px solid}
+.badge-state.active {
+  color:var(--ok);
+  border-color:var(--ok);
+  background:var(--ok-soft)}
+.badge-state.inactive {
+  color:var(--text-faint);
+  border-color:var(--border-strong)}
+.badge-state.left {
+  color:var(--danger);
+  border-color:var(--danger);
+  background:var(--danger-soft)}
+.badge-state.none {
+  color:var(--text-faint);
+  border-color:var(--line-strong)}
+.badge-mic {
+  font-size:11px;
+  color:var(--text-dim)}
+.badge-note {
+  font-size:11px;
+  color:var(--warn)}
+.badge-flag {
+  display:inline-block;
+  border-radius:4px;
+  padding:1px 7px;
+  font-size:11px;
+  line-height:1.5;
+  color:var(--text-dim);
+  border:1px solid var(--border-strong);
+  background:var(--surface-2)}
+.badge-flag--warn {
+  color:var(--warn);
+  border-color:var(--warn);
+  background:var(--warn-soft)}
+.msg {
+  border-radius:var(--radius-sm);
+  padding:8px 12px;
+  margin-bottom:12px;
+  font-size:12px}
+.msg.error {
+  background:var(--danger-soft);
+  border:1px solid var(--danger);
+  color:var(--danger)}
+.msg.ok {
+  background:var(--ok-soft);
+  border:1px solid var(--ok);
+  color:var(--ok)}
+.msg.warn {
+  background:var(--warn-soft);
+  border:1px solid var(--warn);
+  color:var(--warn)}
 .msg--toast {
-  position: fixed; z-index: 80;
-  margin: 0;
-  max-width: min(560px, 46vw);
-  box-shadow: var(--shadow-lift);
-  animation: msg-toast-in .16s ease-out;
-  /* 不挡鼠标：提示只是提示 */
-  pointer-events: none;
-}
-/* 成功/普通提示：右下角 */
+  position:fixed;
+  z-index:80;
+  margin:0;
+  max-width:min(560px,46vw);
+  box-shadow:var(--shadow-lift);
+  animation:msg-toast-in .16s ease-out;
+  pointer-events:none}
 .msg--toast.ok {
-  right: 20px; bottom: 20px;
-}
-/* 报错：顶部居中，比成功提示更显眼，也避免与右下角的成功提示叠在一起。
-   报错**不自动消失**，必须由下一次操作替换。 */
+  right:20px;
+  bottom:20px}
 .msg--toast.error {
-  top: 62px; left: 50%; transform: translateX(-50%);
-  max-width: min(760px, 80vw);
-}
+  top:62px;
+  left:50%;
+  transform:translate(-50%);
+  max-width:min(760px,80vw)}
 @keyframes msg-toast-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  0% {
+  opacity:0;
+  transform:translateY(6px)}
+to {
+  opacity:1;
+  transform:translateY(0)}
 }
-.msg--toast.error { animation: none; }   /* 报错不做位移，translateX 会被动画覆盖 */
-@media (prefers-reduced-motion: reduce) {
-  .msg--toast { animation: none; }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   首页「大厂风」深色视觉层（照 seedance2_0 的视觉特征手写，见根目录 DESIGN.md）
-   —— 只作用于首页：.home-dark 挂在首屏与数据层上，局部换深色令牌，
-      不影响 App 其余浅色页面。
-   ═══════════════════════════════════════════════════════════════ */
+.msg--toast.error {
+  animation:none}
 .home-dark {
   --bg: #0B0B0D;
   --bg-elev: #131317;
@@ -395,266 +483,464 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   --border: #26262E;
   --border-strong: #3B3B46;
   --accent: #FFFFFF;
-  --accent-soft: rgba(110, 123, 255, .20);
+  --accent-soft: rgba(110, 123, 255, .2);
   --glow-cool: #6E7BFF;
   --glow-warm: #C084FC;
   --glow-cyan: #22D3EE;
-  color: var(--text);
-  font-family: Inter, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
-}
-
-/* ── 首屏 ───────────────────────────────────────────────────── */
-/* 注意：必须写成 .hero.home-hero（双类）—— .hero 在本文件更靠后，
-   同权重会覆盖单类的 .home-hero，导致这里写什么都不生效（踩过）。 */
+  color:var(--text);
+  font-family:Inter,SF Pro Display,Segoe UI,PingFang SC,HarmonyOS Sans SC,sans-serif}
 .hero.home-hero {
-  /* 这里**不能**写 position: relative —— 双类权重会盖掉 .hero--pinned 的
-     position: sticky，首屏「钉住不动」就失效了（自检量到滚动后 top=-456）。 */
-  overflow: hidden;
-  border: none; border-radius: 0; padding: 0 34px;
-  min-height: 0;
-  /* 暗罩改成**横向渐变**：左侧压暗保品牌字可读，中右几乎透明让视频/壁纸明显露出来。
-     （之前是满幅 .55 黑罩，把正在播放的视频整个盖住了 —— 自己截图确认过。） */
-  background:
-    radial-gradient(900px 460px at 88% 0%, rgba(110, 123, 255, .10), transparent 62%),
-    linear-gradient(90deg,
-      rgba(11, 11, 13, .90) 0%,
-      rgba(11, 11, 13, .72) 30%,
-      rgba(11, 11, 13, .34) 52%,
-      rgba(11, 11, 13, .12) 72%,
-      rgba(11, 11, 13, .40) 100%);
-  /* 这里**不能**再放 var(--wallpaper-image)：那是静态 preview 图，会画在
-     z-index:-1 的视频层之上，把正在播放的视频盖成一张静态图（自己截图看到的）。
-     静态壁纸由 apply() 写到 html/body/.app/.content 上，照样透得出来。 */
-  /* 注意：这里**不能**再铺 var(--wallpaper-fallback) —— 那是不透明的深色渐变，
-     会把 z-index:-1 的壁纸层（含正在播放的视频）整个挡死（自己截图确认过）。
-     没有壁纸时由 html/body 的 --bg 兜底。 */
-  background-size: auto, auto;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
-  background-attachment: scroll, scroll;
-}
-/* 柔光呼吸（极缓，克制；减少动效偏好时关闭） */
-.hero.home-hero::after {
-  content: ''; position: absolute; inset: -20%;
-  background: radial-gradient(600px 320px at 78% 22%, rgba(110, 123, 255, .12), transparent 60%);
-  animation: home-breathe 7.5s ease-in-out infinite;
-  pointer-events: none;
-}
+  overflow:hidden;
+  border:none;
+  border-radius:0;
+  padding:0 34px;
+  min-height:0;
+  background:radial-gradient(900px 460px at 88% 0%,rgba(110,123,255,.1),transparent 62%),linear-gradient(90deg,#0b0b0de6,#0b0b0db8 30%,#0b0b0d57 52%,#0b0b0d1f 72%,#0b0b0d66);
+  background-size:auto,auto;
+  background-position:center,center;
+  background-repeat:no-repeat,no-repeat;
+  background-attachment:scroll,scroll}
+.hero.home-hero:after {
+  content:"";
+  position:absolute;
+  top:-20%;
+  right:-20%;
+  bottom:-20%;
+  left:-20%;
+  background:radial-gradient(600px 320px at 78% 22%,rgba(110,123,255,.12),transparent 60%);
+  animation:home-breathe 7.5s ease-in-out infinite;
+  pointer-events:none}
 @keyframes home-breathe {
-  0%, 100% { opacity: .55; transform: translate3d(0, 0, 0); }
-  50%      { opacity: .95; transform: translate3d(-10px, 8px, 0); }
+  0%,to {
+  opacity:.55;
+  transform:translateZ(0)}
+50% {
+  opacity:.95;
+  transform:translate3d(-10px,8px,0)}
 }
-@media (prefers-reduced-motion: reduce) { .hero.home-hero::after { animation: none; } }
-
-/* 眉题：小、灰、宽字距，前置一条短横线 */
 .home-eyebrow {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-size: 11px; font-weight: 500; letter-spacing: .08em;
-  color: var(--text-faint); text-transform: uppercase;
-}
-.home-eyebrow::before {
-  content: ''; width: 24px; height: 1px; background: var(--line-strong);
-}
-
-/* Display：超大标题，负字距，紧行高 */
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.08em;
+  color:var(--text-faint);
+  text-transform:uppercase}
+.home-eyebrow:before {
+  content:"";
+  width:24px;
+  height:1px;
+  background:var(--line-strong)}
 .home-display {
-  font-size: clamp(40px, 6vw, 72px); font-weight: 700;
-  line-height: 1.05; letter-spacing: -.025em; color: var(--text);
-  margin: 18px 0 0;
-}
+  font-size:clamp(40px,6vw,72px);
+  font-weight:700;
+  line-height:1.05;
+  letter-spacing:-.025em;
+  color:var(--text);
+  margin:18px 0 0}
 .home-display-en {
-  font-size: clamp(15px, 1.6vw, 22px); font-weight: 400;
-  letter-spacing: .02em; color: var(--text-dim); margin-top: 14px;
-}
+  font-size:clamp(15px,1.6vw,22px);
+  font-weight:400;
+  letter-spacing:.02em;
+  color:var(--text-dim);
+  margin-top:14px}
 .home-lede {
-  max-width: 640px; font-size: 15px; line-height: 1.75;
-  color: var(--text-dim); margin-top: 18px;
-}
-
-/* 药丸按钮 */
-.home-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; }
+  max-width:640px;
+  font-size:15px;
+  line-height:1.75;
+  color:var(--text-dim);
+  margin-top:18px}
+.home-cta {
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-top:34px}
 .home-btn {
-  border: 1px solid transparent; border-radius: 999px;
-  padding: 11px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
-  background: var(--accent); color: var(--fg-on);
-  transition: transform .15s ease, box-shadow .15s ease;
-  font-family: inherit;
-}
-.home-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255, 255, 255, .14); }
+  border:1px solid transparent;
+  border-radius:999px;
+  padding:11px 24px;
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  background:var(--accent);
+  color:var(--fg-on);
+  transition:transform .15s ease,box-shadow .15s ease;
+  font-family:inherit}
+.home-btn:hover {
+  transform:translateY(-1px);
+  box-shadow:0 6px 24px #ffffff24}
 .home-btn--ghost {
-  background: transparent; color: var(--text);
-  border-color: var(--line-strong);
-}
-.home-btn--ghost:hover { background: var(--bg-elev-2); box-shadow: none; }
-@media (prefers-reduced-motion: reduce) { .home-btn { transition: none; } }
-
-/* 职业图标托盘：圆形深托 + 原色图标 */
-.home-tray {
-  display: flex; flex-wrap: wrap; gap: 14px; margin-top: 40px;
-}
-.home-tray__item {
-  display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
-  width: 56px;
-}
-.home-tray__plate {
-  width: 48px; height: 48px; border-radius: 50%;
-  /* 用户口径：职业图标托盘与背景一致（透明）—— 只要原色图标，不要深色圆底 */
-  background: transparent; border: none;
-  display: grid; place-items: center;
-  transition: border-color .15s ease, transform .15s ease;
-}
-.home-tray__item:hover .home-tray__plate { transform: translateY(-2px); }
-.home-tray__plate img { width: 26px; height: 26px; object-fit: contain; }
-.home-tray__label { font-size: 10px; letter-spacing: .04em; color: var(--text-faint); }
-
-/* ── 数据层 ─────────────────────────────────────────────────── */
-.home-section { padding-block: clamp(72px, 10vh, 128px); }
+  background:transparent;
+  color:var(--text);
+  border-color:var(--line-strong)}
+.home-btn--ghost:hover {
+  background:var(--bg-elev-2);
+  box-shadow:none}
+.nav-current {
+  margin-left:auto;
+  padding:8px 14px!important;
+  font-size:13px!important;
+  font-weight:600!important;
+  max-width:240px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.guild-page {
+  padding-bottom:14px}
+.gcard-row {
+  display:flex;
+  gap:14px;
+  align-items:stretch;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:4px 2px 10px;
+  scroll-snap-type:x proximity}
+.gcard {
+  position:relative;
+  flex:0 0 auto;
+  width:210px;
+  height:300px;
+  border-radius:16px;
+  overflow:hidden;
+  border:1px solid var(--line-strong);
+  background:var(--surface-2);
+  cursor:pointer;
+  scroll-snap-align:start;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+  font-family:inherit;
+  text-align:left;
+  padding:0;
+  color:inherit}
+.gcard:hover {
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-lift);
+  border-color:var(--accent)}
+.gcard__cover {
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:100%;
+  object-fit:cover}
+.gcard__cover--text {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(160deg,#6e7bff,#3b3648)}
+.gcard__cover--text span {
+  font-size:44px;
+  font-weight:800;
+  letter-spacing:2px;
+  color:#ffffffeb;
+  writing-mode:vertical-rl}
+.gcard__shade {
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  background:linear-gradient(to top,rgba(10,10,14,.88) 0%,rgba(10,10,14,.25) 45%,transparent 70%)}
+.gcard__body {
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  color:#fff}
+.gcard__name {
+  font-size:18px;
+  font-weight:700;
+  letter-spacing:.5px}
+.gcard__note {
+  font-size:12px;
+  opacity:.82;
+  margin-top:4px;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden}
+.gcard__meta {
+  font-size:11px;
+  opacity:.6;
+  margin-top:6px}
+.gcard--new {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border-style:dashed;
+  background:transparent}
+.gcard--new:hover {
+  background:var(--bg-hover)}
+.gcard__plus {
+  font-size:40px;
+  line-height:1;
+  color:var(--text-dim)}
+.gcard__newlabel {
+  font-size:13px;
+  color:var(--text-dim)}
+.gcard-empty {
+  flex:0 0 auto;
+  width:380px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:flex-start;
+  justify-content:center;
+  border:1px dashed var(--line-strong);
+  border-radius:16px;
+  padding:18px}
+.gcard-empty__t {
+  font-size:16px;
+  font-weight:600}
+.gcard-empty__d {
+  font-size:12px;
+  color:var(--text-dim);
+  line-height:1.6}
+.gset-cover {
+  position:relative;
+  width:200px;
+  height:150px;
+  flex:0 0 auto;
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid var(--border)}
+.gset-cover img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block}
+.gset-cover__empty {
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(160deg,#6e7bff,#3b3648)}
+.gset-cover__empty span {
+  font-size:26px;
+  font-weight:800;
+  color:#ffffffeb;
+  writing-mode:vertical-rl}
+.gset-cover__badge {
+  position:absolute;
+  left:8px;
+  top:8px;
+  background:#6e7bffeb;
+  color:#fff;
+  font-size:11px;
+  padding:2px 8px;
+  border-radius:999px}
+.danger-zone {
+  margin-top:18px;
+  padding:12px 14px;
+  border:1px solid rgba(255,120,120,.45);
+  border-radius:12px;
+  background:#ff787812;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap}
+.danger-zone__t {
+  font-weight:600;
+  color:var(--danger)}
+.danger-zone__d {
+  font-size:12px;
+  color:var(--text-dim);
+  margin-top:3px;
+  line-height:1.6}
+.guild-home__hero {
+  position:relative;
+  height:200px;
+  border-radius:14px;
+  overflow:hidden}
+.guild-home__cover {
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:100%;
+  object-fit:cover}
+.guild-home__cover--text {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:linear-gradient(160deg,#6e7bff,#3b3648)}
+.guild-home__cover--text span {
+  font-size:54px;
+  font-weight:800;
+  color:#ffffffeb;
+  letter-spacing:4px}
+.guild-home__shade {
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  background:linear-gradient(to top,rgba(10,10,14,.82) 0%,transparent 65%)}
+.guild-home__head {
+  position:absolute;
+  left:16px;
+  right:16px;
+  bottom:14px;
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  color:#fff}
+.guild-home__name {
+  font-size:26px;
+  font-weight:800;
+  letter-spacing:1px}
+.guild-home__note {
+  font-size:12px;
+  opacity:.85;
+  margin-top:4px;
+  max-width:720px}
+.home-section {
+  padding-block:clamp(72px,10vh,128px)}
 .home-h2 {
-  font-size: clamp(28px, 3.4vw, 44px); font-weight: 650;
-  line-height: 1.18; letter-spacing: -.015em; margin: 14px 0 0;
-}
-.home-card {
-  background: var(--bg-elev); border: 1px solid var(--line);
-  border-radius: 18px; padding: 26px 28px;
-}
-.home-card:hover { border-color: var(--line-strong); }
-.home-card__k { display: block; margin-bottom: 14px; }
-.home-card__v {
-  font-size: clamp(32px, 3vw, 40px); font-weight: 700; line-height: 1;
-  letter-spacing: -.02em; font-variant-numeric: tabular-nums;
-}
-.home-card__v small { font-size: 14px; font-weight: 500; color: var(--text-dim); margin-left: 4px; }
-.home-card__sub { font-size: 13px; color: var(--text-dim); margin-top: 12px; line-height: 1.7; }
-.home-grid {
-  display: grid; gap: 18px; margin-top: 32px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-/* 换结构：**不用负 z-index**。
-   实测（主进程 capturePage 截图 + 关闭硬解都验证过）：把 <video> 放在 z-index:-1 的
-   容器里，Chromium 合成器会把它丢到根背景之后、整层不出画 —— 帧数/readyState 全正常，
-   但屏幕上什么都没有。改成 z-index:0 + 让 #root 抬到 1 层，视频就正常合成了。 */
+  font-size:clamp(28px,3.4vw,44px);
+  font-weight:650;
+  line-height:1.18;
+  letter-spacing:-.015em;
+  margin:14px 0 0}
 .home-wallpaper {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: var(--wall, none), var(--wallpaper-fallback);
-  background-size: cover, cover;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
-}
+  position:fixed;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  z-index:0;
+  pointer-events:none;
+  background-image:var(--wall, none),var(--wallpaper-fallback);
+  background-size:cover,cover;
+  background-position:center,center;
+  background-repeat:no-repeat,no-repeat}
 .home-wallpaper video {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%; object-fit: cover;
-}
-
-.wall-seg { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-.wall-seg__k { font-size: 12px; color: var(--text-dim); margin-right: 4px; }
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:100%;
+  object-fit:cover}
+.wall-seg {
+  grid-column:1 / -1;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:14px}
+.wall-seg__k {
+  font-size:12px;
+  color:var(--text-dim);
+  margin-right:4px}
 .wall-seg__b {
-  border: 1px solid var(--line-strong); border-radius: 8px;
-  background: var(--surface-2); color: var(--text-dim);
-  padding: 6px 14px; font-size: 13px; cursor: pointer; font-family: inherit;
-}
-.wall-seg__b:hover { color: var(--text); border-color: var(--line-strong); }
+  border:1px solid var(--line-strong);
+  border-radius:8px;
+  background:var(--surface-2);
+  color:var(--text-dim);
+  padding:6px 14px;
+  font-size:13px;
+  cursor:pointer;
+  font-family:inherit}
+.wall-seg__b:hover {
+  color:var(--text);
+  border-color:var(--line-strong)}
 .wall-seg__b.on {
-  background: var(--accent); border-color: var(--accent); color: var(--fg-on, #fff);
-}
+  background:var(--accent);
+  border-color:var(--accent);
+  color:var(--fg-on, #fff)}
 .wall-grid {
-  display: grid; gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
-}
+  display:grid;
+  gap:10px;
+  grid-template-columns:repeat(auto-fill,minmax(136px,1fr))}
 .wall-item {
-  position: relative; aspect-ratio: 16 / 9; padding: 0; overflow: hidden;
-  border: 1px solid var(--line); border-radius: 12px;
-  background: var(--surface-2); cursor: pointer;
-}
-.wall-item img, .wall-item video {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-}
-.wall-item--on { outline: 2px solid var(--accent); outline-offset: 1px; }
+  position:relative;
+  aspect-ratio:16 / 9;
+  padding:0;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface-2);
+  cursor:pointer}
+.wall-item img,.wall-item video {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block}
+.wall-item--on {
+  outline:2px solid var(--accent);
+  outline-offset:1px}
 .wall-item__tag {
-  position: absolute; left: 6px; top: 6px; font-size: 10px; letter-spacing: .04em;
-  background: rgba(0, 0, 0, .55); color: #fff; border-radius: 999px; padding: 2px 7px;
-}
-
+  position:absolute;
+  left:6px;
+  top:6px;
+  font-size:10px;
+  letter-spacing:.04em;
+  background:#0000008c;
+  color:#fff;
+  border-radius:999px;
+  padding:2px 7px}
 .home-scroll {
-  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  color: var(--text-faint); font-size: 12px; letter-spacing: .12em;
-  animation: home-breathe 3.2s ease-in-out infinite;
-}
-@media (prefers-reduced-motion: reduce) { /* 换结构：**不用负 z-index**。
-   实测（主进程 capturePage 截图 + 关闭硬解都验证过）：把 <video> 放在 z-index:-1 的
-   容器里，Chromium 合成器会把它丢到根背景之后、整层不出画 —— 帧数/readyState 全正常，
-   但屏幕上什么都没有。改成 z-index:0 + 让 #root 抬到 1 层，视频就正常合成了。 */
-.home-wallpaper {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: var(--wall, none), var(--wallpaper-fallback);
-  background-size: cover, cover;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
-}
-.home-wallpaper video {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%; object-fit: cover;
-}
-
-.wall-seg { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-.wall-seg__k { font-size: 12px; color: var(--text-dim); margin-right: 4px; }
-.wall-seg__b {
-  border: 1px solid var(--line-strong); border-radius: 8px;
-  background: var(--surface-2); color: var(--text-dim);
-  padding: 6px 14px; font-size: 13px; cursor: pointer; font-family: inherit;
-}
-.wall-seg__b:hover { color: var(--text); border-color: var(--line-strong); }
-.wall-seg__b.on {
-  background: var(--accent); border-color: var(--accent); color: var(--fg-on, #fff);
-}
-.wall-grid {
-  display: grid; gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
-}
-.wall-item {
-  position: relative; aspect-ratio: 16 / 9; padding: 0; overflow: hidden;
-  border: 1px solid var(--line); border-radius: 12px;
-  background: var(--surface-2); cursor: pointer;
-}
-.wall-item img, .wall-item video {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-}
-.wall-item--on { outline: 2px solid var(--accent); outline-offset: 1px; }
-.wall-item__tag {
-  position: absolute; left: 6px; top: 6px; font-size: 10px; letter-spacing: .04em;
-  background: rgba(0, 0, 0, .55); color: #fff; border-radius: 999px; padding: 2px 7px;
-}
-
-.home-scroll { animation: none; } }
-
-/* ── 排表页功能区保持原样（用户口径：不做任何改动）——
-   全局已切到深色，这里把令牌换回原来的浅色，让排表看板原封不动。 */
+  position:absolute;
+  left:50%;
+  bottom:26px;
+  transform:translate(-50%);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  color:var(--text-faint);
+  font-size:12px;
+  letter-spacing:.12em;
+  animation:home-breathe 3.2s ease-in-out infinite}
 .theme-light {
-  --bg: #E6E1E6; --surface: #FCF8FD; --surface-2: #E6E0F0; --surface-3: #E9E0EA;
-  --fg: #4A4459; --line: #D6CFDA; --line-strong: #B9AFC4; --hover: #DCD5E2;
-  --text: #4A4459; --text-dim: #6F6879; --text-faint: #928B9C;
-  --accent: #4A4459; --accent-soft: #E0D8E8;
-  --danger: #8E4453; --danger-soft: #F2DFE3;
-  --warn: #8A6A22; --warn-soft: #F4EAD5;
-  --orange: #C4701C; --orange-soft: #F7E7D2;
-  --ok: #3F6F58; --ok-soft: #DCEBE2;
-  --bg-panel: var(--surface); --bg-panel-2: var(--surface-3); --bg-hover: var(--hover);
-  --border: var(--line); --border-strong: var(--line-strong);
-  --icon-plate: transparent; --icon-plate-bg: transparent;
-  --radius: 8px; --radius-sm: 5px;
+  --bg: #E6E1E6;
+  --surface: #FCF8FD;
+  --surface-2: #E6E0F0;
+  --surface-3: #E9E0EA;
+  --fg: #4A4459;
+  --line: #D6CFDA;
+  --line-strong: #B9AFC4;
+  --hover: #DCD5E2;
+  --text: #4A4459;
+  --text-dim: #6F6879;
+  --text-faint: #928B9C;
+  --accent: #4A4459;
+  --accent-soft: #E0D8E8;
+  --danger: #8E4453;
+  --danger-soft: #F2DFE3;
+  --warn: #8A6A22;
+  --warn-soft: #F4EAD5;
+  --orange: #C4701C;
+  --orange-soft: #F7E7D2;
+  --ok: #3F6F58;
+  --ok-soft: #DCEBE2;
+  --bg-panel: var(--surface);
+  --bg-panel-2: var(--surface-3);
+  --bg-hover: var(--hover);
+  --border: var(--line);
+  --border-strong: var(--line-strong);
+  --icon-plate: transparent;
+  --icon-plate-bg: transparent;
+  --radius: 8px;
+  --radius-sm: 5px;
   --shadow: 0 1px 2px rgba(74, 68, 89, .06), 0 2px 8px rgba(74, 68, 89, .05);
   --shadow-lift: 0 4px 16px rgba(74, 68, 89, .16);
-  color: var(--text);
-  font-family: inherit;
-}
-
-/* ── 首页下滑区：白底（照 seedance2_0 的滚动区）——
-   首屏仍是深色剧场，下滑上来的内容层改为**白底黑字**，
-   和参考站「深色首屏 → 浅色内容区」的节奏一致。 */
+  color:var(--text);
+  font-family:inherit}
 .hero-cover.home-cover {
-  /* 白底降为叠层（约 88% 不透明）→ 壁纸透得出来，但仍读作「白底」 */
-  /* 撤销上一版：首页下滑区回到**纯白**（我误把"上面"理解成了首屏） */
-  background: #FFFFFF;
+  background:#fff;
+  background-image:linear-gradient(180deg,#fff0 0,#ffffff8c 18px,#fff 56px);
+  background-repeat:no-repeat;
+  background-size:100% 56px;
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #F4F4F6;
@@ -672,768 +958,1252 @@ table.grid .empty { text-align: center; color: var(--text-faint); padding: 28px;
   --bg-panel-2: #EFEFF2;
   --bg-hover: #F4F4F6;
   --accent: #0B0B0D;
-  --accent-soft: rgba(11, 11, 13, .10);
-  color: var(--text);
-  font-family: Inter, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
-}
-.hero-cover.home-cover .home-h2,
-.hero-cover.home-cover .home-card__v { color: var(--text); }
+  --accent-soft: rgba(11, 11, 13, .1);
+  color:var(--text);
+  font-family:Inter,SF Pro Display,Segoe UI,PingFang SC,HarmonyOS Sans SC,sans-serif}
+.hero-cover.home-cover .home-h2,.hero-cover.home-cover .home-card__v {
+  color:var(--text)}
 .hero-cover.home-cover .home-card {
-  background: var(--surface-2);
-  border-color: var(--line);
-}
-/* 卡片一律不透明：壁纸只在非卡片区域露出 */
-.hero-cover.home-cover .stat, .hero-cover.home-cover .card { background-color: #FFFFFF; }
-.hero-cover.home-cover .home-eyebrow { color: var(--text-faint); }
-.hero-cover.home-cover .home-eyebrow::before { background: var(--line-strong); }
-
-/* 媒体卡（视频/图占位，照参考站的圆角视频卡） */
-.home-media {
-  display: grid; gap: 18px; margin-top: 32px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-}
-.home-media__frame {
-  position: relative; overflow: hidden;
-  border-radius: 20px; border: 1px solid var(--line);
-  background: var(--surface-2);
-  aspect-ratio: 16 / 9;
-}
-.home-media__frame img {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-}
-.home-media__cap {
-  position: absolute; left: 14px; top: 12px;
-  font-size: 11px; letter-spacing: .08em; color: #fff;
-  background: rgba(0, 0, 0, .38); border-radius: 999px; padding: 3px 10px;
-  backdrop-filter: blur(6px);
-}
-
+  background:var(--surface-2);
+  border-color:var(--line)}
+.hero-cover.home-cover .stat,.hero-cover.home-cover .card {
+  background-color:#fff}
+.hero-cover.home-cover .home-eyebrow {
+  color:var(--text-faint)}
+.hero-cover.home-cover .home-eyebrow:before {
+  background:var(--line-strong)}
 .placeholder {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  min-height: 320px; color: var(--text-faint); text-align: center; gap: 8px;
-}
-.placeholder .big { font-size: 30px; opacity: .5; }
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  min-height:320px;
+  color:var(--text-faint);
+  text-align:center;
+  gap:8px}
+.placeholder .big {
+  font-size:30px;
+  opacity:.5}
 .placeholder code {
-  background: var(--bg-panel-2); border: 1px solid var(--border);
-  border-radius: 4px; padding: 1px 6px; color: var(--text-dim);
-}
-
-.row-edit { display: flex; gap: 6px; align-items: center; }
-.row-edit .input { padding: 3px 6px; }
-
-/* ── 表单字段（标签在上，控件在下） ─────────────────────────── */
-.field { display: inline-flex; flex-direction: column; gap: 3px; }
-.field > span { color: var(--text-faint); font-size: 11px; }
-/* 带标签字段里的控件统一 30px 高。
-   原来 input / select / type=date 各按自己的字体度量撑开：
-   实测同一行里高度是 30 / 28 / 29.33 三种，顶边和底边各差 1px ——
-   于是"标签行对不齐、控件参差"（用户反馈「很多都没对准」）。 */
-.field > .input,
-.field > .select,
-/* 裸控件（没包 .field 的工具栏输入框/下拉）同样统一 —— 实测
-   ID输入 28 / 下拉 29.33 / date 30，底边差 1px，看着就是没对齐 */
-.toolbar > .input,
-.toolbar > .select {
-  height: 30px;
-  box-sizing: border-box;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-/* 一行里全是 .field（带小标签的字段）时：顶边对齐、按钮与输入框底线齐平。
-   否则带标签的字段比裸控件高一截，看着就是"没对齐"。 */
-.toolbar--fields { align-items: flex-end; }
-.toolbar--fields > .hint { align-self: flex-end; padding-bottom: 4px; }
-
-/* ── 页签 ─────────────────────────────────────────────────── */
-.tabs {
-  display: flex; gap: 4px; margin: 12px 0;
-  border-bottom: 1px solid var(--border); padding-bottom: 0;
-}
-.tab {
-  background: transparent; border: 1px solid transparent; border-bottom: none;
-  color: var(--text-dim); padding: 6px 14px; cursor: pointer;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0; margin-bottom: -1px;
-}
-.tab:hover { color: var(--text); background: var(--bg-hover); }
-.tab.active {
-  color: var(--text); background: var(--surface); font-weight: 600;
-  border-color: var(--border); border-bottom: 1px solid var(--surface);
-  box-shadow: inset 0 2px 0 var(--fg);
-}
-
-/* ── 战报网格里的数字输入 ─────────────────────────────────── */
+  background:var(--bg-panel-2);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:1px 6px;
+  color:var(--text-dim)}
+.row-edit {
+  display:flex;
+  gap:6px;
+  align-items:center}
+.row-edit .input {
+  padding:3px 6px}
+.field {
+  display:inline-flex;
+  flex-direction:column;
+  gap:3px}
+.check {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  -webkit-user-select:none;
+  user-select:none}
+.check input {
+  width:14px;
+  height:14px;
+  margin:0;
+  cursor:pointer;
+  accent-color:var(--accent)}
+.check>span {
+  font-size:12px;
+  color:var(--text-dim);
+  white-space:nowrap}
+.field>span {
+  color:var(--text-faint);
+  font-size:11px}
+.field>.input,.field>.select,.toolbar>.input,.toolbar>.select {
+  height:30px;
+  box-sizing:border-box;
+  padding-top:0;
+  padding-bottom:0}
+.toolbar--fields {
+  align-items:flex-end}
+.toolbar--fields>.hint {
+  align-self:flex-end;
+  padding-bottom:4px}
+.tabs,.ptabs {
+  display:flex;
+  gap:4px;
+  margin:12px 0;
+  border-bottom:1px solid var(--border);
+  padding-bottom:0}
+.tab,.ptab {
+  background:transparent;
+  border:1px solid transparent;
+  border-bottom:none;
+  color:var(--text-dim);
+  padding:6px 14px;
+  cursor:pointer;
+  border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+  margin-bottom:-1px}
+.tab:hover,.ptab:hover {
+  color:var(--text);
+  background:var(--bg-hover)}
+.tab.active,.ptab.active {
+  color:var(--text);
+  background:var(--surface);
+  font-weight:600;
+  border-color:var(--border);
+  border-bottom:1px solid var(--surface);
+  box-shadow:inset 0 2px 0 var(--fg)}
+.ptabs {
+  border-bottom-color:#ffffff4d}
+.ptab {
+  color:#1b1b22;
+  background:#ffffff6b;
+  border:1px solid rgba(255,255,255,.48);
+  border-bottom:none;
+  backdrop-filter:blur(8px) saturate(1.1);
+  -webkit-backdrop-filter:blur(8px) saturate(1.1)}
+.ptab:hover {
+  color:#0b0b0d;
+  background:#ffffff9e}
+.ptab.active {
+  color:#0b0b0d;
+  background:#ffffffe6;
+  border-color:#ffffffeb;
+  box-shadow:inset 0 2px #6e7bff}
 .cell-num {
-  width: 72px; padding: 2px 5px; text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-table.grid td .cell-num { background: var(--surface); }
-
-/* ── 队员选择器 ───────────────────────────────────────────── */
+  width:72px;
+  padding:2px 5px;
+  text-align:right;
+  font-variant-numeric:tabular-nums}
+table.grid td .cell-num {
+  background:var(--surface)}
 .picker-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 6px; max-height: 220px; overflow: auto;
-}
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:6px;
+  max-height:220px;
+  overflow:auto}
 .picker-item {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--bg-panel-2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 5px 8px; cursor: pointer;
-  text-align: left;
-}
-.picker-item:hover { background: var(--bg-hover); border-color: var(--border-strong); }
-.picker-item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-textarea.input { resize: vertical; line-height: 1.5; }
-
-/* ─────────────────────────────────────────────────────────────
-   排表看板（LineupBoard）—— 卡片版
-   一队一列卡片，多队横向排开（左右可拉）；队内 6 人上下滑。
-   卡片底色 = 职业色，文字固定深色。
-   ───────────────────────────────────────────────────────────── */
-.board { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
-
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:var(--bg-panel-2);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:5px 8px;
+  cursor:pointer;
+  text-align:left}
+.picker-item:hover {
+  background:var(--bg-hover);
+  border-color:var(--border-strong)}
+.picker-item .nm {
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+textarea.input {
+  resize:vertical;
+  line-height:1.5}
+.board {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  flex:1 1 auto;
+  min-height:0}
 .board__head {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 0 2px;
-}
-.board__title { font-weight: 600; letter-spacing: .5px; }
-.board__stat { color: var(--text-dim); font-size: 12px; }
-.board__stat b { color: var(--text); }
-.board__legend { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-faint); }
-.lg { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-left: 8px; }
-/* 攻/防/替补的图例色：原表偏亮的蓝橙在浅底上略降饱和 */
-.lg--defend { background: #3c6fb0; }
-.lg--attack { background: #b06a3c; }
-.lg--bench { background: #7d7688; }
-
-/* 横向由看板内部滚（右滑看右半区），**纵向交给整页** ——
-   不在这里设 overflow-y，看板就自然长高，下滑滚的是整页而不是这块区域 */
-.board__scroll { overflow-x: auto; overflow-y: visible; flex: 0 0 auto; }
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex-wrap:wrap;
+  padding:0 2px}
+.board__stat {
+  color:var(--text-dim);
+  font-size:12px}
+.board__stat b {
+  color:var(--text)}
+.lg {
+  width:10px;
+  height:10px;
+  border-radius:2px;
+  display:inline-block;
+  margin-left:8px}
+.board__scroll {
+  overflow-x:auto;
+  overflow-y:visible;
+  flex:0 0 auto}
 .board__halves {
-  display: flex; align-items: flex-start; gap: 10px;
-  min-width: min-content;
-}
-
-/* 半区：**一个半区就铺满整个看板宽度**（用户口径），右半区靠右滑看。
-   min-width:100% 是关键 —— 否则两个半区会各分一半、挤在同一屏里，
-   右滑就没了。纵向按行数分高度。 */
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  min-width:min-content}
 .half {
-  display: flex; flex-direction: column; gap: 6px;
-  flex: 0 0 auto; min-width: 100%; min-height: 0;
-}
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  flex:0 0 auto;
+  min-width:100%;
+  min-height:0}
 .half__title {
-  font-size: 11px; color: var(--text-faint); letter-spacing: 2px;
-  padding-left: 2px; flex: 0 0 auto;
-}
-.half__row { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
-.half__group { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
-
-/* 两个半区之间的中缝：固定 344px 宽（用户口径）。
-   图片**居中占 172px 宽**（= 344 的一半），两侧各 86px 由底色补；
-   高度按图片自身比例，竖向不足的部分同样由底色补。
-   flex:0 0 344px 防止被 flex 收缩（之前 44px 被压成 31px）。 */
+  font-size:11px;
+  color:var(--text-faint);
+  letter-spacing:2px;
+  padding-left:2px;
+  flex:0 0 auto}
+.half__row {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  flex:0 0 auto}
+.half__group {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  flex:0 0 auto}
 .board__divider {
-  align-self: stretch; flex: 0 0 344px; width: 344px;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;   /* 水平/垂直都居中 */
-  background: var(--surface-2); border-radius: 6px; overflow: hidden;
-}
-.board__divider--thin { flex: 0 0 12px; width: 12px; }
-
-/* 中缝图片：居中 172px 宽，高度按比例；四周不足的部分露出容器底色 */
+  align-self:stretch;
+  flex:0 0 344px;
+  width:344px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:var(--surface-2);
+  border-radius:6px;
+  overflow:hidden}
 .board__divider-img {
-  width: 172px; height: auto; max-height: 100%;
-  object-fit: contain; object-position: center;
-  display: block;
-}
-
+  width:172px;
+  height:auto;
+  max-height:100%;
+  object-fit:contain;
+  object-position:center;
+  display:block}
 .board__calligraphy {
-  writing-mode: vertical-rl; font-size: 20px; letter-spacing: 10px;
-  color: var(--fg); opacity: .38; font-family: "KaiTi", "STKaiti", serif;
-}
-
-/* 设置页里的中缝图片预览：按实际显示比例（344 宽）给个示意 */
-.divider-preview { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; align-items: flex-start; }
+  writing-mode:vertical-rl;
+  font-size:20px;
+  letter-spacing:10px;
+  color:var(--fg);
+  opacity:.38;
+  font-family:KaiTi,STKaiti,serif}
+.divider-preview {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  margin-top:10px;
+  align-items:flex-start}
 .divider-preview img {
-  width: 120px; max-height: 271px; object-fit: cover;
-  border: 1px solid var(--line-strong); border-radius: 6px; display: block;
-}
-
-/* 一支小队 = 一整行：队名 + 6 张卡片横排铺开，卡片撑满整行宽度 */
+  width:120px;
+  max-height:271px;
+  object-fit:cover;
+  border:1px solid var(--line-strong);
+  border-radius:6px;
+  display:block}
 .squadrow {
-  display: flex; align-items: stretch; gap: 5px;
-  flex: 0 0 auto; width: 100%;
-  background: var(--surface); border-radius: 8px; padding: 4px 5px;
-  box-shadow: var(--shadow);
-}
-.squadrow--defend { box-shadow: inset 0 0 0 1px #9DB6D6, var(--shadow); }
-.squadrow--attack { box-shadow: inset 0 0 0 1px #D6B49D, var(--shadow); }
-.squadrow--drop { box-shadow: inset 0 0 0 2px var(--fg), 0 0 0 4px var(--accent-soft); }
-
-/* 队名列固定宽度，不参与分配，卡片才能把剩余宽度吃干净。
-   用户口径：队名 15px 加粗、战术 13px（人数跟着战术走 12→13）。
-   列宽 74px 容纳放大后的文字。 */
+  display:flex;
+  align-items:stretch;
+  gap:5px;
+  flex:0 0 auto;
+  width:100%;
+  background:var(--surface);
+  border-radius:8px;
+  padding:4px 5px;
+  box-shadow:var(--shadow)}
+.squadrow--defend {
+  box-shadow:inset 0 0 0 1px #9db6d6,var(--shadow)}
+.squadrow--attack {
+  box-shadow:inset 0 0 0 1px #d6b49d,var(--shadow)}
+.squadrow--drop {
+  box-shadow:inset 0 0 0 2px var(--fg),0 0 0 4px var(--accent-soft)}
 .squadrow__head {
-  flex: 0 0 auto; width: 74px; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 2px;
-  border-right: 1px solid var(--line); padding-right: 6px;
-  font-size: 15px; font-weight: 700; color: var(--text); text-align: center;
-  letter-spacing: 0; white-space: nowrap;
-}
-.squadrow__name { font-size: 15px; font-weight: 700; }
-.squadrow__count { font-size: 13px; font-weight: 400; color: var(--text-faint); }
-.squadrow__tactic { font-size: 13px; font-weight: 400; color: var(--text-dim); }
-
-/* 可直接改的战术：外观与普通文字一致（无边框无背景），点开才出现下拉。
-   不加任何额外按钮/图标 —— 用户口径"不要额外添加什么"。 */
+  flex:0 0 auto;
+  width:74px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  border-right:1px solid var(--line);
+  padding-right:6px;
+  font-size:15px;
+  font-weight:700;
+  color:var(--text);
+  text-align:center;
+  letter-spacing:0;
+  white-space:nowrap}
+.squadrow__name {
+  font-size:15px;
+  font-weight:700}
+.squadrow__count {
+  font-size:13px;
+  font-weight:400;
+  color:var(--text-faint)}
+.squadrow__tactic {
+  font-size:13px;
+  font-weight:400;
+  color:var(--text-dim)}
 .squadrow__tactic--edit {
-  appearance: none; -webkit-appearance: none;
-  background: transparent; border: 1px solid transparent; border-radius: 4px;
-  color: var(--text-dim); font-family: inherit; font-size: 13px; font-weight: 400;
-  text-align: center; text-align-last: center; padding: 0 2px; max-width: 100%;
-  cursor: pointer;
-}
+  -moz-appearance:none;
+  appearance:none;
+  -webkit-appearance:none;
+  background:transparent;
+  border:1px solid transparent;
+  border-radius:4px;
+  color:var(--text-dim);
+  font-family:inherit;
+  font-size:13px;
+  font-weight:400;
+  text-align:center;
+  text-align-last:center;
+  padding:0 2px;
+  max-width:100%;
+  cursor:pointer}
 .squadrow__tactic--edit:hover {
-  border-color: var(--line-strong); background: var(--surface-2); color: var(--text);
-}
+  border-color:var(--line-strong);
+  background:var(--surface-2);
+  color:var(--text)}
 .squadrow__tactic--edit:focus {
-  outline: none; border-color: var(--fg); background: var(--surface); color: var(--text);
-}
-
-.squadrow__cards { display: flex; gap: 3px; flex: 1 1 auto; }
-
-/* 队员卡片：16:9 横版圆角矩形，底色 = 职业色（内联）。
-   文字统一白色（用户口径），为保证浅色职业底上也读得清，
-   卡片内叠一层半透明黑把底色压暗 —— 颜色仍是该职业的颜色，只是深一档。 */
-/* 队员卡片：横版圆角矩形，**底色 = 纯职业色**（内联，与职业色板完全一致），文字白字。
-   宽度由 flex 自动分配（6 张把行宽吃满，右边不留空）。
-   高度**显式给死**而不是靠 aspect-ratio：字号是 30/18/20 的绝对值，
-   内容自然高度约 110px，aspect-ratio 会按宽度反推高度、把内容裁掉。
-   这里给 112px —— 6 行 × (112+行内边距+间距) 正好落在可用高度内。 */
+  outline:none;
+  border-color:var(--fg);
+  background:var(--surface);
+  color:var(--text)}
+.squadrow__cards {
+  display:flex;
+  gap:3px;
+  flex:1 1 auto}
 .pcard {
-  position: relative;
-  flex: 1 1 0; min-width: 0;
-  height: 104px;
-  container-type: inline-size;
-  border: 0; text-align: left; font: inherit;
-  background: var(--surface-3); color: var(--ink-on-class);
-  border-radius: 10px; padding: 6px 9px;
-  display: flex; flex-direction: column; gap: 3px;
-  cursor: grab; overflow: hidden;
-}
-.pcard:active { cursor: grabbing; }
-.pcard--dragging { opacity: .35; }
-/* 没有职业（或未登记）时退回浅底深字 */
-.pcard--noclass { background: var(--surface-2); color: var(--text); }
-
-/* 三行字号（用户口径，绝对值）：ID 名 25px 加粗 / 技能备注 17px / 职业 15px。
-   写死不用容器查询缩放 —— 用户给的是确定值，缩放会把它盖掉。 */
+  position:relative;
+  flex:1 1 0;
+  min-width:0;
+  height:104px;
+  container-type:inline-size;
+  border:0;
+  text-align:left;
+  font:inherit;
+  background:var(--pc, var(--surface-3));
+  color:var(--ink-on-class);
+  border-radius:10px;
+  padding:6px 9px;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  cursor:grab;
+  overflow:hidden}
+.pcard:active {
+  cursor:grabbing}
+.pcard--dragging {
+  opacity:.35}
+.pcard--noclass {
+  background:var(--surface-2);
+  color:var(--text)}
 .pcard__id {
-  font-size: 25px; font-weight: 800; line-height: 1.1; letter-spacing: 0;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; word-break: break-all;
-  cursor: pointer;
-}
-.pcard__cls {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 15px; line-height: 1.2; opacity: .92; cursor: pointer;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-
-/* 可就地改的职业：外观贴近那行普通文字（透明底、白字），点开才出现主职/二职选项 */
+  font-size:25px;
+  font-weight:800;
+  line-height:1.1;
+  letter-spacing:0;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  word-break:break-all;
+  cursor:pointer}
 .pcard__cls--edit {
-  appearance: none; -webkit-appearance: none;
-  background: transparent; border: 1px solid transparent; border-radius: 4px;
-  color: inherit; font-family: inherit; font-size: 15px; line-height: 1.2;
-  padding: 0 2px; max-width: 100%; cursor: pointer;
-}
-.pcard__cls--edit:hover { border-color: rgba(255, 255, 255, .55); background: rgba(0, 0, 0, .12); }
-.pcard__cls--edit:focus { outline: none; border-color: rgba(255, 255, 255, .8); }
-/* 下拉展开后的选项在白底上要看得清 */
-.pcard__cls--edit option { color: var(--text); background: var(--surface); }
-/* 交叉核对里成排的 ID 标签 */
-.chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
-/* 导入预览里请假行：整体压暗，和参加行一眼区分 */
-tr.row--leave > td { background: var(--surface-3); }
-
-/* ── 报名候选：按职业分组（可展开/收起，默认收起） ─────────────── */
-.picker-group { border-top: 1px solid var(--line); padding-top: 5px; }
-.picker-group:first-child { border-top: 0; padding-top: 0; }
+  -moz-appearance:none;
+  appearance:none;
+  -webkit-appearance:none;
+  background:transparent;
+  border:1px solid transparent;
+  border-radius:4px;
+  color:inherit;
+  font-family:inherit;
+  font-size:15px;
+  line-height:1.2;
+  padding:0 2px;
+  max-width:100%;
+  cursor:pointer}
+.pcard__cls--edit:hover {
+  border-color:#ffffff8c;
+  background:#0000001f}
+.pcard__cls--edit:focus {
+  outline:none;
+  border-color:#fffc}
+.pcard__cls--edit option {
+  color:var(--text);
+  background:var(--surface)}
+.chip-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px}
+tr.row--leave>td {
+  background:var(--surface-3)}
+.picker-group {
+  border-top:1px solid var(--line);
+  padding-top:5px}
+.picker-group:first-child {
+  border-top:0;
+  padding-top:0}
 .picker-group__head {
-  display: flex; align-items: center; gap: 6px; width: 100%;
-  margin-bottom: 5px; padding: 3px 4px;
-  border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: inherit; text-align: left; border-radius: var(--radius-sm);
-}
-.picker-group__head:hover { background: var(--hover); }
-.picker-group__caret { width: 10px; color: var(--text-faint); font-size: 10px; }
+  display:flex;
+  align-items:center;
+  gap:6px;
+  width:100%;
+  margin-bottom:5px;
+  padding:3px 4px;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  font:inherit;
+  color:inherit;
+  text-align:left;
+  border-radius:var(--radius-sm)}
+.picker-group__head:hover {
+  background:var(--hover)}
+.picker-group__caret {
+  width:10px;
+  color:var(--text-faint);
+  font-size:10px}
 .picker-group__count {
-  font-size: 11px; color: var(--text-faint);
-  background: var(--surface-2); border-radius: 8px; padding: 0 6px;
-}
-
-/* 候选条目：固定两列 —— 左列「名字 + 主职」、右列「副职」。
-   右列给**最小宽度**：没有副职时若塌成 0，主职标签会被推右约 60px，
-   同一列的条目就对不齐了（实测漂移 63px）。 */
+  font-size:11px;
+  color:var(--text-faint);
+  background:var(--surface-2);
+  border-radius:8px;
+  padding:0 6px}
 .picker-item--split {
-  display: grid; grid-template-columns: 1fr 84px;
-  align-items: stretch; padding: 0; gap: 0; overflow: hidden; min-width: 0;
-}
-.picker-item__main,
+  display:grid;
+  grid-template-columns:1fr 84px;
+  align-items:stretch;
+  padding:0;
+  gap:0;
+  overflow:hidden;
+  min-width:0}
+.picker-item__main,.picker-item__sub {
+  display:grid;
+  align-items:center;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  font:inherit;
+  color:inherit;
+  padding:5px 8px}
+.picker-item__main {
+  grid-template-columns:1fr auto;
+  gap:6px;
+  min-width:0}
+.picker-item__main:hover,.picker-item__sub:hover {
+  background:var(--hover)}
+.picker-item__main .nm {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
 .picker-item__sub {
-  display: grid; align-items: center;
-  border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: inherit; padding: 5px 8px;
-}
-.picker-item__main { grid-template-columns: 1fr auto; gap: 6px; min-width: 0; }
-.picker-item__main:hover,
-.picker-item__sub:hover { background: var(--hover); }
-/* 名字占满左格并在必要时省略；主职/副职标签原样保留，不被压缩 */
-.picker-item__main .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker-item__sub {
-  justify-items: center;
-  /* 主职与副职标签外观完全一致（用户口径：不做特殊区分），
-     两个可点区域只靠 hover 高亮区分 */
-}
-.picker-item__sub--empty { cursor: default; }
-/* ── 成员主档：卡片列表（可拖动换位） ─────────────────────────── */
-.roster-cards { display: flex; flex-direction: column; gap: 4px; max-height: 62vh; overflow: auto; }
-/* 单行紧凑卡片。**固定列宽**（用户口径：每项固定位置，不能从左往右依次排）——
-   这样 67 行的「麦克风 / 备注角色 / 橙武 / 备注」都纵向对齐，一眼能扫。
-   [拖动] 序 ID 报名 状态 麦克风 备注角色 橙武 备注 ……… 操作
-   列定义抽成变量，编辑栏复用同一套 → 编辑控件正好落在对应列下面。 */
+  justify-items:center}
+.picker-item__sub--empty {
+  cursor:default}
 :root {
-  --roster-cols:
-    16px 46px minmax(120px, 200px) 62px 62px 86px 86px 58px minmax(0, 1fr) auto;
+  --roster-cols: 16px 46px minmax(120px, 200px) 62px 62px 86px 86px 58px minmax(0, 1fr) auto}
+.mcard-grid {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px;
+  max-height:66vh;
+  overflow:auto;
+  padding:2px 2px 6px;
+  scrollbar-gutter:stable}
+@media(max-width:1240px) {
+  .mcard-grid {
+  grid-template-columns:repeat(4,minmax(0,1fr))}
 }
-.roster-card,
-.roster-cards__head {
-  display: grid;
-  grid-template-columns: var(--roster-cols);
-  align-items: center; gap: 8px;
+@media(max-width:1000px) {
+  .mcard-grid {
+  grid-template-columns:repeat(3,minmax(0,1fr))}
 }
-/* 表头：与卡片共用列定义，所以逐列对齐 */
-.roster-cards__head {
-  padding: 2px 8px 4px;
-  font-size: 11px; color: var(--text-faint);
-  border-bottom: 1px solid var(--line);
-  position: sticky; top: 0; background: var(--bg-panel); z-index: 1;
+.mcard {
+  position:relative;
+  height:116px;
+  border-radius:14px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  padding:12px 12px 10px;
+  cursor:pointer;
+  overflow:hidden;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.mcard:hover {
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-lift);
+  border-color:var(--line-strong)}
+.mcard--found {
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft)}
+.mcard--drop-before:before,.mcard--drop-after:after {
+  content:"";
+  position:absolute;
+  top:-2px;
+  bottom:-2px;
+  width:4px;
+  background:#6e7bff;
+  border-radius:3px;
+  z-index:3;
+  box-shadow:0 0 0 2px #6e7bff47,0 0 12px #6e7bff8c}
+.mcard--drop-before:before {
+  left:-7px}
+.mcard--drop-after:after {
+  right:-7px}
+.mcard-grid--dragging .mcard {
+  transition:none;
+  cursor:grabbing}
+.mcard-grid--dragging .mcard:hover {
+  transform:none;
+  box-shadow:none;
+  border-color:var(--line)}
+.mcard-grid--dragging .mcard__glow {
+  animation:none;
+  opacity:.5}
+.mcard-grid--dragging .mcard--found {
+  box-shadow:none}
+.mcard-grid--dragging .mcard--dragging {
+  opacity:.38;
+  transform:scale(.98);
+  border-style:dashed;
+  border-color:#6e7bff;
+  box-shadow:none}
+.mcard--drop-target {
+  background:#6e7bff1a;
+  border-color:#6e7bff73}
+.drag-hint:empty {
+  display:none}
+.drag-hint {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin:0 8px;
+  padding:4px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+  background:#6e7bff29;
+  border:1px solid rgba(110,123,255,.45);
+  animation:unfold .18s cubic-bezier(.22,1,.36,1);
+  white-space:nowrap}
+.mcard__glow {
+  position:absolute;
+  left:0;
+  right:0;
+  top:0;
+  height:26px;
+  border-radius:14px 14px 0 0;
+  pointer-events:none}
+.mcard__glow--none {
+  background:linear-gradient(to bottom,rgba(140,140,152,.2),transparent)}
+.mcard__glow--filled {
+  background:linear-gradient(to bottom,rgba(53,169,107,.34),transparent)}
+.mcard__glow--unfilled {
+  background:linear-gradient(to bottom,rgba(240,169,58,.52),transparent);
+  animation:mcard-breathe 2.2s ease-in-out infinite}
+@keyframes mcard-breathe {
+  0%,to {
+  opacity:.3}
+50% {
+  opacity:1}
 }
-.roster-cards__head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 可点排序的表头 */
-.roster-cards__head .th { cursor: pointer; user-select: none; }
-.roster-cards__head .th:hover { color: var(--text); }
-.roster-cards__head .th--active { color: var(--fg); font-weight: 700; }
-.roster-card {
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: var(--radius-sm); padding: 3px 8px;
+.mcard__order {
+  position:absolute;
+  top:8px;
+  left:12px;
+  font-size:11px;
+  color:var(--text-faint);
+  font-variant-numeric:tabular-nums}
+.mcard__tri {
+  position:absolute;
+  width:26px;
+  height:26px;
+  pointer-events:none;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.22))}
+.mcard__tri--status {
+  top:0;
+  right:0;
+  clip-path:polygon(100% 0,100% 100%,0 0)}
+.mcard__tri--mic {
+  bottom:0;
+  right:0;
+  clip-path:polygon(100% 0,100% 100%,0 100%)}
+.mcard__tri--play {
+  background:#8ad9a6}
+.mcard__tri--unfilled {
+  background:#ffe9a0}
+.mcard__tri--left {
+  background:#b9bec6}
+.mcard__tri--mic-yes {
+  background:#fff;
+  border:0}
+.mcard__tri--mic-no {
+  background:#ffc93c}
+.mcard__tri--mic-unknown {
+  background:#8c8c9859}
+.mcard__body {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  padding-top:12px}
+.mcard__id {
+  font-size:23px;
+  font-weight:800;
+  line-height:1.15;
+  color:var(--fg);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.mcard__alias {
+  font-size:10px;
+  line-height:1.3;
+  color:var(--text-faint);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.mcard__tags {
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:6px}
+.mcard__tag {
+  font-size:11px;
+  line-height:1.5;
+  padding:0 7px;
+  border-radius:999px;
+  white-space:nowrap}
+.mcard__tag--ow {
+  background:var(--orange-soft);
+  color:var(--orange);
+  border:1px solid var(--orange)}
+.mcard__tag--role {
+  background:#fff;
+  color:#0b0b0d;
+  border:1px solid rgba(11,11,13,.16)}
+.mcard__more {
+  position:absolute;
+  left:10px;
+  bottom:6px;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  color:var(--text-faint);
+  font-size:15px;
+  letter-spacing:1px;
+  line-height:1;
+  padding:2px 6px;
+  border-radius:8px;
+  transition:opacity .16s ease}
+.mcard__more:hover {
+  color:var(--fg);
+  background:var(--hover)}
+.mcard__quick {
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  display:flex;
+  gap:6px;
+  justify-content:center;
+  padding:6px 8px;
+  background:linear-gradient(to top,var(--surface) 60%,transparent);
+  transform:translateY(110%);
+  transition:transform .18s cubic-bezier(.22,1,.36,1)}
+.mcard:hover .mcard__quick {
+  transform:none}
+.mcard:hover .mcard__more {
+  opacity:0}
+.mcard__qbtn {
+  border:1px solid var(--line-strong);
+  background:var(--surface-2);
+  color:var(--text);
+  font:inherit;
+  font-size:11px;
+  padding:2px 9px;
+  border-radius:999px;
+  cursor:pointer}
+.mcard__qbtn:hover {
+  border-color:var(--fg)}
+.mcard__qbtn--danger {
+  color:var(--danger);
+  border-color:color-mix(in srgb,var(--danger) 45%,transparent)}
+.cellpick__add {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px solid var(--line)}
+.cellpick__add .hint {
+  margin:0}
+.manualadd {
+  margin-top:8px}
+.manualadd .toolbar {
+  flex-wrap:wrap}
+.drawer-mask {
+  position:fixed;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  z-index:400;
+  background:#00000047;
+  display:flex;
+  justify-content:flex-end;
+  animation:drawer-mask-in .16s ease-out}
+@keyframes drawer-mask-in {
+  0% {
+  opacity:0}
+to {
+  opacity:1}
 }
-.roster-card:hover { border-color: var(--line-strong); background: var(--bg-hover); }
-.roster-card--dragging { opacity: .4; }
-/* 拖动换位时的**插入细线**：在两张卡片之间的缝隙里画一条线，
-   用户口径「在俩人之间的时候出现一条细线，能够辅助我知道放在哪个位置」。
-   线画在缝隙正中（卡片间距 4px，所以用 -3px 偏移）。 */
-.roster-card { position: relative; }
-.roster-card--drop-above::before,
-.roster-card--drop-below::after {
-  content: ''; position: absolute; left: 0; right: 0; height: 2px;
-  background: var(--fg); border-radius: 1px; z-index: 3;
-  /* 线头加一个小圆点，更像"插入点" */
-  box-shadow: 0 0 0 1px var(--surface);
+.drawer-mask--out {
+  animation:drawer-mask-out .18s ease forwards;
+  pointer-events:none}
+@keyframes drawer-mask-out {
+  0% {
+  opacity:1}
+to {
+  opacity:0}
 }
-.roster-card--drop-above::before { top: -3px; }
-.roster-card--drop-below::after { bottom: -3px; }
-/* 「定位 ID」命中的那一行：整行高亮一下，配合滚动就能一眼找到 */
-.roster-card--found {
-  border-color: var(--fg);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-  background: var(--hover);
+.drawer {
+  width:min(460px,92vw);
+  height:100%;
+  background:#1012186b!important;
+  backdrop-filter:blur(30px) saturate(1.45);
+  -webkit-backdrop-filter:blur(30px) saturate(1.45);
+  border-left:1px solid rgba(255,255,255,.22);
+  box-shadow:-18px 0 48px #0000004d;
+  color:#f4f5f7;
+  padding:16px 18px;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  animation:drawer-in .2s cubic-bezier(.22,1,.36,1)}
+.drawer .drawer__form .field>span {
+  color:#ffffffd1;
+  font-size:12px}
+.drawer .drawer__alias {
+  color:#ffffffad;
+  font-size:12px}
+.drawer .drawer__info dt {
+  color:#ffffffad}
+.drawer .drawer__info dd {
+  color:#fff}
+.drawer .hint {
+  color:#ffffffad}
+@keyframes drawer-in {
+  0% {
+  transform:translate(24px);
+  opacity:.6}
+to {
+  transform:none;
+  opacity:1}
 }
-.roster-locate-msg { color: var(--ok); }
-.roster-locate-msg--miss { color: var(--warn); }
-.roster-card__handle {
-  cursor: grab; color: var(--text-faint); font-size: 13px; user-select: none;
-  padding: 0 1px; line-height: 1;
+.drawer__head {
+  display:flex;
+  align-items:flex-start;
+  gap:10px}
+.drawer__title {
+  min-width:0}
+.drawer__id {
+  font-size:22px;
+  font-weight:800;
+  color:var(--fg)}
+.drawer__alias {
+  font-size:11px;
+  color:var(--text-faint);
+  margin-top:2px}
+.drawer__head>.btn {
+  margin-left:auto}
+.drawer__tags {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px}
+.drawer__info {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px 12px;
+  margin:0}
+.drawer__info>div {
+  display:flex;
+  gap:6px;
+  font-size:12px}
+.drawer__info dt {
+  color:var(--text-faint)}
+.drawer__info dd {
+  margin:0;
+  color:var(--text)}
+.drawer__form {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px}
+.drawer__form .field {
+  display:flex;
+  flex-direction:column;
+  gap:4px}
+.drawer__form .field>span {
+  font-size:11px;
+  color:var(--text-faint)}
+.drawer__form .field--wide {
+  grid-column:1 / -1}
+.drawer__save {
+  grid-column:1 / -1;
+  display:flex;
+  gap:8px}
+.drawer__foot {
+  margin-top:auto;
+  display:flex;
+  gap:8px;
+  align-items:center}
+.drawer .btn,.mcard__qbtn,.mcard__more {
+  transition:transform .12s ease,background .16s ease,border-color .16s ease}
+.drawer .btn:active,.mcard__qbtn:active,.mcard__more:active {
+  transform:scale(.96)}
+.btn.is-ok {
+  background:#35a96b!important;
+  border-color:#2e9460!important;
+  color:#fff!important;
+  animation:ok-pop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes ok-pop {
+  0% {
+  transform:scale(1);
+  box-shadow:0 0 #35a96b8c}
+45% {
+  transform:scale(1.06);
+  box-shadow:0 0 0 8px #35a96b00}
+to {
+  transform:scale(1);
+  box-shadow:0 0 #35a96b00}
 }
-.roster-card__handle:active { cursor: grabbing; }
-.roster-card__order {
-  width: 100%; text-align: center; padding: 1px 4px; font-size: 12px;
+.mcard--flash {
+  animation:mcard-flash 1.4s ease-out}
+@keyframes mcard-flash {
+  0% {
+  box-shadow:0 0 #6e7bff8c;
+  border-color:var(--accent)}
+60% {
+  box-shadow:0 0 0 10px #6e7bff00;
+  border-color:var(--accent)}
+to {
+  box-shadow:0 0 #6e7bff00}
 }
-/* 「序」平时是纯文字：没有白框、也不像输入框。点一下才变成上面的 input。
-   （用户口径：取消没有编辑时的白框与"看起来可改"的样子） */
-.roster-card__order-text {
-  width: 100%; border: 0; background: transparent; cursor: pointer;
-  font: inherit; font-size: 12px; color: var(--text-dim);
-  text-align: center; padding: 1px 0; border-radius: var(--radius-sm);
+.btn.is-warn {
+  animation:warn-shake .3s ease}
+@keyframes warn-shake {
+  0%,to {
+  transform:translate(0)}
+25% {
+  transform:translate(-3px)}
+75% {
+  transform:translate(3px)}
 }
-.roster-card__order-text:hover { background: var(--hover); color: var(--fg); }
-.roster-card__id {
-  border: 0; background: transparent; cursor: pointer; font: inherit;
-  color: var(--fg); font-weight: 700; padding: 0; text-align: left;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.roster-card__id:hover { text-decoration: underline; }
-/* display:contents → 里面的每一项直接成为卡片网格的单元格，才能固定列宽 */
-.roster-card__meta { display: contents; }
-.roster-card__meta > span {
-  font-size: 12px; color: var(--text-dim);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.roster-card__meta b { color: var(--text); font-weight: 400; }
-/* 有橙武：这一项整块显示橙色，一眼能看出来 */
-.roster-orange--yes {
-  color: var(--orange) !important;
-  background: var(--orange-soft);
-  border-radius: 4px; padding: 0 5px;
-}
-.roster-card .badge-state {
-  justify-self: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.roster-card__actions { display: flex; gap: 3px; justify-self: end; }
-.roster-card__actions .btn.sm { padding: 1px 7px; font-size: 11px; }
-/* 编辑栏横跨整行，但内部用**同一套列定义** —— 每个控件正好落在它那一列下面，
-   所以不需要额外的小字说明（列头就是标签）。 */
-.roster-card__edit {
-  display: grid; grid-template-columns: var(--roster-cols);
-  align-items: center; gap: 8px;
-  grid-column: 1 / -1; margin-top: 4px; padding-top: 6px;
-  border-top: 1px dashed var(--line);
-}
-.roster-card__edit .input,
-.roster-card__edit .select { width: 100%; min-width: 0; padding: 2px 6px; font-size: 12px; }
-.roster-card__edit-actions { display: flex; gap: 3px; justify-self: end; }
-
-/* 职业图标：保持原色（用户口径），浅色托底让它在任意职业底色上都看得清。
-   尺寸跟着职业字号（17px）走，略放大到 22px 才压得住。 */
+.roster-locate-msg {
+  color:var(--ok)}
+.roster-locate-msg--miss {
+  color:var(--warn)}
+.alias-badge {
+  font-size:11px;
+  color:var(--text-faint);
+  max-width:340px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  border:1px dashed var(--line-strong);
+  border-radius:999px;
+  padding:1px 8px}
 .pcard__icon {
-  width: 22px; height: 22px; flex: 0 0 auto; object-fit: contain;
-  background: transparent; border-radius: 4px; padding: 0;
-  box-sizing: border-box;
-}
-
-.pcard__id:hover { text-decoration: underline; }
-.pcard__cls:hover { text-decoration: underline; }
+  width:22px;
+  height:22px;
+  flex:0 0 auto;
+  object-fit:contain;
+  background:transparent;
+  border-radius:4px;
+  padding:0;
+  box-sizing:border-box}
+.pcard__id:hover,.pcard__cls:hover {
+  text-decoration:underline}
 .pcard__cls {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 15px; line-height: 1.2; opacity: .92; cursor: pointer;
-  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-.pcard__cls:hover { text-decoration: underline; }
-
-/* 技能备注：单行、**无框**（用户口径）。与卡片同色，只在获得焦点时
-   用一条极轻的底线提示"这里能改"，平时看起来就是一行普通文字。
-   宽度用 100% + box-sizing 撑满卡片 —— 不能用 width:auto，
-   那样 input 只会缩成默认 20 字符宽。 */
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:15px;
+  line-height:1.2;
+  opacity:.92;
+  cursor:pointer;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis}
+.pcard__cls:hover {
+  text-decoration:underline}
 .pcard__note {
-  margin-top: auto; width: 100%; box-sizing: border-box;
-  background: transparent; border: 0; border-bottom: 1px solid transparent;
-  border-radius: 0; padding: 1px 0 2px;
-  font-size: 17px; line-height: 1.25; color: inherit;
-  cursor: text; font-family: inherit;
-}
-.pcard__note::placeholder { color: currentColor; opacity: .42; }
+  margin-top:auto;
+  width:100%;
+  box-sizing:border-box;
+  background:transparent;
+  border:0;
+  border-bottom:1px solid transparent;
+  border-radius:0;
+  padding:1px 0 2px;
+  font-size:17px;
+  line-height:1.25;
+  color:inherit;
+  cursor:text;
+  font-family:inherit}
+.pcard__note::placeholder {
+  color:currentColor;
+  opacity:.42}
 .pcard__note:focus {
-  outline: none;
-  border-bottom-color: currentColor;
-}
-.pcard__note:disabled { opacity: .55; cursor: default; }
-
-/* 空位卡（button）：尺寸与已填卡完全一致 */
+  outline:none;
+  border-bottom-color:currentColor}
+.pcard__note:disabled {
+  opacity:.55;
+  cursor:default}
 .pcard--empty {
-  align-items: center; justify-content: center;
-  background: transparent; border: 1px dashed var(--line-strong);
-  color: var(--text-faint); cursor: pointer;
-}
-.pcard--empty::before { display: none; }
-.pcard--empty:hover { border-color: var(--fg); color: var(--text); background: var(--surface-3); }
-.pcard__empty { font-size: 13px; }
-
-/* ── 拖拽反馈 ─────────────────────────────────────────────── */
+  align-items:center;
+  justify-content:center;
+  background:transparent;
+  border:1px dashed var(--line-strong);
+  color:var(--text-faint);
+  cursor:pointer}
+.pcard--empty:before {
+  display:none}
+.pcard--empty:hover {
+  border-color:var(--fg);
+  color:var(--text);
+  background:var(--surface-3)}
+.pcard__empty {
+  font-size:13px}
 .board__unassigned--hover {
-  border-top-color: var(--fg);
-  background: var(--accent-soft);
-  border-radius: 6px;
-}
-.board__chip[draggable="true"] { cursor: grab; }
-
-/* ─────────────────────────────────────────────────────────────
-   成员详情：雷达图与趋势
-   ───────────────────────────────────────────────────────────── */
-.radar-wrap { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
-.radar { flex: 0 0 auto; }
-.radar-legend { flex: 1; min-width: 300px; }
-.radar-legend__row { display: flex; align-items: center; gap: 7px; font-size: 12px; margin-bottom: 5px; }
-.radar-legend__row .lg { margin-left: 0; }
-.lg--base { background: transparent; border: 1px dashed var(--text-faint); }
-.lg--dmg { background: #2BCBFF; }
-.lg--tower { background: #F0BC06; }
-.radar-legend__hint { color: var(--text-faint); font-size: 11px; margin: 8px 0; }
-
-.trend { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; padding: 8px 2px; }
-.trend__col { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 54px; }
-.trend__bars { display: flex; align-items: flex-end; gap: 3px; height: 130px; }
-.trend__bar { width: 11px; border-radius: 2px 2px 0 0; display: block; }
-.trend__bar--dmg { background: linear-gradient(180deg, #4fdcff, #1c7fa0); }
-.trend__bar--tower { background: linear-gradient(180deg, #ffd257, #a87c07); }
-.trend__label { font-size: 10px; color: var(--text-faint); text-align: center; line-height: 1.2; }
-.trend__legend { align-self: center; font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.trend__legend .lg { margin-left: 0; }
-
-/* 主档里可点击查看详情的姓名 */
-.roster-name-link { cursor: pointer; color: var(--text); }
-.roster-name-link:hover { color: var(--accent); text-decoration: underline; }
-
-/* ── 职业系数网格 ─────────────────────────────────────────── */
+  border-top-color:var(--fg);
+  background:var(--accent-soft);
+  border-radius:6px}
+.board__chip[draggable=true] {
+  cursor:grab}
+.radar-wrap {
+  display:flex;
+  gap:22px;
+  align-items:flex-start;
+  flex-wrap:wrap}
+.radar {
+  flex:0 0 auto}
+.radar-legend {
+  flex:1;
+  min-width:300px}
+.radar-legend__row {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  font-size:12px;
+  margin-bottom:5px}
+.radar-legend__row .lg {
+  margin-left:0}
+.lg--base {
+  background:transparent;
+  border:1px dashed var(--text-faint)}
+.lg--dmg {
+  background:#2bcbff}
+.lg--tower {
+  background:#f0bc06}
+.radar-legend__hint {
+  color:var(--text-faint);
+  font-size:11px;
+  margin:8px 0}
+.trend {
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:8px 2px}
+.trend__col {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  width:54px}
+.trend__bars {
+  display:flex;
+  align-items:flex-end;
+  gap:3px;
+  height:130px}
+.trend__bar {
+  width:11px;
+  border-radius:2px 2px 0 0;
+  display:block}
+.trend__bar--dmg {
+  background:linear-gradient(180deg,#4fdcff,#1c7fa0)}
+.trend__bar--tower {
+  background:linear-gradient(180deg,#ffd257,#a87c07)}
+.trend__label {
+  font-size:10px;
+  color:var(--text-faint);
+  text-align:center;
+  line-height:1.2}
+.trend__legend {
+  align-self:center;
+  font-size:11px;
+  color:var(--text-dim);
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap}
+.trend__legend .lg {
+  margin-left:0}
 .coef-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px;
-}
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(132px,1fr));
+  gap:8px}
 .coef-item {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--surface-3); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px;
-}
-.coef-item > span { flex: 1; }
-.coef-item .cell-num { width: 62px; }
-
-/* 首页的三职业立绘卡（原攻略页已删除，只留这一块） */
-.banner-cards { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
-.banner-cards img {
-  flex: 1 1 320px; min-width: 260px; max-width: 520px;
-  border-radius: 8px; border: 1px solid var(--line);
-  box-shadow: var(--shadow-lift);
-}
-
-/* 评分明细的键值对 */
-.kv { display: flex; flex-wrap: wrap; gap: 6px 14px; }
-.kv__item { display: inline-flex; align-items: baseline; gap: 5px; font-size: 11px; }
-.kv__item i { color: var(--text-faint); font-style: normal; }
-.kv__item b { color: var(--text); font-variant-numeric: tabular-nums; }
-
-/* ── 出勤率条 ─────────────────────────────────────────────── */
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:var(--surface-3);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:4px 8px;
+  font-size:12px}
+.coef-item>span {
+  flex:1}
+.coef-item .cell-num {
+  width:62px}
+.kv {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 14px}
+.kv__item {
+  display:inline-flex;
+  align-items:baseline;
+  gap:5px;
+  font-size:11px}
+.kv__item i {
+  color:var(--text-faint);
+  font-style:normal}
+.kv__item b {
+  color:var(--text);
+  font-variant-numeric:tabular-nums}
 .ratebar {
-  display: inline-block; width: 46px; height: 5px; border-radius: 3px;
-  background: var(--surface-2); margin-left: 6px; vertical-align: middle; overflow: hidden;
-}
-.ratebar--wide { display: block; width: 100%; height: 10px; margin-left: 0; }
-.ratebar > i { display: block; height: 100%; background: var(--fg); border-radius: 3px; }
-
-/* ── 弹窗（选人面板） ─────────────────────────────────────── */
+  display:inline-block;
+  width:46px;
+  height:5px;
+  border-radius:3px;
+  background:var(--surface-2);
+  margin-left:6px;
+  vertical-align:middle;
+  overflow:hidden}
+.ratebar--wide {
+  display:block;
+  width:100%;
+  height:10px;
+  margin-left:0}
+.ratebar>i {
+  display:block;
+  height:100%;
+  background:var(--fg);
+  border-radius:3px}
 .modal {
-  position: fixed; inset: 0; background: rgba(74, 68, 89, .38);
-  display: flex; align-items: flex-start; justify-content: center;
-  padding-top: 8vh; z-index: 50;
-}
+  position:fixed;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  background:#4a445961;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  padding-top:8vh;
+  z-index:50}
 .modal__box {
-  width: min(760px, 92vw); max-height: 76vh; overflow: auto;
-  background: var(--surface); border: 1px solid var(--border-strong);
-  border-radius: 10px; padding: 14px 16px; box-shadow: 0 18px 48px rgba(74, 68, 89, .28);
-}
-.modal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.modal__head h3 { margin: 0; font-size: 14px; }
-.picker-item__where {
-  font-size: 10px; color: var(--warn); border: 1px solid var(--warn);
-  border-radius: 4px; padding: 0 4px; margin-left: 2px;
-}
-
-/* ── 未分配人员条 ─────────────────────────────────────────── */
+  width:min(760px,92vw);
+  max-height:76vh;
+  overflow:auto;
+  background:var(--surface);
+  border:1px solid var(--border-strong);
+  border-radius:10px;
+  padding:14px 16px;
+  box-shadow:0 18px 48px #4a445947}
+.modal__head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:10px}
+.modal__head h3 {
+  margin:0;
+  font-size:14px}
+.cls-cell {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0}
+.cls-cell__bar {
+  width:3px;
+  height:18px;
+  border-radius:2px;
+  flex:0 0 auto;
+  background:transparent}
+.cls-cell .select--cls {
+  min-width:0;
+  font-size:13px;
+  padding-block:2px}
 .board__unassigned {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  border-top: 1px dashed var(--border); padding-top: 8px;
-}
-.board__unassigned-title { color: var(--warn); font-size: 12px; }
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  border-top:1px dashed var(--border);
+  padding-top:8px}
+.board__unassigned-title {
+  color:var(--warn);
+  font-size:12px}
 .board__chip {
-  background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text);
-  border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer;
-}
-.board__chip:hover { background: var(--hover); }
-
-/* 组名行：组名 + 队数 + 「＋ 加一队」（每组队数不固定，按需加） */
+  background:var(--surface-2);
+  border:1px solid var(--line-strong);
+  color:var(--text);
+  border-radius:999px;
+  padding:2px 10px;
+  font-size:12px;
+  cursor:pointer}
+.board__chip:hover {
+  background:var(--hover)}
 .half__groupname {
-  font-size: 11px; color: var(--text-dim); letter-spacing: 1px; padding-left: 2px;
-  display: flex; align-items: center; gap: 8px;
-}
-.half__groupcount { color: var(--text-faint); font-size: 10px; letter-spacing: 0; }
-.half__addbtn { padding: 1px 7px; font-size: 11px; }
-.half__emptygroup { color: var(--text-faint); font-size: 11px; padding: 6px 2px; }
-/* 队名栏里的「×」删队按钮：默认淡，hover 才明显，免得误点 */
+  font-size:11px;
+  color:var(--text-dim);
+  letter-spacing:1px;
+  padding-left:2px;
+  display:flex;
+  align-items:center;
+  gap:8px}
+.half__groupcount {
+  color:var(--text-faint);
+  font-size:10px;
+  letter-spacing:0}
+.half__addbtn {
+  padding:1px 7px;
+  font-size:11px}
+.half__emptygroup {
+  color:var(--text-faint);
+  font-size:11px;
+  padding:6px 2px}
 .squadrow__del {
-  margin-top: 2px; border: 0; background: transparent; cursor: pointer;
-  color: var(--text-faint); font-size: 12px; line-height: 1; padding: 0 3px;
-}
-.squadrow__del:hover { color: var(--danger); }
-
-/* ─────────────────────────────────────────────────────────────
-   首页主视觉（Hero）
-   素材说明：原表首页大图实测为空图，这里用渐变 + 品牌字 + 职业图标阵占位；
-   拿到立绘后在 OverviewPage.tsx 填 HERO_IMAGE 即会覆盖为真实大图。
-   ───────────────────────────────────────────────────────────── */
+  margin-top:2px;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+  color:var(--text-faint);
+  font-size:12px;
+  line-height:1;
+  padding:4px 6px}
+.squadrow__del:hover {
+  color:var(--danger)}
 .hero {
-  position: relative; overflow: hidden;
-  border-radius: 12px; border: 1px solid var(--border);
-  /* 大幅视觉：上半屏主要给图（用户口径「大幅视觉，数据放下方」） */
-  min-height: clamp(380px, 52vh, 620px); padding: 34px 34px 26px;
-  display: flex; flex-direction: column; justify-content: space-between;
-  /* 浅色主视觉：卡片色打底 + 极轻的职业色晕，保持单色稿的干净感 */
-  background:
-    radial-gradient(900px 320px at 10% -16%, rgba(176, 134, 215, .22), transparent 62%),
-    radial-gradient(760px 300px at 94% 4%, rgba(43, 203, 255, .16), transparent 60%),
-    radial-gradient(620px 260px at 52% 124%, rgba(50, 204, 151, .12), transparent 60%),
-    linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
-  box-shadow: var(--shadow);
-}
-.hero__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-/* 只有铺了真实大图时才需要压暗垫字；占位态（立绘透明底）不需要，否则发灰显脏 */
-.hero__veil {
-  position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(90deg, rgba(74, 68, 89, .55) 0%, rgba(74, 68, 89, .22) 55%, transparent 100%);
-}
-.hero__body { position: relative; z-index: 1; }
-.hero__brand {
-  font-size: 40px; font-weight: 700; letter-spacing: 2px; line-height: 1.1;
-  color: var(--fg);
-}
-.hero__brand .dot-sep { color: var(--fg); margin: 0 2px; opacity: .55; }
-.hero__slogan { color: var(--text-dim); font-size: 15px; font-style: italic; margin-top: 6px; letter-spacing: .5px; }
-.hero__slogan--cn { font-style: normal; color: var(--text-dim); font-size: 13px; margin-top: 2px; }
-
-.hero__cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
-.hero__btn {
-  background: var(--surface); border: 1px solid var(--line-strong);
-  color: var(--fg); padding: 8px 16px; border-radius: 999px; cursor: pointer;
-}
-.hero__btn:hover { background: var(--hover); border-color: var(--fg); }
-.hero__btn--primary {
-  background: var(--fg); border-color: var(--fg); color: var(--surface); font-weight: 600;
-}
-.hero__btn--primary:hover { background: #3B3648; border-color: #3B3648; color: var(--surface); }
-
-.hero__classes {
-  position: relative; z-index: 1;
-  display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px;
-  padding-top: 14px; border-top: 1px solid var(--line);
-}
-.hero__class {
-  display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
-  width: 52px; opacity: .95;
-}
-.hero__class img {
-  width: 26px; height: 26px; object-fit: contain;
-  /* 图标原色不变；加一层极浅托底圆盘，让亮色图标在浅背景上也有边界 */
-  background: var(--icon-plate-bg);
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  padding: 3px;
-  box-sizing: content-box;
-}
-.hero__class i { width: 26px; height: 26px; border-radius: 50%; display: block; opacity: .85; }
-.hero__class em { font-style: normal; font-size: 10px; color: var(--text-dim); }
-
-/* ── 首屏钉住 + 数据层上滑覆盖（用户口径）────────────────────────
-   渐变首屏铺满一屏且 sticky 不动；下面的 .hero-cover 不透明、层级更高，
-   滚动时像帘子一样从下往上升起，把首屏盖住。 */
+  position:relative;
+  overflow:hidden;
+  border-radius:12px;
+  border:1px solid var(--border);
+  min-height:clamp(380px,52vh,620px);
+  padding:34px 34px 26px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  background:radial-gradient(900px 320px at 10% -16%,rgba(176,134,215,.22),transparent 62%),radial-gradient(760px 300px at 94% 4%,rgba(43,203,255,.16),transparent 60%),radial-gradient(620px 260px at 52% 124%,rgba(50,204,151,.12),transparent 60%),linear-gradient(160deg,var(--surface) 0%,var(--surface-2) 100%);
+  box-shadow:var(--shadow)}
+.hero__body {
+  position:relative;
+  z-index:1}
+.hero__brand .dot-sep {
+  color:var(--fg);
+  margin:0 2px;
+  opacity:.55}
 .hero--pinned {
-  position: sticky;
-  /* z-index:0 让它待在数据层下面；sticky 只能在本页内容框内活动，
-     上方的对齐靠 .content--flush-top 去掉了上内边距（见上面说明）。 */
-  top: 0; z-index: 0;
-  /* 左右负边距抵消 .content 的 18px 内边距（横向没有 sticky 那种限制） */
-  margin: 0 -18px;
-  height: calc(100vh - 46px);   /* 46px = 顶栏高度 */
-  min-height: 0;
-  border: 0; border-radius: 0;
-  justify-content: center;
-}
+  position:sticky;
+  top:0;
+  z-index:0;
+  margin:0 -18px;
+  height:calc(100vh - 46px);
+  min-height:0;
+  border:0;
+  border-radius:0;
+  justify-content:center}
 .hero-cover {
-  position: relative; z-index: 1;
-  /* 不透明底 → 才能盖住首屏；负边距同样为了铺满 */
-  background: var(--bg);
-  margin: 0 -18px -28px;
-  padding: 18px 18px 28px;
-  min-height: 100vh;
-}
-.hero__scroll {
-  position: absolute; left: 0; right: 0; bottom: 22px;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  color: var(--text-dim); font-size: 12px; letter-spacing: 1px;
-  animation: hero-scroll-hint 1.8s ease-in-out infinite;
-}
-.hero__scroll-arrow { font-size: 15px; }
+  position:relative;
+  z-index:1;
+  background:var(--bg);
+  margin:0 -18px -28px;
+  padding:18px 18px 28px;
+  min-height:100vh}
 @keyframes hero-scroll-hint {
-  0%, 100% { transform: translateY(0); opacity: .75; }
-  50% { transform: translateY(5px); opacity: 1; }
+  0%,to {
+  transform:translateY(0);
+  opacity:.75}
+50% {
+  transform:translateY(5px);
+  opacity:1}
 }
-/* 尊重"减少动效"偏好 */
-@media (prefers-reduced-motion: reduce) {
-  .hero__scroll { animation: none; }
-}
-
-/* ─────────────────────────────────────────────────────────────
-   xlsx 导入向导
-   ───────────────────────────────────────────────────────────── */
-.modal__box--wide { width: min(1180px, 95vw); }
-.sheet-preview { max-height: 46vh; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
-table.grid--sheet { font-size: 11px; }
-table.grid--sheet th, table.grid--sheet td {
-  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  border-right: 1px solid var(--border);
-}
-table.grid--sheet th { background: var(--surface-2); color: var(--text); position: sticky; top: 0; }
-table.grid--sheet th.rownum, table.grid--sheet td.rownum {
-  position: sticky; left: 0; width: 46px; text-align: right;
-  background: var(--surface-3); color: var(--text-faint);
-}
-table.grid--sheet tr.sheet-row--before td { background: var(--surface-3); color: var(--text-faint); }
-table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3); }
-
-
-/* ═══════════════════════════════════════════════════════════════
-   半透明磨砂（用户口径）：
-     · 首页下滑区 = 纯白（上面已设）
-     · 其他页（除排表功能区）= 卡片半透明磨砂 + 侧边导航/顶栏同样磨砂
-     · 排表功能区挂 .theme-light → 显式还原成不透明浅色，保持原样
-   ═══════════════════════════════════════════════════════════════ */
-/* ═══ 卡片三级层次（用户口径）═══════════════════════════════════
-   一级 = 磨砂半透明（深色玻璃，透出壁纸，白字）
-   二级 = 白色半透明（卡内行/格子，深字）
-   三级及更深 = 纯白（不透明，最深一层）
-   排表功能区仍走 .theme-light 还原，不受影响。
-   ═══════════════════════════════════════════════════════════════ */
-/* 一级：磨砂半透明（白系 —— 越往里越白，不是深色玻璃） */
-.card, .board {
-  --text: #0B0B0D; --text-dim: #4A4A55; --text-faint: #7C7C88;
-  --fg: #0B0B0D; --line: rgba(11, 11, 13, .16); --line-strong: rgba(11, 11, 13, .28);
-  --border: rgba(11, 11, 13, .16); --border-strong: rgba(11, 11, 13, .28);
-  --surface: #FFFFFF; --surface-2: rgba(255, 255, 255, .55); --surface-3: rgba(255, 255, 255, .40);
-  --hover: rgba(11, 11, 13, .07); --bg-hover: rgba(11, 11, 13, .07);
-  --bg-panel: #FFFFFF; --bg-panel-2: rgba(255, 255, 255, .55);
-  --accent: #0B0B0D; --accent-soft: rgba(11, 11, 13, .12);
-  background-color: rgba(255, 255, 255, .50) !important;
-  backdrop-filter: blur(22px) saturate(1.3);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, .40);
-  color: var(--text);
-}
-/* 一级里的输入框/下拉也翻浅，否则白卡上放深控件 */
-.card .input, .card .select, .board .input, .board .select {
-  background-color: rgba(255, 255, 255, .88) !important;
-  color: #0B0B0D !important;
-  border-color: rgba(11, 11, 13, .18) !important;
-}
-.sidebar {
-  background: rgba(11, 11, 13, .55) !important;
-  backdrop-filter: blur(18px) saturate(1.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
-  border-color: rgba(255, 255, 255, .08);
-}
-/* 用户口径：顶栏**透明**（不要那条深色横带），收起导航栏按钮保持原样 */
+.modal__box--wide {
+  width:min(1180px,95vw)}
+.sheet-preview {
+  max-height:46vh;
+  overflow:auto;
+  border:1px solid var(--border);
+  border-radius:6px}
+table.grid--sheet {
+  font-size:11px}
+table.grid--sheet th,table.grid--sheet td {
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  border-right:1px solid var(--border)}
+table.grid--sheet th {
+  background:var(--surface-2);
+  color:var(--text);
+  position:sticky;
+  top:0}
+table.grid--sheet th.rownum,table.grid--sheet td.rownum {
+  position:sticky;
+  left:0;
+  width:46px;
+  text-align:right;
+  background:var(--surface-3);
+  color:var(--text-faint)}
+table.grid--sheet tr.sheet-row--before td {
+  background:var(--surface-3);
+  color:var(--text-faint)}
+table.grid--sheet tr.sheet-row--before td.rownum {
+  background:var(--surface-3)}
+.card,.board {
+  --text: #0B0B0D;
+  --text-dim: #4A4A55;
+  --text-faint: #7C7C88;
+  --fg: #0B0B0D;
+  --line: rgba(11, 11, 13, .16);
+  --line-strong: rgba(11, 11, 13, .28);
+  --border: rgba(11, 11, 13, .16);
+  --border-strong: rgba(11, 11, 13, .28);
+  --surface: #FFFFFF;
+  --surface-2: rgba(255, 255, 255, .55);
+  --surface-3: rgba(255, 255, 255, .4);
+  --hover: rgba(11, 11, 13, .07);
+  --bg-hover: rgba(11, 11, 13, .07);
+  --bg-panel: #FFFFFF;
+  --bg-panel-2: rgba(255, 255, 255, .55);
+  --accent: #0B0B0D;
+  --accent-soft: rgba(11, 11, 13, .12);
+  background-color:#ffffff80!important;
+  backdrop-filter:blur(22px) saturate(1.3);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.4);
+  color:var(--text)}
+.card .input,.card .select,.board .input,.board .select {
+  background-color:#ffffffe0!important;
+  color:#0b0b0d!important;
+  border-color:#0b0b0d2e!important}
 .topbar {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-/* 二级：白色半透明（卡内的行/格子/浮层），文字翻黑 */
-.stat, .roster-card, .picker-item, .modal, .home-card, .roster-cards__head {
+  background:transparent!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  border:none!important;
+  box-shadow:none!important}
+.stat,.roster-card,.picker-item,.modal,.home-card,.roster-cards__head {
   --text: #0B0B0D;
   --text-dim: #4A4A55;
   --text-faint: #7C7C88;
@@ -1445,157 +2215,139 @@ table.grid--sheet tr.sheet-row--before td.rownum { background: var(--surface-3);
   --border-strong: rgba(11, 11, 13, .26);
   --surface: #FFFFFF;
   --surface-2: rgba(255, 255, 255, .55);
-  --surface-3: rgba(255, 255, 255, .40);
+  --surface-3: rgba(255, 255, 255, .4);
   --hover: rgba(11, 11, 13, .07);
   --bg-hover: rgba(11, 11, 13, .07);
   --bg-panel: #FFFFFF;
   --bg-panel-2: rgba(255, 255, 255, .55);
   --accent: #0B0B0D;
   --accent-soft: rgba(11, 11, 13, .12);
-  background-color: rgba(255, 255, 255, .78) !important;
-  backdrop-filter: blur(20px) saturate(1.25);
-  -webkit-backdrop-filter: blur(20px) saturate(1.25);
-  border: 1px solid rgba(255, 255, 255, .45);
-  color: var(--text);
-}
-/* 二级里的输入框/下拉：浅底深字，免得白卡上放深控件 */
-.stat .input, .stat .select, .roster-card .input, .roster-card .select,
-.picker-item .input, .picker-item .select,
-.roster-cards__head .input, .roster-cards__head .select {
-  background-color: rgba(255, 255, 255, .88) !important;
-  color: #0B0B0D !important;
-  border-color: rgba(11, 11, 13, .18) !important;
-}
-/* 三级及更深：纯白不透明 */
-.roster-card__edit, .card .card, .modal .card, .stat .stat,
-.roster-card .card, .picker-item .card {
-  background-color: #FFFFFF !important;
-  backdrop-filter: none; -webkit-backdrop-filter: none;
-  --text: #0B0B0D; --text-dim: #4A4A55; --text-faint: #7C7C88;
-  --line: rgba(11, 11, 13, .14); --line-strong: rgba(11, 11, 13, .26);
-  --surface: #FFFFFF; --surface-2: #F4F4F6; --surface-3: #EFEFF2;
-  color: #0B0B0D;
-}
-/* 排表功能区（.theme-light）显式还原：不透明浅色、不磨砂 —— 用户要求不做改动 */
-/* 用户口径更新：排表区也套三级卡片；只保留卡内浅色令牌，
-   .pcard 等职业色块不受影响（换职业仍按职业色）。 */
-.theme-light .stat, .theme-light .roster-card,
-.theme-light .picker-item, .theme-light .modal,
-.theme-light .roster-cards__head {
-  background-color: var(--surface) !important;
-  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
-  border-color: var(--line) !important;
-  --text: #4A4459; --text-dim: #6F6879; --text-faint: #928B9C; --fg: #4A4459;
-  --line: #D6CFDA; --line-strong: #B9AFC4;
-  --surface: #FCF8FD; --surface-2: #E6E0F0; --surface-3: #E9E0EA;
-  --hover: #DCD5E2; --bg-hover: #DCD5E2;
-  --border: #D6CFDA; --border-strong: #B9AFC4;
-  --accent: #4A4459; --accent-soft: #E0D8E8;
-  color: #4A4459;
-}
-
-
-/* ═══ 圆角（用户口径：**只给容器矩形**加弧度）══════════════════
-   上一版我把槽位/图片/按钮也圆了 —— 空位变成椭圆，属于改过头，已撤。
-   现在只有容器类矩形带弧度；槽位、职业卡、控件保持原样。
-   ═══════════════════════════════════════════════════════════════ */
-.card, .board, .home-card { border-radius: 18px; }
-.stat, .modal, .roster-cards__head { border-radius: 14px; }
-.roster-card { border-radius: 12px; }
-
-/* ═══ 侧栏选中项：不要纯黑，用半透明叠层（壁纸透得过去）══════════
-   原来选中态是实心黑块，把壁纸磨砂效果整个压没了。
-   改成半透明白叠层 + 轻微描边：在深色磨砂侧栏上读作"透黑"，但底下仍有画面。
-   ═══════════════════════════════════════════════════════════════ */
-.nav-item.active {
-  background: rgba(255, 255, 255, .12) !important;
-  border: 1px solid rgba(255, 255, 255, .14) !important;
-  color: #FFFFFF !important;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: none !important;
-}
-.nav-item:hover:not(.active) { background: rgba(255, 255, 255, .07) !important; }
-/* 顶栏折叠按钮、其它实心黑胶囊同样换成半透明 */
-.nav-toggle, .tab.active {
-  background: rgba(255, 255, 255, .12) !important;
-  border: 1px solid rgba(255, 255, 255, .14) !important;
-  color: #FFFFFF !important;
-}
-.tab.active { border-radius: 999px !important; }
-
-
-/* ═══ 顶部导航条（用户说的"上面那块"）══════════════════════════
-   它必须和下方内容一致：透出壁纸，不要自己一条深色横带。
-   之前只设了 background:transparent，但 .topbar 在网格里仍可能被
-   兄弟层的不透明底顶上来 —— 这里补上定位与层级，并清掉任何底/描边/滤镜。
-   ═══════════════════════════════════════════════════════════════ */
+  background-color:#ffffffc7!important;
+  backdrop-filter:blur(20px) saturate(1.25);
+  -webkit-backdrop-filter:blur(20px) saturate(1.25);
+  border:1px solid rgba(255,255,255,.45);
+  color:var(--text)}
+.stat .input,.stat .select,.roster-card .input,.roster-card .select,.picker-item .input,.picker-item .select,.roster-cards__head .input,.roster-cards__head .select {
+  background-color:#ffffffe0!important;
+  color:#0b0b0d!important;
+  border-color:#0b0b0d2e!important}
+.roster-card__edit,.card .card,.modal .card,.stat .stat,.roster-card .card,.picker-item .card {
+  background-color:#fff!important;
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+  --text: #0B0B0D;
+  --text-dim: #4A4A55;
+  --text-faint: #7C7C88;
+  --line: rgba(11, 11, 13, .14);
+  --line-strong: rgba(11, 11, 13, .26);
+  --surface: #FFFFFF;
+  --surface-2: #F4F4F6;
+  --surface-3: #EFEFF2;
+  color:#0b0b0d}
+.theme-light .stat,.theme-light .roster-card,.theme-light .picker-item,.theme-light .modal,.theme-light .roster-cards__head {
+  background-color:var(--surface)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  border-color:var(--line)!important;
+  --text: #4A4459;
+  --text-dim: #6F6879;
+  --text-faint: #928B9C;
+  --fg: #4A4459;
+  --line: #D6CFDA;
+  --line-strong: #B9AFC4;
+  --surface: #FCF8FD;
+  --surface-2: #E6E0F0;
+  --surface-3: #E9E0EA;
+  --hover: #DCD5E2;
+  --bg-hover: #DCD5E2;
+  --border: #D6CFDA;
+  --border-strong: #B9AFC4;
+  --accent: #4A4459;
+  --accent-soft: #E0D8E8;
+  color:#4a4459}
+.card,.board,.home-card {
+  border-radius:18px}
+.stat,.modal,.roster-cards__head {
+  border-radius:14px}
+.nav-toggle,.tab.active {
+  background:#ffffff1f!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  color:#fff!important}
+.tab.active {
+  border-radius:999px!important}
 .topbar {
-  position: relative; z-index: 2;
-  background: transparent !important;
-  background-image: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-
-/* ═══ 首页顶栏与首屏颜色一致 ══════════════════════════════════
-   首屏 .home-hero 自带一层横向压暗蒙层（左深右浅，为了品牌字可读），
-   而顶栏是透明的 → 顶栏露原始壁纸、首屏露"壁纸+蒙层"，交界处就有色差。
-   其他页没有这层蒙层，所以本来就一致。
-   这里让首页顶栏套**同一串渐变**，两边接上就没有缝了。
-   ═══════════════════════════════════════════════════════════════ */
-/* 用户方案：**顶栏完全不画背景**，让首屏那一层向上盖住顶栏区
-   —— 一层渐变贯穿两区，物理上不可能有色差。
-
-   注意实现方式：不能给首屏加负 margin —— .hero--pinned 是 position:sticky，
-   **sticky 元素无法超出包含块的上边缘**（前面踩过这个坑，改数值完全没反应）。
-   所以改成给顶栏**加负的下边距**：整个内容区上移 46px 钻进顶栏下面，
-   顶栏透明 + 首屏渐变从视口最顶端开始铺 → 同一层渐变贯穿两区。
-   （顶栏高度见 .app 的布局：46px。） */
+  z-index:2;
+  background:transparent!important;
+  background-image:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  border:none!important;
+  box-shadow:none!important}
 .topbar--home {
-  background: none !important;
-  background-image: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  box-shadow: none !important;
-  margin-bottom: -46px !important;
-}
-/* 首屏改成整屏高：内容区上移 46px 后，仍要铺满整视口 */
-.hero.hero--pinned.home-hero { height: 100vh !important; }
-
-
-/* ═══ 卡片上的「橙武」徽标（用户口径）══════════════════════════
-   位置：职业右侧、卡片最右端；有橙武才显示，没有不显示。
-   字号：比职业字号小 2px（职业 15px → 这里 13px）。
-   配色：橙色卡片 + 橙色字体。
-   ═══════════════════════════════════════════════════════════════ */
+  background:radial-gradient(900px 460px at 88% 0%,rgba(110,123,255,.1),transparent 62%),linear-gradient(90deg,#0b0b0de6,#0b0b0db8 30%,#0b0b0d57 52%,#0b0b0d1f 72%,#0b0b0d66)!important;
+  background-attachment:fixed,fixed!important;
+  background-size:auto,auto!important;
+  background-position:center,center!important;
+  background-repeat:no-repeat,no-repeat!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  border:none!important;
+  box-shadow:none!important}
+.hero.home-hero {
+  background-attachment:fixed,fixed}
+.hero.hero--pinned.home-hero {
+  height:100%!important}
+.pcard__owart {
+  position:absolute;
+  right:0;
+  bottom:0;
+  width:30%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none}
+.pcard__owart img {
+  width:150%;
+  height:150%;
+  object-fit:cover;
+  object-position:center;
+  display:block;
+  transform:rotate(30deg)}
+.pcard--ow .pcard__id {
+  max-width:80%}
+.pcard--ow .pcard__note {
+  max-width:70%}
+.pcard__badges {
+  align-self:flex-end;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  margin-top:-22px;
+  margin-bottom:-18px;
+  z-index:2}
 .pcard__ow {
-  align-self: flex-end;
-  margin-top: -22px;      /* 提回职业那一行 */
-  margin-right: 2px;
-  padding: 0 6px;
-  font-size: 13px;        /* 职业 15px − 2px */
-  line-height: 1.4;
-  color: var(--orange);
-  background: var(--orange-soft);
-  border: 1px solid var(--orange);
-  border-radius: 6px;
-  white-space: nowrap;
-}
-
-
-/* ═══ 表格 / 页签 / 输入框也走白色三级方案（用户口径：不要黑色卡片）═══
-   上一版只覆盖了 .card/.stat/.roster-card 这类容器，
-   报名页的 table.grid、筛选页签、搜索框都不在 .card 里，
-   拿不到浅色令牌，于是还是深色 → 看起来仍是黑卡片。
-   这里给它们单独的浅色令牌与白底，规则与三级一致：
-     表格本体 = 一级磨砂（.50）  表头 = 二级（.78）  行 = 二级偏透（.66）
-   ═══════════════════════════════════════════════════════════════ */
-table.grid, table.grid * {
+  padding:0 6px;
+  font-size:13px;
+  line-height:1.4;
+  color:var(--orange);
+  background:var(--orange-soft);
+  border:1px solid var(--orange);
+  border-radius:6px;
+  white-space:nowrap;
+  flex:0 0 auto}
+.pcard__noterole {
+  padding:0 6px;
+  font-size:13px;
+  line-height:1.4;
+  background:#fff;
+  color:#0b0b0d;
+  border:1px solid rgba(11,11,13,.14);
+  border-radius:6px;
+  white-space:nowrap;
+  box-shadow:0 1px 3px #0000002e;
+  flex:0 0 auto}
+table.grid,table.grid * {
   --text: #0B0B0D;
   --text-dim: #4A4A55;
   --text-faint: #7C7C88;
@@ -1607,765 +2359,1276 @@ table.grid, table.grid * {
   --surface: #FFFFFF;
   --surface-2: rgba(255, 255, 255, .55);
   --hover: rgba(11, 11, 13, .06);
-  --bg-hover: rgba(11, 11, 13, .06);
-}
+  --bg-hover: rgba(11, 11, 13, .06)}
 table.grid {
-  background-color: rgba(255, 255, 255, .50) !important;
-  color: #0B0B0D !important;
-  border-radius: 14px;
-  overflow: hidden;
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-}
+  background-color:#ffffff80!important;
+  color:#0b0b0d!important;
+  border-radius:14px;
+  overflow:clip;
+  backdrop-filter:blur(20px) saturate(1.2);
+  -webkit-backdrop-filter:blur(20px) saturate(1.2)}
 table.grid thead th {
-  background-color: rgba(255, 255, 255, .78) !important;
-  color: #4A4A55 !important;
-}
-table.grid tbody tr { background-color: rgba(255, 255, 255, .62) !important; }
-table.grid tbody tr:nth-child(even) { background-color: rgba(255, 255, 255, .55) !important; }
-table.grid tbody tr:hover { background-color: rgba(255, 255, 255, .85) !important; }
-table.grid tbody td, table.grid tbody th { color: #0B0B0D !important; }
-
-/* 筛选页签 / 工具栏 / 输入框：深色页上也不要黑块 */
+  background-color:#ffffffc7!important;
+  color:#4a4a55!important}
+table.grid tbody tr {
+  background-color:#ffffff9e!important}
+table.grid tbody tr:nth-child(2n) {
+  background-color:#ffffff8c!important}
+table.grid tbody tr:hover {
+  background-color:#ffffffd9!important}
+table.grid th.col-act,table.grid td.col-act {
+  position:sticky;
+  right:0;
+  z-index:3;
+  background-color:#ffffffe0;
+  backdrop-filter:blur(10px) saturate(1.1);
+  -webkit-backdrop-filter:blur(10px) saturate(1.1);
+  box-shadow:-10px 0 10px -10px #00000073}
+table.grid tbody td,table.grid tbody th {
+  color:#0b0b0d!important}
 .tab {
-  background: rgba(255, 255, 255, .50) !important;
-  color: #0B0B0D !important;
-  border-radius: 999px !important;
-  border: 1px solid rgba(255, 255, 255, .40) !important;
-}
+  background:#ffffff80!important;
+  color:#0b0b0d!important;
+  border-radius:999px!important;
+  border:1px solid rgba(255,255,255,.4)!important}
 .tab.active {
-  background: rgba(255, 255, 255, .88) !important;
-  color: #0B0B0D !important;
-  border-color: rgba(255, 255, 255, .70) !important;
-}
-.toolbar .input, .toolbar .select, .input, .select {
-  background-color: rgba(255, 255, 255, .80) !important;
-  color: #0B0B0D !important;
-  border-color: rgba(11, 11, 13, .18) !important;
-}
-.input::placeholder { color: #7C7C88 !important; }
-
-
-/* ═══ 职业图标一律透明托底（用户口径：「职业的图片也是得透明的」）═══
-   原来图标后面有一层深色（--icon-plate-bg: #1C1C22）或白色小方底，
-   在卡片/表格里看就是一个个色块。这里统一清掉底色与描边、去掉内边距，
-   只留图标本身的原色（既定口径：职业图标不改色）。
-   ═══════════════════════════════════════════════════════════════ */
-.chip img, .chip .ico, .chip .icon,
-.picker-item img, .picker-item__main img, .picker-item__sub img,
-table.grid img, .roster-card img, .stat img, .card img,
-.pcard__icon, .home-tray__plate img {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-
-
-/* ═══ 选职业的反馈：职业标签自己放大/跳动（用户口径）════════════
-   原来选中/悬停时是**外圈那格底色加深**（一块灰底），
-   用户要求改成"职业卡片跳动或者放大" —— 反馈落在标签自己身上。
-   ═══════════════════════════════════════════════════════════════ */
-/* 外圈不再加深 */
-.picker-item__main, .picker-item__sub,
-.picker-item__main:hover, .picker-item__sub:hover,
-.picker-item__main:focus, .picker-item__sub:focus {
-  background: transparent !important;
-}
-/* 标签本体：悬停放大、按下弹一下 */
-.picker-item .chip,
-.picker-item__main .chip, .picker-item__sub .chip,
-.picker-item__main > *, .picker-item__sub > * {
-  transition: transform .12s cubic-bezier(.2, .7, .2, 1);
-  transform-origin: center;
-}
-.picker-item__main:hover > *, .picker-item__sub:hover > * { transform: scale(1.10); }
-.picker-item__main:active > *, .picker-item__sub:active > * { animation: cls-pop .3s ease; }
-
+  background:#ffffffe0!important;
+  color:#0b0b0d!important;
+  border-color:#ffffffb3!important}
+.toolbar .input,.toolbar .select,.input,.select {
+  background-color:#fffc!important;
+  color:#0b0b0d!important;
+  border-color:#0b0b0d2e!important}
+.input::placeholder {
+  color:#7c7c88!important}
+.chip img,.chip .ico,.chip .icon,.picker-item img,.picker-item__main img,.picker-item__sub img,table.grid img,.roster-card img,.stat img,.card img,.pcard__icon,.home-tray__plate img {
+  background:transparent!important;
+  background-color:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+  padding:0!important}
+.picker-item__main,.picker-item__sub,.picker-item__main:hover,.picker-item__sub:hover,.picker-item__main:focus,.picker-item__sub:focus {
+  background:transparent!important}
+.picker-item .chip,.picker-item__main .chip,.picker-item__sub .chip,.picker-item__main>*,.picker-item__sub>* {
+  transition:transform .12s cubic-bezier(.2,.7,.2,1);
+  transform-origin:center}
+.picker-item__main:hover>*,.picker-item__sub:hover>* {
+  transform:scale(1.1)}
+.picker-item__main:active>*,.picker-item__sub:active>* {
+  animation:cls-pop .3s ease}
 @keyframes cls-pop {
-  0%   { transform: scale(1); }
-  40%  { transform: scale(1.24); }
-  70%  { transform: scale(.98); }
-  100% { transform: scale(1); }
+  0% {
+  transform:scale(1)}
+40% {
+  transform:scale(1.24)}
+70% {
+  transform:scale(.98)}
+to {
+  transform:scale(1)}
 }
-@media (prefers-reduced-motion: reduce) {
-  .picker-item__main:active > *, .picker-item__sub:active > * { animation: none; }
-  .picker-item__main:hover > *, .picker-item__sub:hover > * { transform: none; }
+.picker-group .chip,.chip.class,.chip-icon {
+  transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s ease;
+  will-change:transform}
+.picker-group .chip:hover,.chip.class:hover {
+  transform:translateY(-2px);
+  background:transparent!important;
+  box-shadow:0 2px 6px #0000001f}
+.picker-group .chip:active,.chip.class:active {
+  transform:translateY(-1px)}
+.picker-group .chip:focus,.chip.class:focus {
+  outline:none!important}
+.pcard .pcard__cls--edit {
+  -moz-appearance:none;
+  appearance:none;
+  -webkit-appearance:none;
+  background:transparent!important;
+  border:none!important;
+  outline:none!important;
+  box-shadow:none!important;
+  color:inherit!important;
+  font:inherit!important;
+  font-size:15px!important;
+  line-height:1.2!important;
+  padding:0 16px 0 0!important;
+  margin:0!important;
+  width:auto;
+  max-width:100%;
+  cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%)!important;
+  background-position:calc(100% - 7px) 55%,calc(100% - 3px) 55%!important;
+  background-size:4px 4px,4px 4px!important;
+  background-repeat:no-repeat!important}
+.pcard .pcard__cls--edit:hover {
+  opacity:.85}
+.pcard .pcard__cls--edit option {
+  background:#fff;
+  color:#0b0b0d}
+.pcard .cs {
+  position:relative;
+  display:inline-block}
+.pcard .cs__btn {
+  list-style:none;
+  cursor:pointer;
+  color:inherit;
+  font:inherit;
+  font-size:15px;
+  line-height:1.2;
+  padding:0 16px 0 0;
+  position:relative;
+  -webkit-user-select:none;
+  user-select:none;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+  background-position:calc(100% - 7px) 55%,calc(100% - 3px) 55%;
+  background-size:4px 4px,4px 4px;
+  background-repeat:no-repeat}
+.pcard .cs__btn::-webkit-details-marker {
+  display:none}
+.pcard .cs__btn:hover {
+  opacity:.85}
+.pcard .cs__list {
+  position:absolute;
+  z-index:40;
+  left:0;
+  top:calc(100% + 4px);
+  min-width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  padding:4px;
+  background:#fff;
+  border:1px solid rgba(11,11,13,.16);
+  border-radius:10px;
+  box-shadow:0 8px 22px #00000038}
+.pcard .cs__opt {
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  appearance:none;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  text-align:left;
+  padding:5px 10px;
+  border-radius:6px;
+  white-space:nowrap;
+  color:#0b0b0d;
+  font-size:14px;
+  font-family:inherit}
+.pcard .cs__opt:hover {
+  background:#0b0b0d12}
+.pcard .cs__opt.on {
+  font-weight:700;
+  background:#0b0b0d1a}
+.sel {
+  position:relative;
+  display:inline-block;
+  min-width:0}
+.sel__btn {
+  list-style:none;
+  cursor:pointer;
+  -webkit-user-select:none;
+  user-select:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  padding:5px 9px;
+  border-radius:10px;
+  background:#fffc;
+  color:#0b0b0d;
+  border:1px solid rgba(11,11,13,.18);
+  font:inherit;
+  font-size:13px;
+  line-height:1.35;
+  min-width:0}
+.sel__txt {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.sel__btn::-webkit-details-marker {
+  display:none}
+.sel__btn:after {
+  content:"";
+  flex:0 0 auto;
+  width:8px;
+  height:5px;
+  background:currentColor;
+  opacity:.55;
+  clip-path:polygon(0 0,100% 0,50% 100%)}
+.sel__btn:hover {
+  border-color:#0b0b0d4d}
+.sel[open]>.sel__btn {
+  border-color:#0b0b0d6b}
+.sel__list {
+  position:absolute;
+  z-index:60;
+  left:0;
+  top:calc(100% + 4px);
+  min-width:max(100%,max-content);
+  display:flex;
+  flex-direction:column;
+  gap:1px;
+  padding:4px;
+  background:#fff;
+  border:1px solid rgba(11,11,13,.16);
+  border-radius:10px;
+  box-shadow:0 10px 26px #00000040;
+  max-height:min(52vh,400px);
+  overflow:auto}
+.sel__opt {
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  appearance:none;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  flex:0 0 auto;
+  text-align:left;
+  padding:7px 11px;
+  border-radius:6px;
+  white-space:nowrap;
+  color:#0b0b0d;
+  font-size:13px;
+  line-height:1.45;
+  font-family:inherit}
+.sel__opt:hover {
+  background:#0b0b0d12}
+.sel__opt.on {
+  font-weight:700;
+  background:#0b0b0d1a}
+.sel__opt:disabled {
+  opacity:.45;
+  cursor:not-allowed}
+.pcard .sel__btn {
+  background:transparent;
+  border:none;
+  padding:0 16px 0 0;
+  color:inherit;
+  font-size:15px}
+.pcard .sel__btn:after {
+  opacity:.8}
+.sel__native {
+  display:none}
+.sel__btn {
+  max-width:100%;
+  overflow:hidden;
+  border-radius:12px;
+  background:#ffffff8c!important;
+  backdrop-filter:blur(18px) saturate(1.25);
+  -webkit-backdrop-filter:blur(18px) saturate(1.25);
+  border:1px solid rgba(255,255,255,.45)!important}
+.sel__txt {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.sel__ico {
+  width:16px;
+  height:16px;
+  flex:0 0 auto;
+  object-fit:contain;
+  background:transparent}
+.sel__list {
+  border-radius:12px;
+  background:#ffffffe0!important;
+  backdrop-filter:blur(22px) saturate(1.3);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.55)!important;
+  box-shadow:0 12px 30px #00000047}
+.sel__opt {
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis}
+.sel--up .sel__list {
+  top:auto;
+  bottom:calc(100% + 4px);
+  transform-origin:bottom center}
+.pcard .sel__btn {
+  background:transparent!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  border:none!important}
+.sel[open]>.sel__btn {
+  background:#ffffffbd!important;
+  color:#0b0b0d!important;
+  border-color:#0b0b0d4d!important}
+.sel[open] .sel__list {
+  background:#fffc!important;
+  backdrop-filter:blur(22px) saturate(1.3);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);
+  border-color:#ffffff8c!important;
+  box-shadow:0 12px 30px #00000042}
+.sel[open] .sel__opt {
+  color:#0b0b0d}
+.sel[open] .sel__opt:hover {
+  background:#0b0b0d12}
+.sel[open] .sel__opt.on {
+  background:#0b0b0d1f;
+  color:#0b0b0d;
+  font-weight:700}
+.sel[open] {
+  z-index:80}
+.toolbar:has(.sel[open]),.card:has(.sel[open]),.stat:has(.sel[open]),.roster-cards__head:has(.sel[open]),.home-card:has(.sel[open]),.field:has(.sel[open]) {
+  position:relative;
+  z-index:75}
+.sel__btn {
+  background:#fffc!important;
+  color:#0b0b0d!important;
+  border:1px solid rgba(11,11,13,.18)!important;
+  border-radius:10px!important;
+  padding:0 9px!important;
+  font-size:13px!important;
+  height:30px;
+  box-sizing:border-box;
+  justify-content:space-between}
+.sel__btn:hover {
+  border-color:#0b0b0d47!important}
+.sel[open]>.sel__btn {
+  background:#ffffffeb!important;
+  border-color:#0b0b0d57!important}
+.input[type=date] {
+  background:#fffc!important;
+  color:#0b0b0d!important;
+  border:1px solid rgba(11,11,13,.18)!important;
+  border-radius:10px!important;
+  font-size:13px!important}
+.input[type=date]::-webkit-calendar-picker-indicator {
+  opacity:.55;
+  cursor:pointer}
+.dp {
+  position:relative;
+  display:inline-block;
+  min-width:0}
+.dp__native {
+  display:none}
+.dp__btn {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  height:30px;
+  box-sizing:border-box;
+  padding:0 9px;
+  background:#fffc;
+  color:#0b0b0d;
+  border:1px solid rgba(11,11,13,.18);
+  border-radius:10px;
+  font:inherit;
+  font-size:13px;
+  min-width:0;
+  width:100%;
+  text-align:left}
+.dp__btn:hover {
+  border-color:#0b0b0d47}
+.dp__btn:after {
+  content:"";
+  margin-left:auto;
+  flex:0 0 auto;
+  width:8px;
+  height:5px;
+  background:currentColor;
+  opacity:.5;
+  clip-path:polygon(0 0,100% 0,50% 100%)}
+.dp__txt {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap}
+.dp__pop {
+  position:absolute;
+  z-index:95;
+  left:0;
+  top:calc(100% + 6px);
+  width:264px;
+  padding:12px 12px 8px;
+  border-radius:16px;
+  background:#fffc;
+  backdrop-filter:blur(22px) saturate(1.3);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:0 14px 34px #00000042;
+  color:#0b0b0d}
+.dp__head {
+  display:flex;
+  align-items:center;
+  gap:4px;
+  margin-bottom:8px}
+.dp__month {
+  font-weight:700;
+  font-size:13px;
+  letter-spacing:.02em}
+.dp__sp {
+  flex:1}
+.dp__nav {
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  font-size:15px;
+  color:#0b0b0d;
+  padding:2px 8px;
+  border-radius:8px;
+  font-family:inherit}
+.dp__nav:hover {
+  background:#0b0b0d14}
+.dp__wd {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  margin-bottom:4px;
+  font-size:11px;
+  color:#7c7c88;
+  text-align:center}
+.dp__grid {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:2px}
+.dp__d {
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  font-family:inherit;
+  font-size:12px;
+  color:#0b0b0d;
+  padding:6px 0;
+  border-radius:9px}
+.dp__d:hover {
+  background:#0b0b0d14}
+.dp__d--out {
+  color:#0b0b0d42;
+  cursor:default}
+.dp__d--out:hover {
+  background:transparent}
+.dp__d.today {
+  box-shadow:inset 0 0 0 1px #0b0b0d38}
+.dp__d.on {
+  background:#0b0b0d29;
+  font-weight:700}
+.dp__foot {
+  display:flex;
+  justify-content:space-between;
+  margin-top:8px}
+.dp__lnk {
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  font-family:inherit;
+  color:#0b0b0d;
+  font-size:12px;
+  padding:3px 6px;
+  border-radius:8px}
+.dp__lnk:hover {
+  background:#0b0b0d14}
+.toolbar:has(.dp__pop),.field:has(.dp__pop),.card:has(.dp__pop) {
+  position:relative;
+  z-index:75}
+.cfm {
+  position:fixed;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  z-index:200;
+  display:grid;
+  place-items:center;
+  background:#00000059;
+  -webkit-backdrop-filter:blur(2px);
+  backdrop-filter:blur(2px)}
+.cfm__box {
+  width:min(420px,86vw);
+  padding:20px;
+  border-radius:16px;
+  background:#ffffffdb;
+  backdrop-filter:blur(24px) saturate(1.3);
+  -webkit-backdrop-filter:blur(24px) saturate(1.3);
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:0 18px 44px #00000057;
+  color:#0b0b0d}
+.cfm__msg {
+  font-size:14px;
+  line-height:1.7;
+  white-space:pre-wrap}
+.cfm__foot {
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  margin-top:18px}
+.sel,.dp {
+  background:none!important;
+  background-color:transparent!important;
+  border:none!important;
+  box-shadow:none!important;
+  outline:none!important;
+  padding:0!important;
+  min-height:0!important;
+  height:auto!important}
+.sel.input:before,.sel.select:before,.dp.input:before {
+  display:none!important}
+.dp__pop {
+  background:#fffffff2!important;
+  border-color:#0b0b0d1a!important;
+  box-shadow:0 16px 40px #0000004d!important}
+.sel[open] .sel__list {
+  background:#fffffff2!important;
+  border-color:#0b0b0d1a!important}
+.sel[open]>.sel__btn {
+  background:#fffffff2!important}
+.cfm__box {
+  background:#fffffff2!important}
+.pcard .sel__btn,.pcard .sel__txt {
+  color:inherit!important}
+.pcard .sel__ico {
+  width:22px;
+  height:22px}
+.pcard .sel__list .sel__opt {
+  color:#0b0b0d!important}
+.sel__btn:after,.dp__btn:after {
+  display:none!important;
+  content:none!important}
+.sel__btn,.dp__btn {
+  padding-right:9px!important}
+.pcard .sel__btn {
+  background:none!important;
+  border:none!important}
+.sel.menu>.sel__btn {
+  background:#fffc!important;
+  border:1px solid rgba(11,11,13,.18)!important;
+  border-radius:10px!important;
+  height:30px;
+  padding:0 12px!important;
+  color:#0b0b0d!important;
+  font-size:13px!important;
+  justify-content:center}
+.sel.menu>.sel__btn:hover {
+  border-color:#0b0b0d4d!important}
+.sel.menu .sel__list {
+  min-width:168px;
+  right:0;
+  left:auto}
+.sel.menu .sel__opt {
+  font-size:13px}
+.pop-wrap {
+  position:relative;
+  display:inline-flex}
+.pop {
+  position:absolute;
+  right:0;
+  top:calc(100% + 8px);
+  z-index:95;
+  width:min(760px,78vw);
+  padding:16px;
+  border-radius:16px;
+  background:#fffffff5;
+  backdrop-filter:blur(22px) saturate(1.3);
+  -webkit-backdrop-filter:blur(22px) saturate(1.3);
+  border:1px solid rgba(11,11,13,.1);
+  box-shadow:0 18px 44px #00000047;
+  color:#0b0b0d}
+.pop__head {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:12px}
+.pcard--ow {
+  background:color-mix(in srgb,var(--pc, var(--surface-3)) 60%,transparent)!important;
+  border:1px solid color-mix(in srgb,var(--pc, #888) 75%,#000000);
+  color:color-mix(in srgb,var(--pc, #333) 75%,#0B0B0D);
+  box-shadow:0 0 27px 4.5px color-mix(in srgb,var(--pc, #888) 55%,transparent),inset 0 0 24px 4.5px color-mix(in srgb,var(--pc, #888) 42%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 32%,transparent);
+  animation:ow-halo 4.5s ease-in-out infinite}
+.pcard--ow:hover {
+  box-shadow:0 0 42px 9px color-mix(in srgb,var(--pc, #888) 70%,transparent),inset 0 0 33px 7.5px color-mix(in srgb,var(--pc, #888) 55%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 45%,transparent);
+  animation-duration:2.2s}
+.pcard--ow.pcard--dragging {
+  box-shadow:0 0 15px 1.5px color-mix(in srgb,var(--pc, #888) 35%,transparent),inset 0 0 15px 3px color-mix(in srgb,var(--pc, #888) 30%,transparent)}
+@property --ow-ang {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+  }
+@keyframes ow-halo {
+  0% {
+  box-shadow:0 0 27px 4.5px color-mix(in srgb,var(--pc, #888) 55%,transparent),inset 0 0 24px 4.5px color-mix(in srgb,var(--pc, #888) 42%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 32%,transparent)}
+25% {
+  box-shadow:0 0 34px 6px color-mix(in srgb,var(--pc, #888) 66%,transparent),inset 7px -5px 22px 4px color-mix(in srgb,var(--pc, #888) 52%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 42%,transparent)}
+50% {
+  box-shadow:0 0 27px 4.5px color-mix(in srgb,var(--pc, #888) 55%,transparent),inset 0 0 24px 4.5px color-mix(in srgb,var(--pc, #888) 42%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 32%,transparent)}
+75% {
+  box-shadow:0 0 34px 6px color-mix(in srgb,var(--pc, #888) 66%,transparent),inset -7px 5px 22px 4px color-mix(in srgb,var(--pc, #888) 52%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 42%,transparent)}
+to {
+  box-shadow:0 0 27px 4.5px color-mix(in srgb,var(--pc, #888) 55%,transparent),inset 0 0 24px 4.5px color-mix(in srgb,var(--pc, #888) 42%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--pc, #fff) 32%,transparent)}
+}
+.pcard--ow:before {
+  content:"";
+  position:absolute;
+  top:0;
+  right:0;
+  bottom:0;
+  left:0;
+  border-radius:10px;
+  padding:2px;
+  background:conic-gradient(from var(--ow-ang),transparent 0deg,color-mix(in srgb,var(--pc, #fff) 45%,#ffffff) 45deg,transparent 130deg,transparent 195deg,color-mix(in srgb,var(--pc, #fff) 35%,#ffffff) 250deg,transparent 335deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  opacity:.9;
+  pointer-events:none;
+  animation:ow-rim 4.5s linear infinite}
+.pcard--ow:hover:before {
+  animation-duration:2.2s}
+@keyframes ow-rim {
+  to {
+  --ow-ang: 360deg}
+}
+.pcard--ow .pcard__cls,.pcard--ow .pcard__note,.pcard--ow .pcard__note::placeholder {
+  color:color-mix(in srgb,var(--pc, #333) 75%,#0B0B0D)}
+.pcard--ow .pcard__note::placeholder {
+  opacity:.78}
+.sel[open],.dp[open],.dp .dp__pop {
+  z-index:90}
+:is(.roster-card,.roster-card__edit,.roster-cards,.roster-cards__head,.toolbar,.card,.stat,.field,.home-card,.board,.picker-item,.modal__box,table.grid,tbody,tr,td) :has(.sel[open]) {
+  position:relative;
+  z-index:88}
+:is(.roster-card,.roster-card__edit,.roster-cards,.toolbar,.card,.stat,.field,.home-card,.board,.picker-item,.modal__box) :has(.dp__pop) {
+  position:relative;
+  z-index:88}
+.pcard--ow .pcard__id {
+  background-image:repeating-linear-gradient(100deg,color-mix(in srgb,var(--pc, #333) 75%,#0B0B0D),color-mix(in srgb,var(--pc, #333) 88%,#0B0B0D) 35px,color-mix(in srgb,var(--pc, #333) 88%,#0B0B0D) 105px,color-mix(in srgb,var(--pc, #333) 75%,#0B0B0D) 140px);
+  background-size:auto;
+  background-position:0 0;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent!important;
+  -webkit-text-fill-color:transparent;
+  animation:ow-id 4.5s linear infinite}
+@keyframes ow-id {
+  0% {
+  background-position:0 0}
+to {
+  background-position:140px 0}
+}
+.brand {
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap}
+.brand>h1 {
+  margin:0}
+.brand .sub {
+  flex:0 0 100%;
+  margin-top:2px}
+.hero.home-hero .hero__body {
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  box-sizing:border-box}
+.hero.home-hero .home-cta {
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  align-items:center;
+  gap:14px;
+  margin:0;
+  padding-top:34px}
+.hero.home-hero .home-cta .home-btn {
+  height:32px;
+  padding:0 18px;
+  font-size:14px;
+  border-radius:16px}
+.hero.home-hero .home-brand {
+  margin-top:auto;
+  align-self:flex-start;
+  max-width:min(720px,62%);
+  text-align:left;
+  padding-bottom:96px}
+.hero.home-hero .home-brand .home-display {
+  font-size:clamp(46px,6.6vw,96px)}
+.hero.home-hero .home-brand .home-display-en {
+  font-size:18px}
+.hero.home-hero .home-brand .home-lede {
+  font-size:15px;
+  max-width:720px}
+.modal__box {
+  transform-origin:top center;
+  animation:unfold .22s cubic-bezier(.22,1,.36,1)}
+.sel__list {
+  transform-origin:top center}
+.sel__list--in {
+  animation:unfold .22s cubic-bezier(.22,1,.36,1)}
+.sel__list--out {
+  animation:fold .18s cubic-bezier(.4,0,1,1) forwards;
+  pointer-events:none}
+@keyframes unfold {
+  0% {
+  clip-path:inset(0 0 100% 0 round 12px);
+  opacity:.35}
+to {
+  clip-path:inset(0 0 0 0 round 12px);
+  opacity:1}
+}
+@keyframes pop-in-unused {
+  0% {
+  opacity:0;
+  transform:translateY(-6px) scale(.985)}
+to {
+  opacity:1;
+  transform:none}
+}
+.app {
+  position:relative;
+  overflow:hidden}
+@keyframes fold {
+  0% {
+  clip-path:inset(0 0 0 0 round 12px);
+  opacity:1}
+to {
+  clip-path:inset(0 0 100% 0 round 12px);
+  opacity:0}
+}
+.pcard__cls--nudge {
+  animation:nudge .34s cubic-bezier(.36,.07,.19,.97)}
+@keyframes nudge {
+  0%,to {
+  transform:translate(0)}
+20% {
+  transform:translate(-3px)}
+45% {
+  transform:translate(3px)}
+70% {
+  transform:translate(-2px)}
+88% {
+  transform:translate(1px)}
+}
+.modal {
+  z-index:300!important}
+.modal__box {
+  position:relative;
+  z-index:301}
+.pop {
+  z-index:310!important}
+.cfm {
+  z-index:400!important}
+.cfm__box {
+  position:relative;
+  z-index:401}
+.sel[open],.dp[open] {
+  z-index:150}
+.picker-grid {
+  transform-origin:top center}
+.picker-grid--in {
+  animation:unfold .22s cubic-bezier(.22,1,.36,1)}
+.picker-grid--out {
+  animation:fold .18s cubic-bezier(.4,0,1,1) forwards;
+  pointer-events:none}
+.dp__pop,.pop,.cfm__box {
+  transform-origin:top center}
+.dp__pop--in,.pop--in,.cfm__box--in {
+  animation:unfold .22s cubic-bezier(.22,1,.36,1)}
+.dp__pop--out,.pop--out,.cfm__box--out {
+  animation:fold .18s cubic-bezier(.4,0,1,1) forwards;
+  pointer-events:none}
+.modal,.theme-light .modal,.page-fill .modal,.theme-light .page-fill .modal,.main .modal,.content .modal {
+  background:#e4e2e08c!important;
+  backdrop-filter:blur(10px) saturate(1.15)!important;
+  -webkit-backdrop-filter:blur(10px) saturate(1.15)!important}
+.hero.home-hero .home-display {
+  text-shadow:0 0 12px rgba(255,255,255,.55),0 0 34px rgba(255,255,255,.38),0 0 72px rgba(255,255,255,.2)}
+.hero.home-hero .home-display-en {
+  text-shadow:0 0 18px rgba(255,255,255,.3)}
+.pop-wrap {
+  align-items:flex-end;
+  align-self:flex-end}
+.pop-wrap>.btn {
+  height:30px;
+  padding:0 14px;
+  align-self:center;
+  white-space:nowrap}
+.topbar {
+  pointer-events:none}
+.topbar .nav {
+  pointer-events:auto}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   以下为「构建产物之后」的三项改动，用末尾覆盖块补回（同优先级后者生效）：
+     ① 封面 9:16 + contain：照片永不裁切
+     ② 留白按图片自己的背景补：同图铺满 + 模糊当底
+     ③ 帮会首页新布局：封面在左（竖向）+ 右侧 2×2 四张卡片
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── ① 9:16（169:300）与"不裁照片" ─────────────────────────────── */
+.gcard { width: 169px; height: 300px; background: linear-gradient(160deg, #6E7BFF 0%, #3B3648 100%); }
+.gcard__cover { object-fit: contain; }
+.gset-cover {
+  position: relative; width: 169px; height: 300px; flex: 0 0 auto;
+  border-radius: 12px; overflow: hidden; border: 1px solid var(--border);
+  background: linear-gradient(160deg, #6E7BFF 0%, #3B3648 100%);
+}
+.gset-cover__img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* ── ② 留白用图片自己补（模糊底）────────────────────────────────── */
+.gcard__blur, .guild-home__blur, .gset-cover__blur {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover;
+  filter: blur(16px) saturate(1.2) brightness(.92);
+  transform: scale(1.15);
+  pointer-events: none;
+}
+
+/* ── ③ 帮会首页：封面在左（竖向），右侧 2×2 ─────────────────────── */
+.guild-home { display: grid; grid-template-columns: 169px minmax(0, 1fr); gap: 18px; align-items: start; }
+.guild-home__side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.guild-home__poster {
+  position: relative; width: 169px; height: 300px;
+  border-radius: 12px; overflow: hidden;
+  background: linear-gradient(160deg, #6E7BFF 0%, #3B3648 100%);
+}
+.guild-home__cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.guild-home__name { font-size: 19px; font-weight: 700; letter-spacing: .5px; color: var(--text); }
+.guild-home__note { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+.guild-home__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gstat {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; min-height: 92px;
+  display: flex; flex-direction: column; justify-content: center;
+}
+.gstat__k { font-size: 12px; color: var(--text-dim); }
+.gstat__v { font-size: 28px; font-weight: 700; margin-top: 6px; line-height: 1.1; }
+.gstat__v small { font-size: 14px; font-weight: 500; margin-left: 2px; }
+
+
+/* ═══ 页签切换动画 ═════════════════════════════════════════════════
+   用户口径 2026-09-27：
+     · 进帮会（列表 → 帮会首页）= **只飞图**（JS 克隆体，见 lib/guildTransition.ts），
+       页面内容**不做**任何入场动画 —— 两套动画同时跑看着是重复的；
+     · 点上面的页签 = **只做"从按钮位置从小到大"**（下面这条）。 */
+@keyframes tabGrow {
+  from { opacity: 0; transform: scale(.86); }
+  to { opacity: 1; transform: none; }
+}
+.gpage--tab {
+  animation: tabGrow 220ms cubic-bezier(.22,.61,.36,1) both;
+  transform-origin: var(--tab-l, 50%) top;   /* --tab-l = 被点按钮的中心 */
 }
 
 
-/* ═══ 职业标签：悬停上移一点点（与首页职业图标一致），移开恢复 ═════
-   上一版我写的 .picker-item__main / .picker-item__sub **这两个类根本不存在**
-   （实测 DOM：候选是 .picker-group，标签是 .chip.class，图标是 .chip-icon），
-   所以写了等于没写 —— 这就是「没动啊」的原因。
-   这次按实测到的真实类名写，效果对齐首页 .home-tray__item:hover 的 translateY(-2px)。
-   ═══════════════════════════════════════════════════════════════ */
-.picker-group .chip, .chip.class, .chip-icon {
-  transition: transform .18s cubic-bezier(.34, 1.56, .64, 1), box-shadow .18s ease;
+/* ═══ 页签切换：从被点的按钮位置展开 ═══════════════════════════════
+   用户口径 2026-09-27：「点击上面按钮，从按钮位置展开」。
+   --tab-l / --tab-r = 按钮中心到内容区左右边的距离（App 点击时写入），
+   于是 clip-path 一开始只露出按钮那一小条，然后向两侧铺开。 */
+/* 用**以按钮横坐标为原点的缩放**来做"展开"：
+   实测 clip-path(inset) 在这台机器的 Chromium 上不插值（中途直接跳到终值＝没有过程），
+   而 transform 一定插值，且走合成层不触发重排。 */
+/* 「从按钮位置**从小到大**」：以按钮横坐标为原点整体缩放 —— 不是从上往下滑
+   （用户口径 2026-09-27 明确否掉了从上往下）。 */
+@keyframes tabGrow {
+  from { opacity: 0; transform: scale(.86); }
+  to { opacity: 1; transform: none; }
+}
+.gpage--tab {
+  animation: tabGrow 220ms cubic-bezier(.22,.61,.36,1) both;
+  transform-origin: var(--tab-l, 50%) top;
+}
+
+
+/* ═══ 文字封面统一排版（三处必须一模一样）═══════════════════════════
+   口径来源（用户 2026-09-27）："只是文字封面，文字格式变化了，让它别变"。
+   卡片 / 帮会首页 / 设置预览用的是同一个帮会名，排版必须一致，
+   否则飞图交接的一瞬间会看到文字"变形"。
+   38px + line-height 1.08：6 个字竖排 = 246px，放得进 300px 的卡片且不折列。 */
+.gcard__cover--text span,
+.guild-home__cover--text span,
+.gset-cover__empty span {
+  writing-mode: vertical-rl;
+  font-size: 38px;
+  line-height: 1.08;
+  letter-spacing: 3px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, .92);
+  max-height: 94%;
+  overflow: hidden;
+}
+
+
+/* ═══ 首屏品牌块：进入首页时"向右划出" ═══════════════════════════════
+   用户口径 2026-09-27：这部分每次进入首页都要向右划出（滑入到位）。
+   逐行错开（眉标 → 主标题 → 英文副题 → 说明），有"划"的层次感。
+   ⚠️ 这是用户明确要求的动效，**不加** prefers-reduced-motion 降级。 */
+@keyframes brandSlideRight {
+  from { opacity: 0; transform: translateX(-46px); }
+  to { opacity: 1; transform: none; }
+}
+.home-hero .home-brand > * {
+  animation: brandSlideRight 460ms cubic-bezier(.22,.61,.36,1) both;
+}
+.home-hero .home-brand > *:nth-child(1) { animation-delay: 40ms; }
+.home-hero .home-brand > *:nth-child(2) { animation-delay: 100ms; }
+.home-hero .home-brand > *:nth-child(3) { animation-delay: 190ms; }
+.home-hero .home-brand > *:nth-child(4) { animation-delay: 270ms; }
+
+
+/* ═══ 卡片 hover：只放大 + 边框变黑 ═══════════════════════════════════
+   用户口径 2026-09-27：hover 时只有"放大 + 边框变黑"，
+   不要原来的上移 3px 与浮起阴影（那会让人以为卡片在"跳"）。 */
+.gcard:hover {
+  transform: scale(1.03);
+  border-color: #0B0B0D;
+  box-shadow: none;
+  z-index: 2;              /* 放大后压住相邻卡片，避免被裁一半 */
+}
+/* 放大 3% 会让 300px 高的卡片上下各溢出约 4.5px，给横向滚动条留出余量 */
+.gcard-row { padding: 8px 2px 14px; }
+
+
+/* ═══ 卡片底：半透明磨砂 + 10% 黑 ═══════════════════════════════════
+   用户口径 2026-09-27："把这个底全部换成半透明磨砂底加 10% 黑"。
+   原来的蓝紫渐变底（卡片本体 / 文字封面 / ＋新建帮会）统一换成
+   rgba(0,0,0,.10) + backdrop-filter 磨砂 —— 与全站磨砂语言一致，
+   壁纸会透过模糊后的底显出来。卡片上的白字仍由 .gcard__shade 那层暗渐变保证可读。 */
+.gcard {
+  background: rgba(0, 0, 0, .10);
+  backdrop-filter: blur(18px) saturate(1.05);
+  -webkit-backdrop-filter: blur(18px) saturate(1.05);
+}
+/* 文字封面不再自带蓝紫渐变，露出卡片那层磨砂底 */
+.gcard__cover--text { background: transparent; }
+/* ＋新建帮会：同一块底，只保留虚线边 */
+.gcard--new {
+  background: rgba(0, 0, 0, .10);
+  backdrop-filter: blur(18px) saturate(1.05);
+  -webkit-backdrop-filter: blur(18px) saturate(1.05);
+}
+
+
+/* ═══ 磨砂底统一（卡片 + 首页封面位 + 设置预览）═══════════════════════
+   用户口径 2026-09-27：卡片换成"半透明磨砂 + 10% 黑"之后，
+   帮会首页的竖向封面位与「帮会设置」里的预览"一起全部换了"——
+   三处底完全一致，飞图交接时底色也不会突然变。 */
+.guild-home__poster,
+.gset-cover {
+  background: rgba(0, 0, 0, .10);
+  backdrop-filter: blur(18px) saturate(1.05);
+  -webkit-backdrop-filter: blur(18px) saturate(1.05);
+}
+/* 无封面（文字或占位）时不再自带蓝紫渐变，露出那层磨砂底 */
+.guild-home__cover--text,
+.gset-cover__empty { background: transparent; }
+
+
+/* ═══ 个人主页（成员详情）：整屏播放 + 多屏吸附 + 连续色调渐变 ═════════════
+   用户口径 2026-09-27：背景铺满（除顶部导航栏）、第 1 屏跟首屏一样渐变黑、
+   第 2 屏起越往下越暗（**一层连续渐变，不做硬切** → 也就没有分界线）；
+   **不要卡片、不要分割线**，内容直接铺在背景上，靠留白与字号层级分区。 */
+/* Portal 到 body 之后，用 z-index:-1 让它在应用内容**之下**（但在根背景之上） */
+/* 层级：要在**全局壁纸之上**、应用内容之下（-1 会被压在壁纸后面 → 成员背景看不见） */
+.md-bg { position: fixed; left: 0; right: 0; top: 52px; bottom: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #000; /* 左侧留白处铺黑，和左侧渐变一致 */ }
+/* 应用外壳抬一层，保证 UI 永远在媒体层之上 */
+.app { position: relative; z-index: 1; }
+/* 素材：**高度按画面的高、宽度按素材自身比例**（不裁剪、不拉伸、不放大），
+   整体右移让它的**中心落在画面横向 70%**（用户口径 2026-09-27）。
+   做法：left: 70% 把左边缘放到 70%，再 translateX(-50%) 回退自身半宽 → 中心正好 70%。 */
+.md-bg video, .md-bg img {
+  position: absolute; top: 0; height: 100%; width: auto;
+  left: 70%; transform: translateX(-50%);
+  object-fit: contain;
+  display: block;
+  /* 素材左边缘落在画面里（约 x=286），左边是纯黑背景 —— 不加遮罩就会看到一条硬线 ✗
+     把左边缘渐隐 160px，让它**融进黑色**，线就没了。 */
+  /* 左边缘渐隐**加宽到 30%**：把"糊 → 清"的过渡摊开，边界就看不出来了 */
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 30%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 30%);
+  /* 横向遮罩（只压左侧）：素材左边缘从**透明**渐显到实色，
+     这样它与左边"黑底 + .88 色调"的纯黑区域之间不再有硬边 ✓
+     （用户口径 2026-09-27：横向遮罩只压左侧；2026-09-30 截图确认那条竖线就是这里 ✗） */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .55) 20%, #000 45%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .55) 20%, #000 45%);
+}
+/* 第 1 屏的色调与首屏一致：**左→右**渐变（左侧压暗放内容，右侧透出画面） */
+.md-bg__tone {
+  position: absolute; inset: 0;
+  /* 第 1 屏：**左侧 25% 起、到 75% 止做渐变**（25% 之前是纯黑，75% 之后就是原色）
+     用户口径 2026-09-27 */
+  background: linear-gradient(90deg, rgba(0, 0, 0, .92) 0%, rgba(0, 0, 0, .88) 32%, rgba(0, 0, 0, .45) 58%, rgba(0, 0, 0, 0) 82%);
+}
+/* 滚下去之后的压暗：**静态渐变**（实测滚动驱动动画在这台机器上不生效）
+   · 第 1 屏：只有底部的竖直渐变在加深（顶部保持首屏那种"左→右"，不受影响）
+   · 第 2 屏起：恒定 .72 —— 与第 1 屏底部的 .72 接上，所以是连续的、也看不出分界 */
+.md-bg__dark {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 46%,
+    rgba(0, 0, 0, .30) 76%, rgba(0, 0, 0, .60) 100%);
+  /* 这层"底部压暗"**只作用在左侧**（右侧保持原色）：用横向遮罩把右边淡出。
+     这样第 1 屏右下角仍是原色，而左下角仍能连续接上第 2 屏的色调。 */
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, .55) 46%, transparent 74%);
+  mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, .55) 46%, transparent 74%);
+}
+/* 翻页吸附（挂在滚动容器 .content 上，只在本页生效） */
+/* 用 proximity 而不是 mandatory：mandatory 下"内容超过一屏的区块"会被吸附卡住滚不到底 */
+.content.md-snap { scroll-snap-type: y mandatory; }   /* 每页吸附（配合下面"每页正好一屏"才安全） */
+/* 每页必须**正好一屏**：height 之外还带 7vh 内边距，不设 border-box 的话每页实际
+   会比一屏高（实测吸附点间距 1000px ≠ 831px），吸附就"不齐"。 */
+.md-hero, .md-block { box-sizing: border-box; scroll-snap-align: start; scroll-snap-stop: always; }
+
+/* 第 1 屏 */
+.md-hero {
+  position: relative; z-index: 1;
+  height: calc(100vh - 52px);        /* 第 1 屏正好一屏 */
+  overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0 4vw 7vh;
+}
+.md-hero__left { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.md-hero__id {
+  margin: 0; color: #fff; font-size: clamp(40px, 5.6vw, 76px); font-weight: 800;
+  letter-spacing: 2px; line-height: 1.05; text-shadow: 0 4px 30px rgba(0, 0, 0, .55);
+}
+/* 自定义介绍：**固定 3 行、字号最小（12px）** */
+.md-hero__intro {
+  color: rgba(255, 255, 255, .86); font-size: 12px; line-height: 1.75; max-width: 640px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* 个性签名：单独一段 */
+.md-hero__sign { color: rgba(255, 255, 255, .95); font-size: 13px; letter-spacing: .6px; }
+/* 橙武标：字号 = 介绍 + 2px（14px），金色渐变 + 细描边 + 柔光 */
+.md-ow {
+  font-size: 14px; font-weight: 700; letter-spacing: 1px;
+  padding: 3px 12px; border-radius: 999px; color: #4A3A10;
+  background: linear-gradient(140deg, #FFE9A8 0%, #E8C264 45%, #B98B2E 100%);
+  border: 1px solid rgba(255, 236, 178, .85);
+  box-shadow: 0 0 24px rgba(232, 194, 100, .45), inset 0 1px 0 rgba(255, 255, 255, .7);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
+}
+.md-hero__back { position: absolute; left: 4vw; top: 14px; }
+
+/* 第 2 屏起：原来的卡片 → 直接铺在背景上（无卡片、无分割线） */
+.md-block {
+  position: relative; z-index: 1;
+  /* 每页**正好一屏**：这样 mandatory 吸附不会把内容卡住；
+     内容比一屏高时，在**页内自己滚**（overscroll-behavior: contain 防止带着整页跳） */
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 7vh 4vw;
+  /* 第 2 屏起色调**恒定**（与第 1 屏底部的 .72 接上 → 连续、无缝、无分界） */
+  background: rgba(0, 0, 0, .45);   /* 半透明：媒体继续透出来，字仍够清楚 */
+  border: none; border-radius: 0; box-shadow: none;
+  display: flex; flex-direction: column; justify-content: center;
+}
+
+
+/* ═══ 右侧页点（替代滚动条）══════════════════════════════════════════
+   用户口径 2026-09-27：每页一个点，当前页的点**填充满**。 */
+.md-dots {
+  position: fixed; right: 16px; top: 50%; transform: translateY(-50%);
+  z-index: 2; display: flex; flex-direction: column; gap: 10px;
+}
+.md-dot {
+  width: 9px; height: 9px; padding: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .30);
+  border: 1px solid rgba(255, 255, 255, .60);
+  cursor: pointer;            /* 点了跳到那一页 */
+  transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.md-dot--on {
+  background: #fff;
+  transform: scale(1.25);
+  box-shadow: 0 0 10px rgba(255, 255, 255, .75);
+}
+/* 个人主页不用滚动条（原生 + 自绘都藏） */
+.content.md-snap::-webkit-scrollbar { width: 0; height: 0; }
+.content.md-snap { scrollbar-width: none; }
+
+
+/* 个人主页已经是"一滑一页"，不再需要页签栏（它的按钮藏掉，省得和页点重复一套导航） */
+.md-block button.tab { display: none; }
+
+/* 个人主页的页必须是"严格一页接一页"：这些块上残留的入场动画（transform 位移）
+   会让页与页重叠/错位（实测间距 715/860 而不是 831），并把背景漏出来 —— 看起来就像
+   "页之间有卡片/东西"。这里强制拍平，页的定位只由 height 决定。 */
+.md-hero, .md-block {
+  transform: none !important;
+  animation: none !important;
+  opacity: 1 !important;
+  margin: 0 !important;
+}
+
+/* 页签栏整行藏掉（之前只藏了 button.tab，容器还占着约 170px，看起来就是"2、3 页之间有个卡片组"） */
+.gpage :has(> button.tab) { display: none !important; }
+
+
+/* 清掉 .gpage 里"不是页"的占位元素（第 2→3 页之间那多余的 116px 就是它）
+   做法：页签栏之外的直接子元素若既不是 .md-hero 也不是 .md-block，一律不占位。 */
+/* 必须限定在成员详情页：.gpage / .stat-grid 别的帮会页也在用，
+   不加 .content.md-snap 前缀会把帮会首页的内容一起隐藏（踩过这个坑）。 */
+.content.md-snap .gpage > *:not(.md-hero):not(.md-block):not(.stat-grid) { display: none !important; }
+
+/* 统计小卡组（.stat-grid）并进第 2 页（用户选 A）：
+   它原本是 .gpage 的独立子元素，会把第 2、3 页撑开 116px（104 高 + 12 下边距）。
+   这里让它**不占流高度**（height:0），再往上平移 116px 贴到第 2 页底部 ——
+   页间距因此仍是严格的 831，数据也不再被藏掉。 */
+.content.md-snap .gpage > .stat-grid {
+  display: grid !important;
+  height: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  transform: translateY(-116px) !important;
+}
+
+
+/* ═══ 成员卡片背景媒体（成员主档专属；.mcard* 不会漏到别的页面）═══════════
+   用户口径 2026-09-27：卡片也要有视频/图片 —— 视频取**最后一帧**当静帧，不播放。 */
+.mcard { overflow: hidden; }
+.mcard__media {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: inherit;
+  /* 底色黑，与成员主页 .md-bg 的 background:#000 一致（左侧那条黑边也一样）✓ */
+  background: #000;
+  /* 没有图片/视频就半透明黑（用户口径 2026-09-27）*/
+  background: rgba(0, 0, 0, .45);
+}
+.mcard__media img, .mcard__media video {
+  /* 用户口径 2026-09-27：**右对齐**（贴卡片右边），整帧不裁切、宽度按素材自身比例。
+     左边空出来的那条由卡片的**白色渐变**盖住（不是黑边 ✗）。 */
+  position: absolute; top: 0; right: 0;
+  height: 100%; width: auto;
+  object-fit: contain;
+  display: block;
+}
+/* 媒体之上的遮罩：**左侧半透明白 → 右侧完全透明（露出原图）**（用户口径 2026-09-27）。
+   卡片本身就是浅色底 + 深色字，左侧用白色渐变既压住媒体、又和卡片原本的样子一致。 */
+.mcard__mediaTone {
+  position: absolute; inset: 0;
+  /* 用户口径 2026-09-27：改用**黑色**，且与成员主页 .md-bg__tone **完全同一套值** */
+  background: linear-gradient(90deg,
+    rgba(0, 0, 0, .88) 0%, rgba(0, 0, 0, .88) 25%,
+    rgba(0, 0, 0, 0) 75%, rgba(0, 0, 0, 0) 100%);
+}
+/* 卡片里的文字与按钮浮在媒体之上 */
+.mcard__body, .mcard__order, .mcard__tri, .mcard__more, .mcard__quick { position: relative; z-index: 1; }
+
+
+/* ═══ 成员卡片 → 详情页 的共享元素动画（用户口径 2026-09-27）══════════════
+   点击时把卡片上的「媒体 + ID」克隆出来飞向详情页对应位置并放大；
+   成员主档其它元素向右移出；详情页首屏元素**等飞行结束再显形**（避免重影）。 */
+.fly-layer { position: fixed; inset: 0; z-index: 9999; pointer-events: none; }
+.fly-clone {
+  position: fixed; margin: 0; overflow: hidden; border-radius: 12px;
+  transform-origin: center center;
+  transition: transform .42s cubic-bezier(.2, .8, .2, 1), opacity .22s ease, border-radius .42s ease;
   will-change: transform;
 }
-/* 实测确认规则**已经命中**（transition 里就是这条），但 3px 肉眼看不出来 ——
-   加大到 6px + 轻微放大，并把动效做成带弹性的上浮。 */
-/* 幅度再收小（用户口径：-3px 还要小）→ 与首屏职业图标一致 -2px，去掉缩放 */
-.picker-group .chip:hover, .chip.class:hover {
-  transform: translateY(-2px);
-  background: transparent !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+.fly-clone img, .fly-clone video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* ID 那个克隆：从左下角生长（scale 以左下为原点），落点与详情页大字号 ID 对齐 */
+.fly-clone--id {
+  border-radius: 0; transform-origin: left bottom;
+  transition: transform .42s cubic-bezier(.2, .8, .2, 1);
 }
-.picker-group .chip:active, .chip.class:active { transform: translateY(-1px); }
-/* 去掉外圈的底色加深与焦点框 —— 但**不能**在 :hover 上写 box-shadow: none !important，
-   那会把悬停时的悬浮投影一起干掉（上一版就是被它压住的）。
-   只清 outline，投影交给 :hover 规则自己决定。 */
-.picker-group .chip:focus, .chip.class:focus { outline: none !important; }
-/* 注意：**不要**在这里把悬停位移关掉。
-   实测发现：本机 Windows 开了「减少动画」→ 这段媒体查询生效 →
-   悬停的 translateY 被抹成 none，而 box-shadow 不在这条里所以照常生效，
-   表现为「有投影、不上移」。用户明确要这个位移，故此处不抑制；
-   只把过渡时间压到几乎瞬时，避免"动画"本身带来的不适。 */
-@media (prefers-reduced-motion: reduce) {
-  .picker-group .chip, .chip.class { transition-duration: .01s; }
+/* 其它卡片向右移出 */
+body.roster-leaving .mcard-grid {
+  transform: translateX(110px);
+  opacity: 0;
+  transition: transform .3s ease, opacity .3s ease;
+}
+/* 详情页首屏元素：延迟 0.38s 再显形（backwards → 延迟期间保持 from 状态 = 透明） */
+.md-bg, .md-hero__left { animation: mdAppear .2s ease .3s backwards; }
+@keyframes mdAppear { from { opacity: 0; } to { opacity: 1; } }
+
+
+/* 跳转过程中"左侧逐步变黑"：0 → 不透明（420ms 与飞行同步）
+   渐变值和详情页第 1 屏的左侧遮罩一致（25% 前纯黑、75% 后透明），所以落到详情页时无缝。 */
+.fly-leftshade {
+  /* 只铺导航栏**以下**（和详情页 .md-bg 的 top:52px 一致）——
+     否则飞行时会把顶栏那 52px 一起压黑 ✗（用户口径：导航要独立） */
+  position: fixed; top: 52px; left: 0; right: 0; bottom: 0; z-index: 0;
+  background: linear-gradient(90deg,
+    /* 左侧必须**不透明纯黑**：落定后那里是 .md-bg 的 #000 底 + .88 色调层（黑压黑=纯黑），
+       只写 .88 的话壁纸会透出来（用户截图里左侧能看到蝴蝶 ✗ = 一条竖缝的来源）。
+       20%~28% 之间平滑过渡到与 .md-bg__tone 相同的 .88→0 曲线，避免出现新的硬边。 */
+    #000 0%, #000 20%, rgba(0, 0, 0, .88) 25%,
+    rgba(0, 0, 0, 0) 75%, rgba(0, 0, 0, 0) 100%);
+  opacity: 0;
+  /* 淡入 .18s（比最早的 .42s 快，减少"半透明透壁纸"的窗口） */
+  transition: opacity .18s ease;
+}
+.fly-clone { z-index: 1; }
+
+
+/* 媒体克隆内部的色调层：铺满克隆体（和详情页 .md-bg__tone 同一条渐变） */
+.fly-clone .md-bg__tone { position: absolute; inset: 0; }
+
+
+/* 飞行中的**盒子**左边缘渐隐（动画里那条硬线就是它的边）：
+   遮罩必须挂在盒子上 —— 挂在里面的 img/video 上没用，因为盒子里的色调层
+   （.md-bg__tone）本身还是硬边 ✗。ID 那个克隆要排除，否则字的左边会被淡化。 */
+/* 纯 scale + translate：媒体克隆不再需要任何遮罩（用户口径 2026-09-27）✓ */
+
+
+
+/* 素材的模糊放大版打底（补左侧那条缝）
+   用 .md-bg video.md-bg__blur（两层类 + 元素）覆盖，而不是另写一条普通类：
+   原规则 .md-bg video, .md-bg img 优先级更高，普通类压不住它，
+   会把"中心 70%、左边缘 mask"一起继承过来。这里显式覆盖并关掉 mask。 */
+/* 关键：模糊层必须和清晰层**同一套取景**（contain、中心 70%、高按画面），
+   否则两层的画面内容在 x=286 处对不上 → 边界处内容跳一下 = 那条线 ✗。
+   这里只比清晰层"更糊 + 略微放大（盖住模糊边缘）+ 更暗"。 */
+.md-bg video.md-bg__blur, .md-bg img.md-bg__blur {
+  position: absolute; top: 0; height: 100%; width: auto;
+  left: 70%;
+  transform: translateX(-50%) scale(1.16);
+  object-fit: contain; object-position: 50% 50%;
+  filter: blur(30px) saturate(1.1) brightness(.62);
+  -webkit-mask-image: none; mask-image: none;
 }
 
-/* 卡片上的职业下拉：跟卡片一体，去掉系统灰框（用户口径：好丑） */
-.pcard .pcard__cls--edit {
-  appearance: none; -webkit-appearance: none;
-  background: transparent !important;
-  border: none !important; outline: none !important; box-shadow: none !important;
-  color: inherit !important; font: inherit !important; font-size: 15px !important;
-  line-height: 1.2 !important; padding: 0 16px 0 0 !important; margin: 0 !important;
-  width: auto; max-width: 100%; cursor: pointer;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-                    linear-gradient(135deg, currentColor 50%, transparent 50%) !important;
-  background-position: calc(100% - 7px) 55%, calc(100% - 3px) 55% !important;
-  background-size: 4px 4px, 4px 4px !important;
-  background-repeat: no-repeat !important;
-}
-.pcard .pcard__cls--edit:hover { opacity: .85; }
-.pcard .pcard__cls--edit option { background: #FFFFFF; color: #0B0B0D; }
 
-/* 卡片上的职业下拉：自绘，替换原生 <select>（它的展开列表由系统画，改不了样式） */
-.pcard .cs { position: relative; display: inline-block; }
-.pcard .cs__btn {
-  list-style: none; cursor: pointer; color: inherit;
-  font: inherit; font-size: 15px; line-height: 1.2;
-  padding: 0 16px 0 0; position: relative; user-select: none;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-                    linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: calc(100% - 7px) 55%, calc(100% - 3px) 55%;
-  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+/* 所有卡片现在都是深色底（有媒体=媒体，没媒体=半透明黑）→ 文字统一改浅色 ✓ */
+.mcard .mcard__id, .mcard .mcard__alias {
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .65);
 }
-.pcard .cs__btn::-webkit-details-marker { display: none; }
-.pcard .cs__btn:hover { opacity: .85; }
-.pcard .cs__list {
-  position: absolute; z-index: 40; left: 0; top: calc(100% + 4px); min-width: 100%;
-  display: flex; flex-direction: column; gap: 1px; padding: 4px;
-  background: #FFFFFF; border: 1px solid rgba(11,11,13,.16); border-radius: 10px;
-  box-shadow: 0 8px 22px rgba(0,0,0,.22);
-}
-.pcard .cs__opt {
-  appearance: none; border: none; background: transparent; cursor: pointer;
-  text-align: left; padding: 5px 10px; border-radius: 6px; white-space: nowrap;
-  color: #0B0B0D; font-size: 14px; font-family: inherit;
-}
-.pcard .cs__opt:hover { background: rgba(11,11,13,.07); }
-.pcard .cs__opt.on { font-weight: 700; background: rgba(11,11,13,.10); }
+.mcard .mcard__order { color: rgba(255, 255, 255, .82); }
 
-/* ═══ 自绘下拉（替换全站原生 select）══════════════════════════
-   原生 <select> 的展开列表由系统绘制，<option> 样式无效；
-   这里用 <details> 自绘，闭合态与展开态都可控。
-   ═══════════════════════════════════════════════════════════════ */
-.sel { position: relative; display: inline-block; min-width: 0; }
-.sel__btn {
-  list-style: none; cursor: pointer; user-select: none;
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
-  padding: 5px 9px; border-radius: 10px;
-  background: rgba(255,255,255,.80); color: #0B0B0D;
-  border: 1px solid rgba(11,11,13,.18);
-  font: inherit; font-size: 13px; line-height: 1.35;
-  min-width: 0;
-}
-.sel__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sel__btn::-webkit-details-marker { display: none; }
-.sel__btn::after {
-  content: ""; flex: 0 0 auto; width: 8px; height: 5px;
-  background: currentColor; opacity: .55;
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-}
-.sel__btn:hover { border-color: rgba(11,11,13,.30); }
-.sel[open] > .sel__btn { border-color: rgba(11,11,13,.42); }
-.sel__list {
-  position: absolute; z-index: 60; left: 0; top: calc(100% + 4px); min-width: 100%;
-  display: flex; flex-direction: column; gap: 1px; padding: 4px;
-  background: #FFFFFF; border: 1px solid rgba(11,11,13,.16); border-radius: 10px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.25); max-height: 260px; overflow: auto;
-}
-.sel__opt {
-  appearance: none; border: none; background: transparent; cursor: pointer;
-  text-align: left; padding: 6px 10px; border-radius: 6px; white-space: nowrap;
-  color: #0B0B0D; font-size: 13px; font-family: inherit;
-}
-.sel__opt:hover { background: rgba(11,11,13,.07); }
-.sel__opt.on { font-weight: 700; background: rgba(11,11,13,.10); }
-.sel__opt:disabled { opacity: .45; cursor: not-allowed; }
-/* 排表卡片里的职业下拉跟随卡片字色 */
-.pcard .sel__btn { background: transparent; border: none; padding: 0 16px 0 0; color: inherit; font-size: 15px; }
-.pcard .sel__btn::after { opacity: .8; }
 
-/* 下拉（用户口径）：半透明磨砂 + 弧度 + 文字不超出边框 */
-.sel__native { display: none; }
-.sel__btn {
-  max-width: 100%; overflow: hidden;
-  border-radius: 12px;
-  background: rgba(255,255,255,.55) !important;
-  backdrop-filter: blur(18px) saturate(1.25);
-  -webkit-backdrop-filter: blur(18px) saturate(1.25);
-  border: 1px solid rgba(255,255,255,.45) !important;
-}
-.sel__txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sel__ico { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; background: transparent; }
-.sel__list {
-  border-radius: 12px;
-  background: rgba(255,255,255,.88) !important;
-  backdrop-filter: blur(22px) saturate(1.3);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  border: 1px solid rgba(255,255,255,.55) !important;
-  box-shadow: 0 12px 30px rgba(0,0,0,.28);
-}
-.sel__opt { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-/* 排表卡片里的职业下拉：透明、随卡片字色、图标+文字同色 */
-.pcard .sel__btn { background: transparent !important; backdrop-filter: none !important; border: none !important; }
+/* 飞行期间把详情页的色调层**临时关掉**：飞行遮罩已经用了完全相同的值 ✓，
+   两层同时存在会叠加 → 中段被压得更黑 ✗（用户实测"动画中的渐变黑和主页不一致"）。
+   交接时飞行遮罩被移除、这层恢复 1，而同值 → 复合结果不变，看不出切换 ✓ */
+body.roster-leaving .md-bg__tone { opacity: 0; }
 
-/* ═══ 下拉展开态（用户口径修正）════════════════════════════════
-   ① 之前写成深色玻璃 → 用户说「选中才深点点不是黑色」，改回半透明磨砂，
-      选中项只加一点点深灰底。
-   ② 展开的列表被**下一张卡片盖住** → 给正在展开的那一层抬 z-index。
-      用 :has() 精准命中"里面有展开下拉"的容器，不影响别的层。
-   ═══════════════════════════════════════════════════════════════ */
-.sel[open] > .sel__btn {
-  background: rgba(255, 255, 255, .74) !important;
-  color: #0B0B0D !important;
-  border-color: rgba(11, 11, 13, .30) !important;
-}
-.sel[open] .sel__list {
-  background: rgba(255, 255, 255, .80) !important;
-  backdrop-filter: blur(22px) saturate(1.3);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  border-color: rgba(255, 255, 255, .55) !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .26);
-}
-.sel[open] .sel__opt { color: #0B0B0D; }
-.sel[open] .sel__opt:hover { background: rgba(11, 11, 13, .07); }
-/* 选中项：只深一点点，不是黑块 */
-.sel[open] .sel__opt.on { background: rgba(11, 11, 13, .12); color: #0B0B0D; font-weight: 700; }
 
-/* 抬层级：正在展开下拉的容器整体提到最前，避免被下一张卡片盖住 */
-.sel[open] { z-index: 80; }
-.toolbar:has(.sel[open]),
-.card:has(.sel[open]),
-.stat:has(.sel[open]),
-.roster-cards__head:has(.sel[open]),
-.home-card:has(.sel[open]),
-.field:has(.sel[open]) { position: relative; z-index: 75; }
+/* 与详情页 .md-bg__dark 逐条对应的一层（用户口径 2026-09-27）：
+   底部压暗 180deg 46%→100%，并用横向遮罩**只压左侧**。 */
+.fly-leftdark {
+  position: fixed; top: 52px; left: 0; right: 0; bottom: 0; z-index: 0;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 46%,
+    rgba(0, 0, 0, .30) 76%, rgba(0, 0, 0, .60) 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, .55) 46%, transparent 74%);
+  mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, .55) 46%, transparent 74%);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
 
-/* ① 下拉按钮与输入框统一外观（用户口径：为啥颜色不一样）——
-   .input / .select 与 .sel__btn 用完全相同的一组值，放在一起看不出差别。 */
-.sel__btn {
-  background: rgba(255, 255, 255, .80) !important;
-  color: #0B0B0D !important;
-  border: 1px solid rgba(11, 11, 13, .18) !important;
-  border-radius: 10px !important;
-  padding: 0 9px !important;      /* 与 .input 完全一致（实测差异只剩这一项） */
-  font-size: 13px !important;
-  height: 30px; box-sizing: border-box;
-  justify-content: space-between;
-}
-.sel__btn:hover { border-color: rgba(11, 11, 13, .28) !important; }
-/* 展开态：同一底色的加深版（不是换色系） */
-.sel[open] > .sel__btn {
-  background: rgba(255, 255, 255, .92) !important;
-  border-color: rgba(11, 11, 13, .34) !important;
-}
-/* 日期框也纳入同一套外观（原生 picker 的日历弹层无法自绘，见说明） */
-.input[type="date"] {
-  background: rgba(255, 255, 255, .80) !important;
-  color: #0B0B0D !important;
-  border: 1px solid rgba(11, 11, 13, .18) !important;
-  border-radius: 10px !important;
-  font-size: 13px !important;
-}
-.input[type="date"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
 
-/* ═══ 自绘日期选择器（原生日历弹层无法改样式，故自写）══════════
-   用户口径：别太矩、带弧度、透明磨砂、选中只深一点点（不是蓝）
-   ═══════════════════════════════════════════════════════════════ */
-.dp { position: relative; display: inline-block; min-width: 0; }
-.dp__native { display: none; }
-.dp__btn {
-  display: flex; align-items: center; gap: 6px; cursor: pointer;
-  height: 30px; box-sizing: border-box; padding: 0 9px;
-  background: rgba(255,255,255,.80); color: #0B0B0D;
-  border: 1px solid rgba(11,11,13,.18); border-radius: 10px;
-  font: inherit; font-size: 13px; min-width: 0; width: 100%; text-align: left;
-}
-.dp__btn:hover { border-color: rgba(11,11,13,.28); }
-.dp__btn::after {
-  content: ""; margin-left: auto; flex: 0 0 auto; width: 8px; height: 5px;
-  background: currentColor; opacity: .5; clip-path: polygon(0 0, 100% 0, 50% 100%);
-}
-.dp__txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dp__pop {
-  position: absolute; z-index: 95; left: 0; top: calc(100% + 6px); width: 264px;
-  padding: 12px 12px 8px; border-radius: 16px;
-  background: rgba(255,255,255,.80);
-  backdrop-filter: blur(22px) saturate(1.3);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  border: 1px solid rgba(255,255,255,.55);
-  box-shadow: 0 14px 34px rgba(0,0,0,.26);
-  color: #0B0B0D;
-}
-.dp__head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
-.dp__month { font-weight: 700; font-size: 13px; letter-spacing: .02em; }
-.dp__sp { flex: 1; }
-.dp__nav { border: none; background: transparent; cursor: pointer; font-size: 15px;
-  color: #0B0B0D; padding: 2px 8px; border-radius: 8px; font-family: inherit; }
-.dp__nav:hover { background: rgba(11,11,13,.08); }
-.dp__wd { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px;
-  font-size: 11px; color: #7C7C88; text-align: center; }
-.dp__grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-.dp__d { border: none; background: transparent; cursor: pointer; font-family: inherit;
-  font-size: 12px; color: #0B0B0D; padding: 6px 0; border-radius: 9px; }
-.dp__d:hover { background: rgba(11,11,13,.08); }
-.dp__d--out { color: rgba(11,11,13,.26); cursor: default; }
-.dp__d--out:hover { background: transparent; }
-.dp__d.today { box-shadow: inset 0 0 0 1px rgba(11,11,13,.22); }
-/* 选中：只深一点点，不用系统那套蓝 */
-.dp__d.on { background: rgba(11,11,13,.16); font-weight: 700; }
-.dp__foot { display: flex; justify-content: space-between; margin-top: 8px; }
-.dp__lnk { border: none; background: transparent; cursor: pointer; font-family: inherit;
-  color: #0B0B0D; font-size: 12px; padding: 3px 6px; border-radius: 8px; }
-.dp__lnk:hover { background: rgba(11,11,13,.08); }
-/* 展开时抬层级，免得被下面的卡片盖住 */
-.toolbar:has(.dp__pop), .field:has(.dp__pop), .card:has(.dp__pop) { position: relative; z-index: 75; }
-
-/* 自绘确认框（替代 window.confirm） */
-.cfm { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
-  background: rgba(0,0,0,.35); backdrop-filter: blur(2px); }
-.cfm__box { width: min(420px, 86vw); padding: 20px; border-radius: 16px;
-  background: rgba(255,255,255,.86); backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(255,255,255,.55); box-shadow: 0 18px 44px rgba(0,0,0,.34);
-  color: #0B0B0D; }
-.cfm__msg { font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
-.cfm__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
-
-/* ═══ 兜底：自绘控件的外层容器一律不画框（用户口径：所有 UI 都不要双框）═══
-   盒子统一由内部的 .sel__btn / .dp__btn 提供；外层只负责定位与抬层级。
-   这里用 !important 兜住，避免以后某个调用点又传了 .input/.select 之类的类名
-   导致"外围一个框 + 内层一个框"。
-   ═══════════════════════════════════════════════════════════════ */
-.sel, .dp {
+/* ═══ 详情页里的统计小卡组：**去掉卡片外观**，直接铺在背景上 ═══════════════════
+   用户口径 2026-09-27："删除卡片显示，直接显示在背景上" —— 当时只改了 .card，
+   漏了 .stat-grid（第 2 屏那排浅底圆角的小卡 ✗）。这里只作用于详情页（.content.md-snap ✓），
+   背景改透明、边框圆角阴影全去掉，文字改浅色（背景是深色 ✓）。 */
+.content.md-snap .stat-grid {
   background: none !important;
-  background-color: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  outline: none !important;
-  padding: 0 !important;
-  min-height: 0 !important;
-  height: auto !important;
 }
-/* 外层若同时带 .input/.select，其伪元素与指示器也一并清掉 */
-.sel.input::before, .sel.select::before, .dp.input::before { display: none !important; }
+/* 注意用**后代**选择器（不是 >）：实测卡片并不是 .stat-grid 的直接子元素 ✗ */
+.content.md-snap .stat-grid * {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+/* 文字改浅色：值用近白、标签用 72% 白，压在深色背景上才读得清 */
+.content.md-snap .stat-grid * { color: rgba(255, 255, 255, .92); }
+.content.md-snap .stat-grid * * { color: rgba(255, 255, 255, .72); }
 
-/* ═══ 弹层提高白度（用户口径：别太透明了，白点）════════════════
-   原来 .80 的白太透，底下的表格/卡片内容会透上来，读起来费劲。
-   三个弹层统一提到 .95 左右，保留一点磨砂感但内容不再透上来。
-   ═══════════════════════════════════════════════════════════════ */
-.dp__pop {
-  background: rgba(255, 255, 255, .95) !important;
-  border-color: rgba(11, 11, 13, .10) !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, .30) !important;
+/* 纯 scale + translate 的飞行：只给**媒体克隆**加左渐隐 ✗ 别碰 ID 克隆（否则字的左边被淡化 ✓）
+   与详情页 .md-bg__sharp 的遮罩同值，交接处才看不出切换 ✓ */
+.fly-clone:not(.fly-clone--id) {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .55) 20%, #000 45%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .55) 20%, #000 45%);
 }
-.sel[open] .sel__list {
-  background: rgba(255, 255, 255, .95) !important;
-  border-color: rgba(11, 11, 13, .10) !important;
-}
-.sel[open] > .sel__btn { background: rgba(255, 255, 255, .95) !important; }
-.cfm__box { background: rgba(255, 255, 255, .95) !important; }
-
-/* 卡片上的职业：图标 + 职业名，白字（与原来的样子一致） */
-.pcard .sel__btn { color: inherit !important; }
-.pcard .sel__txt { color: inherit !important; }
-.pcard .sel__ico { width: 22px; height: 22px; }
-/* 展开的列表里才用深色文字，保证在白底列表上可读 */
-.pcard .sel__list .sel__opt { color: #0B0B0D !important; }
-
-/* 用户口径：所有下拉不要三角标 */
-.sel__btn::after, .dp__btn::after { display: none !important; content: none !important; }
-.sel__btn, .dp__btn { padding-right: 9px !important; }
-/* 卡片上的职业已改回纯文字，相关的下拉按钮样式一并撤掉 */
-.pcard .sel__btn { background: none !important; border: none !important; }
-
-/* 「数据」菜单：按钮外观的下拉（区别于值选择型下拉） */
-.sel.menu > .sel__btn {
-  background: rgba(255,255,255,.80) !important;
-  border: 1px solid rgba(11,11,13,.18) !important;
-  border-radius: 10px !important;
-  height: 30px; padding: 0 12px !important;
-  color: #0B0B0D !important; font-size: 13px !important;
-  justify-content: center;
-}
-.sel.menu > .sel__btn:hover { border-color: rgba(11,11,13,.30) !important; }
-.sel.menu .sel__list { min-width: 168px; right: 0; left: auto; }
-.sel.menu .sel__opt { font-size: 13px; }
-
-/* 新增成员浮层：锚在按钮下方，不遮页面、背景不变暗（用户选定方案 A） */
-.pop-wrap { position: relative; display: inline-flex; }
-.pop {
-  position: absolute; right: 0; top: calc(100% + 8px); z-index: 95;
-  width: min(760px, 78vw); padding: 16px; border-radius: 16px;
-  background: rgba(255, 255, 255, .96);
-  backdrop-filter: blur(22px) saturate(1.3);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  border: 1px solid rgba(11, 11, 13, .10);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, .28);
-  color: #0B0B0D;
-}
-.pop__head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-
-/* ═══ 有橙武的卡片：外框加橙色光效 ═════════════════════════════
-   判据与卡片上的「橙武」徽标同源（playerId → 是否有橙武 的映射），
-   两者不会出现"有徽标没光"或"有光没徽标"的不一致。
-   ═══════════════════════════════════════════════════════════════ */
-/* 用户反馈「为啥就是个框」——原来只有 2px 环 + 18px 柔光，
-   而柔光被祖先容器的 overflow:hidden 剪掉了，所以看着只剩一圈框。
-   现在三层叠加，其中**内发光不会被祖先裁剪**，一定看得见：
-     ① 2px 橙色实环    ② 外发光（放大到 22px/4px 扩散、.70）
-     ③ 内发光（暖白，让卡片看起来"被点亮"） */
-/* ═══ 橙武卡片：底色做渐变，外光晕用「本职业色」 ═══════════════
-   用户口径：「不要动态光效了，把橙武的职业颜色换成渐变，
-              然后外围光效换成本职业颜色的」
-   ③ 职业色由内联的 --pc 传入（见 LineupBoard），这里只做派生：
-      底色     linear-gradient(135deg, var(--pc) → 该色混白 32%)
-      外光晕   color-mix(var(--pc) 70%, transparent)
-   无动画、无 filter —— 不影响文字与图标。
-   ═══════════════════════════════════════════════════════════════ */
-.pcard { background: var(--pc); }
-/* 渐变（用户口径：混白 15% → 混黑 15%）：
-   左端 = 职业色混 15% 白，右端 = 职业色混 15% 黑 */
-.pcard--ow {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, var(--pc) 85%, #000000) 0%,
-    color-mix(in srgb, var(--pc) 85%, #FFFFFF) 100%) !important;
-  box-shadow: 0 0 20px 3px color-mix(in srgb, var(--pc) 70%, transparent) !important;
-}
-.pcard--ow:hover {
-  box-shadow: 0 0 28px 6px color-mix(in srgb, var(--pc) 85%, transparent) !important;
-}
-.pcard--ow.pcard--dragging {
-  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--pc) 55%, transparent) !important;
-}
-
-/* ═══ 抬层级（重加 + 加固）════════════════════════════════════
-   背景：这条规则在之前某轮"截断文件再追加样式块"时被连带删掉了
-   （我用过几次 css.slice(0, i)，把末尾的旧块一起切走了）——
-   于是自绘下拉又被后面的行盖住，表现为"下滑又没了"。
-
-   这次的写法更稳：凡是**包含**已展开下拉/日期弹层的容器，一律抬到最前。
-   （用 :has(.sel[open]) 任意后代，不要写 :has(> .sel[open]) ——
-     实测：编辑行里的下拉嵌在网格单元中，直接子代选择器匹配不上，抬层级会失效。）
-   覆盖了列表行、编辑行、工具栏、卡片、字段、弹窗、看板等所有已知容器。
-   ═══════════════════════════════════════════════════════════════ */
-.sel[open] { z-index: 90; }
-.dp[open], .dp .dp__pop { z-index: 90; }
-:is(.roster-card, .roster-card__edit, .roster-cards, .roster-cards__head,
-    .toolbar, .card, .stat, .field, .home-card, .board, .picker-item,
-    .modal__box, table.grid, tbody, tr, td)
-  :has(.sel[open]) { position: relative; z-index: 88; }
-:is(.roster-card, .roster-card__edit, .roster-cards, .toolbar, .card, .stat,
-    .field, .home-card, .board, .picker-item, .modal__box)
-  :has(.dp__pop) { position: relative; z-index: 88; }
-
-/* ═══ 橙武卡片的 ID 文字：炫彩渐变 ═════════════════════════════
-   用户口径：「排表 橙武的ID可以变为炫彩」
-   做法：background-clip:text 把渐变"染"进文字。
-   这一版是**静态**渐变（用户此前明确不要动效）；
-   想让它缓慢流动只要把 animation 那行打开即可（已写在下方注释里）。
-   ═══════════════════════════════════════════════════════════════ */
-.pcard--ow .pcard__id {
-  /* 用户口径：本职业色（压暗一点）→ 白，速度放慢。
-     跳变的根因：原来用 background-size:220% + position 0%→220%，
-     位移量是图片宽的 1.2 倍（非整数倍）→ 每轮接不上。
-     改成 **repeating-linear-gradient + 按像素位移一整个周期**，
-     位移量与元素宽度无关，必定无缝。 */
-  /* 中间的白占整个周期(140px)的 70%，即 21px → 119px 之间是纯白，
-     两端各留 15% 做过渡（压暗色 → 白 → 压暗色）。 */
-  background-image: repeating-linear-gradient(100deg,
-    color-mix(in srgb, var(--pc) 90%, #000000) 0px,
-    #FFFFFF 21px,
-    #FFFFFF 119px,
-    color-mix(in srgb, var(--pc) 90%, #000000) 140px);
-  background-size: auto;
-  background-position: 0 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent !important;
-  -webkit-text-fill-color: transparent;
-  animation: ow-id 9s linear infinite;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35));
-}
-  @keyframes ow-id {
-  from { background-position: 0 0; }
-  to   { background-position: 140px 0; }   /* 正好一个周期 */
-}
-
-/* 侧边导航品牌区的应用图标 */
-/* 用户口径：图标与「万象·Omnia」放在同一水平线上；
-   口号（.sub）用 flex-basis:100% 换到下一行。 */
-.brand { display: flex; flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; }
-.brand__logo {
-  width: 30px; height: 30px; display: block; margin: 0; flex: 0 0 auto;
-  /* 图标是白描边 + 细黑边，深色侧栏上直接可用；浅色主题下也看得清 */
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .28));
-}
-.brand > h1 { margin: 0; }
-.brand .sub { flex: 0 0 100%; margin-top: 2px; }
-/* 导航收起时完全隐藏（与其它导航文字一致） */
-.nav-collapsed .brand__logo { display: none; }
-
-/* ═══ 首屏重排（用户口径）══════════════════════════════════════
-   ① 快捷按钮 → 最上面居中
-   ② 品牌块（eyebrow / 万象·Omnia / 英文 / 说明）→ 左下角
-   ③ 职业托盘已删除（连同 .home-tray 相关样式不再需要，这里不重写）
-   用两段类名选择器，避免被同特异度的 .hero 规则盖住（此前踩过这个坑）。
-   ═══════════════════════════════════════════════════════════════ */
-.hero.home-hero .hero__body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  box-sizing: border-box;
-}
-/* 顶部居中：按钮排 */
-.hero.home-hero .home-cta {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 14px;
-  margin: 0;
-  /* 用户口径：与「收起导航栏」的按钮对齐同一条线。
-     实测：导航按钮 top=8 高=30 中心=23；
-     这里取 top=7 高=32 → 中心 23，完全对齐，且不贴顶边。 */
-  padding-top: 7px;
-}
-/* 左下角：品牌块。margin-top:auto 把它推到剩余空间的底部 */
-/* 按钮尺寸对齐导航按钮（高 30~32），否则无法在同一条线上 */
-.hero.home-hero .home-cta .home-btn {
-  height: 32px;
-  padding: 0 18px;
-  font-size: 14px;
-  border-radius: 16px;
-}
-
-.hero.home-hero .home-brand {
-  margin-top: auto;
-  align-self: flex-start;
-  /* 用户口径：放大点、整体往上点点 */
-  max-width: min(720px, 62%);
-  text-align: left;
-  padding-bottom: 96px;
-}
-/* 品牌块尺寸（用户口径：上一版太大，收回一档） */
-.hero.home-hero .home-brand .home-display { font-size: clamp(46px, 6.6vw, 96px); }
-.hero.home-hero .home-brand .home-display-en { font-size: 18px; }
-.hero.home-hero .home-brand .home-lede { font-size: 15px; max-width: 720px; }
-
-/* 首屏"轻推即翻"改由 JS 负责（见 OverviewPage）。
-   这里不再用 scroll-snap：CSS 吸附与 JS 滚动叠加时会互相打架，
-   表现为"两段跳"、不顺，用户要的是"丝滑"。 */
-
-/* 统一展开过渡（用户口径：所有收缩/展开都要丝滑）——
-   下拉列表、日期弹层、新增成员浮层、确认框、参选者分组都是"挂载即出现"，
-   用入场动画补上过渡感。不用 prefers-reduced-motion 关掉：用户明确要动效。 */
-/* 用户口径：下拉要"上下展开"的收起感，不是整块弹出来。
-   原来 pop-in 是"淡入 + 微位移"，看着是弹的。
-   改成 clip-path 自上而下展开：
-     · 从按钮向下"揭开"，读起来是展开/收起；
-     · 不用 scaleY（会把文字压扁），也不用 max-height（布局属性、每帧重排）；
-     · clip-path + opacity 都是合成器友好的。 */
-.modal__box {
-  transform-origin: top center;
-  animation: unfold .22s cubic-bezier(.22, 1, .36, 1);
-}
-/* 下拉：展开/收起两个方向都有动画（Select 已改为受控组件，关闭时保持挂载 180ms） */
-.sel__list { transform-origin: top center; }
-.sel__list--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
-.sel__list--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
-  @keyframes unfold {
-  from { clip-path: inset(0 0 100% 0 round 12px); opacity: .35; }
-  to   { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
-}
-  /* 旧的 pop-in 关键帧已由 unfold 取代（保留仅为可回溯） */
-  @keyframes pop-in-unused {
-  from { opacity: 0; transform: translateY(-6px) scale(.985); }
-  to   { opacity: 1; transform: none; }
-}
-/* 侧栏收起是瞬时的，导航项不需要淡出过渡 */
-
-/* ═══ 侧栏：方案 B（保持推开式，但用 transform 动画）═══════════
-   之前动画 grid-template-columns 是**布局属性** → 每帧整页重排 → 卡。
-   现在：
-     · .app 只留一列，布局不动；
-     · .sidebar 绝对定位，用 transform: translateX 滑出（合成器属性 ✓）；
-     · .main 用 transform 同步右移 216px、并把布局宽度设为 100%-216px，
-       视觉上等价于"被侧栏推开"，但动画期间不重排 → 与首屏一样丝滑；
-     · 宽度的切换是**瞬时**的（不在 transition 列表里）：它只在开头/结尾变一次，
-       不是每帧都变，所以不会拖慢动画。
-     · 收起动画走完后把侧栏 visibility 置为 hidden（transition-delay），
-       保证"收起后确实不可见"，同时不打断滑出过程。
-   ═══════════════════════════════════════════════════════════════ */
-.app { display: grid; grid-template-columns: 1fr; height: 100%; position: relative; overflow: hidden; }
-.sidebar {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 216px;
-  z-index: 40;
-  transform: translateX(0);
-  visibility: visible;
-  transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s;
-  will-change: transform;
-  background: rgba(19, 19, 23, .86);
-  backdrop-filter: blur(18px) saturate(1.2);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-}
-.main {
-  grid-column: 1;
-  width: calc(100% - 216px);
-  /* 用 margin-left 而不是 transform 做"被推开"的位移：
-     transform / will-change 会给 .main 建新的合成层与层叠上下文，
-     导致内部自绘下拉的"抬层级"(:has(.sel[open])) 失效、被后面的行盖住。
-     margin-left 只影响布局（每帧重排的代价在这里可以接受：它是整块位移，
-     不像栅格列宽那样牵动整页），且不产生层叠上下文。 */
-  margin-left: 216px;
-  transition: margin-left .3s cubic-bezier(.4, 0, .2, 1);
-}
-.app.nav-collapsed { grid-template-columns: 1fr; }
-.app.nav-collapsed .sidebar {
-  transform: translateX(-100%);
-  visibility: hidden;
-  transition: transform .3s cubic-bezier(.4, 0, .2, 1), visibility 0s linear .3s;
-}
-.app.nav-collapsed .main { width: 100%; margin-left: 0; }
-
-/* 收起：反向"合拢"（与展开同一条路径，读起来才是上下收的） */
-  @keyframes fold {
-  from { clip-path: inset(0 0 0 0 round 12px); opacity: 1; }
-  to   { clip-path: inset(0 0 100% 0 round 12px); opacity: 0; }
-}
-
-/* 单职业时点击职业：轻微抖动一下（用户口径 C）。
-   只在被点的那个 .pcard__cls 上抖，不动整张卡片，幅度很小（±3px）。 */
-.pcard__cls--nudge { animation: nudge .34s cubic-bezier(.36, .07, .19, .97); }
-  @keyframes nudge {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-3px); }
-  45% { transform: translateX(3px); }
-  70% { transform: translateX(-2px); }
-  88% { transform: translateX(1px); }
-}
-
-/* ═══ 弹层层级统一抬到侧栏之上 ═══════════════════════════════
-   用户反馈：选人/添加队员弹出的面板**被侧边导航盖住**。
-   侧栏是 position:absolute + z-index:40（在根层叠上下文里），
-   而弹层虽然写了 50，实测仍被压住 —— 不纠结成因，直接把弹层抬到远高于侧栏，
-   并按"遮罩 < 面板"的关系排好，避免以后再加层级时又出现类似问题。
-   ═══════════════════════════════════════════════════════════════ */
-.modal { z-index: 300 !important; }
-.modal__box { position: relative; z-index: 301; }
-.pop { z-index: 310 !important; }
-.cfm { z-index: 400 !important; }
-.cfm__box { position: relative; z-index: 401; }
-/* 下拉/日期弹层仍要低于模态面板，但高于普通内容与侧栏 */
-.sel[open], .dp[open] { z-index: 150; }
-
-/* 参选者职业分组：展开/收起两个方向都有动画（与 Select 同一套 fold/unfold） */
-.picker-grid { transform-origin: top center; }
-.picker-grid--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
-.picker-grid--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
-
-/* 日期弹层 / 新增成员浮层 / 确认框：展开收双向（与 Select 同一套 fold/unfold） */
-.dp__pop, .pop, .cfm__box { transform-origin: top center; }
-.dp__pop--in,  .pop--in,  .cfm__box--in  { animation: unfold .22s cubic-bezier(.22, 1, .36, 1); }
-.dp__pop--out, .pop--out, .cfm__box--out { animation: fold .18s cubic-bezier(.4, 0, 1, 1) forwards; pointer-events: none; }
-
-/* ═══ 模态遮罩改为半透明（用户口径：背景可以是半透明的吗）═══════
-   原来 .modal 的遮罩是不透明的浅色整屏，把下面的页面完全挡住了。
-   改为半透明 + 磨砂：能看到底下的页面轮廓，同时面板本身仍然清晰。
-   用追加覆盖 + !important，避免依赖上面那条 .modal 规则的具体写法。
-   ═══════════════════════════════════════════════════════════════ */
-/* 实测：.modal 的计算背景是 rgb(252,248,253) —— 说明有一条**更具体**的规则
-   （带 .theme-light / .page-fill 之类的祖先前缀）也带 !important，压过了单类选择器。
-   所以这里把祖先前缀都写上，用更高特异性把它盖掉。 */
-.modal,
-.theme-light .modal,
-.page-fill .modal,
-.theme-light .page-fill .modal,
-.main .modal,
-.content .modal {
-  background: rgba(228, 226, 224, .55) !important;
-  backdrop-filter: blur(10px) saturate(1.15) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(1.15) !important;
-}
-
-/* 首屏大字发白光（用户口径）。
-   两层 text-shadow：近处一层亮而紧、远处一层柔而散 ——
-   单层要么像描边要么像糊，两层叠起来才是"发光"。
-   用三段落类名选择器（.hero.home-hero .home-display），
-   避免被同特异度的 .hero / .home-display 规则盖住（这项目里踩过两次）。 */
-.hero.home-hero .home-display {
-  text-shadow:
-    0 0 12px rgba(255, 255, 255, .55),
-    0 0 34px rgba(255, 255, 255, .38),
-    0 0 72px rgba(255, 255, 255, .20);
-}
-/* 英文小标题也给一点点，避免只有主标题在发光显得孤立 */
-.hero.home-hero .home-display-en {
-  text-shadow: 0 0 18px rgba(255, 255, 255, .30);
-}
-
-/* 修「+ 新增成员」按钮被拉伸成竖条（截图里那块黑色长方形）。
-   .pop-wrap 作为 toolbar 的 flex 子项会被 align-items 拉伸，
-   而它内部的浮层是绝对定位、不参与高度计算 —— 所以按钮跟着容器一起变高。
-   这里把高度写死、并让它在交叉轴上居中。 */
-/* 与「定位 ID」字段底边对齐（字段上有小标签，所以整体更高） */
-.pop-wrap { align-items: flex-end; align-self: flex-end; }
-.pop-wrap > .btn {
-  height: 30px;
-  padding: 0 14px;
-  align-self: center;
-  white-space: nowrap;
-}
-
-/* 定位命中的人：一直高亮到清空搜索框为止（用户口径）。
-   原来是 .roster-card--found（单类），这里用两个类提高特异性，
-   把描边、底色、左侧色条都加满，扫一眼就能看到是哪一行。 */
-/* 用户反馈：根本**没有**高亮（不是"消失太快"）。说明类名加上了、
-   但样式被更具体的规则压住了 —— 和 .modal 那次是同一个坑：
-   .theme-light / .page-fill 这类主题前缀会提高特异性。
-   所以这里把前缀都写上（并用两个类名 + !important）。 */
-.roster-card.roster-card--found,
-.theme-light .roster-card.roster-card--found,
-.page-fill .roster-card.roster-card--found,
-.theme-light .page-fill .roster-card.roster-card--found {
-  /* 用户口径：不要黑边。去掉 outline 与左侧 inset 阴影，
-     只留底色 —— 既能一眼看到是哪一行，又不会在卡片上多出边线。 */
-  background: rgba(110, 123, 255, .20) !important;
-  transition: background .18s ease;
-}
-
-/* ═══ 修「首屏按钮点击没反应」════════════════════════════════
-   实测：elementFromPoint 落在「录入对局与战报」按钮中心时，
-   最顶层元素是 HEADER.topbar（不是按钮自己）——
-   顶栏是一条贯穿整行的透明条，盖在首屏按钮上方把点击吃掉了。
-   修法：顶栏不接收鼠标事件，但里面的折叠按钮单独恢复。
-   ═══════════════════════════════════════════════════════════════ */
-.topbar { pointer-events: none; }
-.topbar .nav-toggle { pointer-events: auto; }

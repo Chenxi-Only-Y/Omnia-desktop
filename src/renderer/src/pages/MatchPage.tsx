@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { MatchSummary } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
 import { MATCH_RESULT_LABEL, TOTAL_TOWERS_PER_SIDE } from '@shared/domain';
 import MatchDetail from './MatchDetail';
@@ -47,7 +47,7 @@ export default function MatchPage({ classes, classMap }: Props) {
       // 刚 setSelected(null) 就又被自动选回去，表现为返回按钮完全无效。
       // 创建对局后进入详情由 handleCreate 自己 setSelected 负责。
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export default function MatchPage({ classes, classMap }: Props) {
       setSelected(res.match.id);
     } catch (err) {
       setNotice(null);
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -103,7 +103,7 @@ export default function MatchPage({ classes, classMap }: Props) {
       setError(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 

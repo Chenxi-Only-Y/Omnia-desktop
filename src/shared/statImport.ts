@@ -21,6 +21,12 @@ export interface RosterEntry {
   gameId: string;
   name: string;
   mainClass: string;
+  /**
+   * 历史用名（用户口径 2026-09）。
+   * 战报里可能写着玩家改名前的旧名 —— 不查这一列就会「认不出人」，
+   * 而 mode='roster' 下认不出会直接**阻止入库**。
+   */
+  aliases?: string[];
 }
 
 type RawRow = Record<string, string>;
@@ -105,18 +111,41 @@ export function parseStatText(text: string, startRow = 2): ParseResult {
   const lines = clean.split('\n').filter((l) => l.trim() !== '');
   const errors: ValidationIssue[] = [];
   if (lines.length < 2) {
-    errors.push({ level: 'error', code: 'INVALID_NUMBER', row: 0, player: '', message: '内容不足两行（需要表头 + 数据）' });
+    errors.push({ level: 'error', code: 'HEADER_NOT_FOUND', row: 0, player: '', message: '内容不足两行（需要表头 + 数据）' });
     return { rows: [], errors };
   }
 
   const delim = detectDelimiter(clean);
-  const header = splitLine(lines[0], delim).map(normHeader);
+  /* 表头**不一定在第一行**（用户口径 2026-09：「这个是我从游戏里导出来的，你看看怎么兼容」）：
+     游戏导出的 CSV 第一行是元信息，例如
+         "霜序客","60"
+         "玩家名字","职业","击败/清泉",...
+     以前写死 lines[0] 当表头 → 找不到「玩家名字」列 → 整份导不进去。
+     现在在前 12 行里找"看起来像表头"的那一行：既要有姓名/职业列，
+     也要至少有一个战报列（这样 "霜序客","60" 不会被误判）。 */
+  const looksLikeHeader = (line: string) => {
+    const h = splitLine(line, delim).map(normHeader);
+    const hasName = h.some((x) => NAME_KEYS.some((k) => x.toLowerCase() === k.toLowerCase()));
+    const hasStat = h.some((x) => HEADER_MAP[x] !== undefined);
+    return hasName && hasStat ? h : null;
+  };
+  let headerIdx = -1;
+  let header: string[] = [];
+  for (let i = 0; i < Math.min(lines.length, 12); i += 1) {
+    const h = looksLikeHeader(lines[i]);
+    if (h) { headerIdx = i; header = h; break; }
+  }
+  if (headerIdx < 0) {
+    // 兜底：仍然用第一行，报原来那条错（保持既有提示不变）
+    header = splitLine(lines[0], delim).map(normHeader);
+    headerIdx = 0;
+  }
 
   // 定位姓名列与职业列
   const nameIdx = header.findIndex((h) => NAME_KEYS.some((k) => h.toLowerCase() === k.toLowerCase()));
   const classIdx = header.findIndex((h) => CLASS_KEYS.some((k) => h.toLowerCase() === k.toLowerCase()));
   if (nameIdx < 0) {
-    errors.push({ level: 'error', code: 'INVALID_NUMBER', row: 1, player: '', message: '表头里找不到「玩家名字 / 角色ID」列' });
+    errors.push({ level: 'error', code: 'HEADER_NOT_FOUND', row: headerIdx + 1, player: '', message: '表头里找不到「玩家名字 / 角色ID」列' });
     return { rows: [], errors };
   }
 
@@ -133,18 +162,29 @@ export function parseStatText(text: string, startRow = 2): ParseResult {
     statCols.push({ idx: i, field, composite: false });
   });
   if (!statCols.length) {
-    errors.push({ level: 'error', code: 'INVALID_NUMBER', row: 1, player: '', message: '表头里找不到任何战报列（击败/助攻/伤害…）' });
+    errors.push({ level: 'error', code: 'HEADER_NOT_FOUND', row: headerIdx + 1, player: '', message: '表头里找不到任何战报列（击败/助攻/伤害…）' });
     return { rows: [], errors };
   }
 
   const rows: RawRow[] = [];
-  lines.slice(1).forEach((line, i) => {
+  /* 数据从**表头行的下一行**开始；行号按原文件的行号报（表头不在第一行也对得上）。
+     ⚠️ 游戏导出的 CSV 里可能**有多段**：每段都是「公会名,人数」+ 表头 + 该段的数据，
+     例如 霜序客 一段、朝歌夜弦 一段（用户给的样本就是两段）。
+     所以循环里还要把这两类行跳过，否则它们会被当成数据：
+       · 又一行"表头"（重复表头）→ 它的"击败/清泉"这类文字会被数值校验判成错误；
+       · 「公会名,60」这种只有 1~2 个非空格的元信息行 → 会变成"不在主档"的错。
+     跳过的条数记在 skipped 里，供上层显示。 */
+  let skipped = 0;
+  lines.slice(headerIdx + 1).forEach((line, i) => {
     const cells = splitLine(line, delim);
+    const nonEmpty = cells.filter((c) => (c ?? '').trim() !== '').length;
+    if (looksLikeHeader(line)) { skipped += 1; return; }
     const name = (cells[nameIdx] ?? '').trim();
     const cls = classIdx >= 0 ? (cells[classIdx] ?? '').trim() : '';
     if (!name && !cls) return; // 空行
+    if (nonEmpty <= 2) { skipped += 1; return; }   // 「公会名,60」这类分段元信息
 
-    const rec: RawRow = { __row: String(startRow + i), __name: name, __class: cls };
+    const rec: RawRow = { __row: String(headerIdx + startRow + i), __name: name, __class: cls };
     for (const { idx, field, composite } of statCols) {
       const raw = (cells[idx] ?? '').trim();
       if (composite) {
@@ -165,19 +205,56 @@ export function parseStatText(text: string, startRow = 2): ParseResult {
   return { rows, errors };
 }
 
-/** 姓名/ID → 主档成员的匹配（角色 ID 优先，姓名兜底） */
-export function matchRoster(rows: RawRow[], roster: RosterEntry[]): Map<number, RosterEntry | null> {
-  const byId = new Map(roster.map((r) => [r.gameId, r]));
+/** 匹配结果：命中的主档成员 + 靠哪条线索命中（id / 当前名 / 历史用名） */
+export interface RosterMatch {
+  entry: RosterEntry;
+  via: 'id' | 'name' | 'alias';
+}
+
+/**
+ * 「鸿音」按奶量分流（用户口径 2026-09）：
+ *   「鸿音奶量大于 500w 以上的按妙音，低于的按惊鸿」。
+ * 也就是 鸿音 其实是**门派名**，它有两个流派：妙音（奶）与惊鸿（输出），
+ * 靠本场治疗量是否大于 500 万来判定。这样它不会再被当成"不在 12 职业表内"的未知职业，
+ * 职业色 / 图标 / 评分里的职业系数也都按真正的职业走。
+ */
+export const HONGYIN = '鸿音';
+export const HONGYIN_HEAL_THRESHOLD = 5_000_000;
+export function resolveHongyin(name: string, healing: number): string {
+  if (name !== HONGYIN) return name;
+  return healing > HONGYIN_HEAL_THRESHOLD ? '妙音' : '惊鸿';
+}
+
+/**
+ * 姓名/ID → 主档成员的匹配。
+ * 优先级：角色 ID → 当前姓名 → **历史用名**（改名后旧战报仍能认人）。
+ * 同一个键命中多人时标记为歧义（null），继续走下一级线索。
+ */
+export function matchRoster(rows: RawRow[], roster: RosterEntry[]): Map<number, RosterMatch | null> {
+  const byId = new Map<string, RosterEntry | null>();
   const byName = new Map<string, RosterEntry | null>();
+  const byAlias = new Map<string, RosterEntry | null>();
+  const put = (m: Map<string, RosterEntry | null>, raw: string | undefined, r: RosterEntry) => {
+    const key = (raw ?? '').trim();
+    if (!key) return;
+    if (m.has(key)) m.set(key, null); // 撞键 → 歧义
+    else m.set(key, r);
+  };
   for (const r of roster) {
-    if (byName.has(r.name)) byName.set(r.name, null); // 重名标记为歧义
-    else byName.set(r.name, r);
+    put(byId, r.gameId, r);
+    put(byName, r.name, r);
+    for (const a of r.aliases ?? []) put(byAlias, a, r);
   }
-  const out = new Map<number, RosterEntry | null>();
+  const out = new Map<number, RosterMatch | null>();
   rows.forEach((r, i) => {
-    const key = r.__name ?? '';
-    const hit = byId.get(key) ?? byName.get(key) ?? null;
-    out.set(i, hit);
+    const key = (r.__name ?? '').trim();
+    if (!key) { out.set(i, null); return; }
+    const asId = byId.get(key);
+    if (asId) { out.set(i, { entry: asId, via: 'id' }); return; }
+    const asName = byName.get(key);
+    if (asName) { out.set(i, { entry: asName, via: 'name' }); return; }
+    const asAlias = byAlias.get(key);
+    out.set(i, asAlias ? { entry: asAlias, via: 'alias' } : null);
   });
   return out;
 }
@@ -216,7 +293,7 @@ export function buildPreview(
         level: 'warn', code: 'CLASS_LEVEL_MISMATCH', row: rowNo, player: name,
         message: `职业列填的是数字「${cls}」，疑似等级串位；请核对原始战报列顺序`,
       });
-    } else if (!known.has(cls) && !findClass(cls)) {
+    } else if (cls !== HONGYIN && !known.has(cls) && !findClass(cls)) {
       rowIssues.push({
         level: 'warn', code: 'UNKNOWN_CLASS', row: rowNo, player: name,
         message: `职业「${cls}」不在 12 职业表内，且无别名映射`,
@@ -224,7 +301,8 @@ export function buildPreview(
     }
 
     // ── 2. 名单校验 ──
-    const hit = matches.get(i) ?? null;
+    const matched = matches.get(i) ?? null;
+    const hit = matched?.entry ?? null;
     if (!hit) {
       rowIssues.push({
         level: mode === 'roster' ? 'error' : 'warn',
@@ -232,6 +310,12 @@ export function buildPreview(
         message: mode === 'roster'
           ? `「${name}」不在成员主档里；请先建档，或改用「完整名单」模式`
           : `「${name}」不在成员主档里，将跳过建档直接入库（建议后续补档）`,
+      });
+    } else if (matched?.via === 'alias') {
+      // 战报里写的是改名前的老名字：认得出人，但要让用户知道归到谁头上了
+      rowIssues.push({
+        level: 'warn', code: 'ALIAS_MATCH', row: rowNo, player: name,
+        message: `「${name}」是主档成员「${hit.name}」的历史用名，本条已归到「${hit.name}」（主档名保持不变）`,
       });
     } else if (hit.name && name && hit.name !== name && hit.gameId === name) {
       rowIssues.push({
@@ -282,7 +366,10 @@ export function buildPreview(
         message: '有重伤但击杀/助攻/伤害/治疗全为 0，疑似漏填或串列',
       });
     }
-    const effClass = findClass(cls)?.name ?? hit?.mainClass ?? '';
+    /* 鸿音按奶量分流成 妙音 / 惊鸿（用户口径：>500w 妙音，否则惊鸿）——
+       必须在语义校验与 classUsed 之前算出来，治疗职业的"有击杀"提醒才对得上。 */
+    const clsFinal = resolveHongyin(cls, stat.healing);
+    const effClass = findClass(clsFinal)?.name ?? clsFinal ?? hit?.mainClass ?? '';
     const role = findClass(effClass)?.role;
     if (role === 'HEAL' && stat.kills + stat.fountainKills > 0) {
       rowIssues.push({
@@ -297,7 +384,7 @@ export function buildPreview(
       playerId: hit?.id ?? null,
       gameId: hit?.gameId ?? name,
       name: hit?.name ?? name,
-      classUsed: findClass(cls)?.name ?? cls ?? hit?.mainClass ?? '',
+      classUsed: findClass(clsFinal)?.name ?? clsFinal ?? hit?.mainClass ?? '',
       squad: '',
       stat,
       issues: rowIssues,

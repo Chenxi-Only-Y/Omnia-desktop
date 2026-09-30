@@ -1,4 +1,5 @@
 import { api } from '../api';
+import { localUrl } from './localFile';
 
 /**
  * 全局壁纸层：body 下挂一个 position:fixed 的容器（.home-wallpaper），
@@ -23,12 +24,11 @@ function apply(kind: string, file: string) {
   if (!host) return;
   const next = kind + '|' + file;
   if (next === current) return;          // 同一张：什么都不动，绝不打断播放
-  // 路径转 URL：按 / 或 \ 切开再用 / 拼。
-  // 原来是 file.replace(/\\\\/g, '/') —— 那个正则匹配的是「两个反斜杠」，
-  // 单个反斜杠永远换不掉，生成 file:///C:WindowsWeb... 这种非法 URL，
-  // 图永远加载不出来（CDP 实测确认，见诊断【5】）。
-  const norm = String(file ?? '').split(/[\\\/]+/).filter(Boolean).join('/');
-  const url = norm ? 'file:///' + norm : '';
+  // 路径转 URL：统一走主进程注册的 omnia:// 特权协议。
+  // 原先是 file:/// —— 在 dev（http 源）下 Chromium 一律拒绝读取，且 CSP 放不开，
+  // 于是开发模式下全局壁纸永远加载不出来（打包后是 file 源才正常）。
+  // 详见 lib/localFile.ts 里的对照实验结论。
+  const url = localUrl(file);
   if (kind === 'video' && url && mode === 'dynamic') {
     // 记住当前播放进度，换源后接着播（保证「不重置」）
     const t = video && video.src === url ? video.currentTime : lastTime;
@@ -61,7 +61,7 @@ function apply(kind: string, file: string) {
           void (async () => {
             try {
               const out = await api.player.wallpaperTranscode();
-              video!.src = 'file:///' + out.replace(/[\\/]+/g, '/');
+              video!.src = localUrl(out);
               void video!.play();
               window.dispatchEvent(new CustomEvent('omnia:wallpaper-error', {
                 detail: '转码完成，已切换到 H.264',
@@ -105,7 +105,7 @@ function apply(kind: string, file: string) {
   if (isVideo && url) {
     const dir = url.slice(0, url.lastIndexOf('/'));
     bgLayers = ['preview.gif', 'preview.jpg', 'preview.webp', 'preview.png']
-      .map(nm => 'url("file:///' + dir + '/' + nm + '")').join(', ');
+      .map(nm => 'url("' + dir + '/' + nm + '")').join(', ');
   }
   // 渲染模式：关闭壁纸 → 全清；静态帧 → 只用静态图（gif 换成 jpg、视频不播）
   let image = bgLayers || 'none';
@@ -116,7 +116,7 @@ function apply(kind: string, file: string) {
   if (mode === 'off') { image = 'none'; }
   else if (mode === 'static' && isVideo && url) {
     const dir = url.slice(0, url.lastIndexOf('/'));
-    image = ['preview.jpg', 'preview.png'].map(nm => 'url("file:///' + dir + '/' + nm + '")').join(', ');
+    image = ['preview.jpg', 'preview.png'].map(nm => 'url("' + dir + '/' + nm + '")').join(', ');
   }
   // 内联样式优先级最高：逐个元素写死，任何 CSS 规则都压不过它
   const targets: HTMLElement[] = [document.documentElement, document.body,
@@ -174,6 +174,14 @@ export function installWallpaper(): void {
   if (installed) return;
   installed = true;
   const boot = () => {
+    // 渲染模式/适应方式也要在**首帧之前**生效。原先只在事件回调里赋值，
+    // 而 boot 走 localStorage 命中分支时会提前 return、根本不读库 ——
+    // 库里存着 contain（完整缩放），启动后却按默认 cover（铺满裁剪）显示，
+    // 用户改过的设置看着就是「没生效」。
+    // 因此先把库里的设置读出来，再由 setWallpaper 统一应用一次。
+    const bootFromDb = (): Promise<Record<string, unknown>> =>
+      api.meta.settings().then((s) => s as Record<string, unknown>).catch(() => ({}));
+
     host = document.createElement('div');
     host.className = 'home-wallpaper';
     document.body.appendChild(host);
@@ -193,12 +201,21 @@ export function installWallpaper(): void {
         if (w && w.file) { apply(w.kind === 'video' ? 'video' : 'image', String(w.file)); booted = true; }
       }
     } catch { /* localStorage 不可用就算了 */ }
-    if (!booted) {
-      void api.meta.settings().then((s) => {
-        apply((s as Record<string, unknown>).wallpaperKind === 'video' ? 'video' : 'image',
-          String((s as Record<string, unknown>).wallpaperImage ?? ''));
-      }).catch(() => { /* 没设置就用默认渐变 */ });
-    }
+    // 无论命中哪条分支，都要用库里的 mode/fit 重算一次（apply 是幂等的：
+    // 同一张图会因为 current 相同而提前 return，所以这里先清 current 强制重算）
+    void bootFromDb().then((s) => {
+      if (typeof s.wallpaperRenderMode === 'string' && s.wallpaperRenderMode) mode = s.wallpaperRenderMode;
+      if (typeof s.wallpaperFit === 'string' && s.wallpaperFit) fit = s.wallpaperFit;
+      if (typeof s.wallpaperMuted === 'string') muted = s.wallpaperMuted !== '0';
+      if (video) video.muted = muted;
+      if (booted) {
+        const [k, f] = current.split('|');
+        current = '';
+        if (f) apply(k || 'image', f);
+      } else {
+        apply(s.wallpaperKind === 'video' ? 'video' : 'image', String(s.wallpaperImage ?? ''));
+      }
+    });
   };
   if (document.body) boot();
   else document.addEventListener('DOMContentLoaded', boot, { once: true });

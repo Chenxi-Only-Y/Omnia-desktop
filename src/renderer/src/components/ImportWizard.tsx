@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { ImportPreview, PlayerInput, SheetGrid } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 import { parseTableText } from '../lib/importer';
 import { gridToTsv, isEmptyRow } from '../lib/sheet';
 import type { PageProps } from '../App';
@@ -31,6 +31,8 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
   const [sheet, setSheet] = useState<string>('');
   const [grid, setGrid] = useState<SheetGrid | null>(null);
   const [joinMode, setJoinMode] = useState<'roster' | 'full'>('roster');
+  /* 对方帮会的数据要不要存下来（用户口径选项 A）：默认存，但只作对比 —— 不评分、不进主档 */
+  const [storeOpp, setStoreOpp] = useState(true);
   const [statPreview, setStatPreview] = useState<ImportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
         await loadGrid(data, first.name);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -72,7 +74,7 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
       setGrid(g);
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -106,17 +108,35 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
         if (!matchId) throw new Error('缺少目标对局');
         const preview = await api.match.importPreview(tsv, joinMode);
         setStatPreview(preview);
-        if (preview.summary.errors > 0) {
-          setError(`有 ${preview.summary.errors} 行存在错误，请修正后再提交（下方为校验明细）`);
-        } else {
-          const res = await api.match.importCommit(matchId, preview);
-          const msg = `已写入 ${res.written} 条战报${res.created ? `，自动建档 ${res.created} 人` : ''}`;
-          setNotice(msg);
-          onDone(msg);
+        /* 只有「不在主档」这一类问题（= 对方帮会的人）时不再拦整批：
+           按勾选存为对方数据 / 跳过，能对上的自己人照常入库。
+           数字不对、同一人重复这类硬错误仍然拦住。 */
+        const hard = preview.rows.filter((r) =>
+          r.issues.some((i) => i.level === 'error' && i.code !== 'NOT_IN_ROSTER'));
+        if (hard.length) {
+          setError(`有 ${hard.length} 行存在硬错误（数字 / 重复），请修正后再提交（下方为校验明细）`);
+          return;
         }
+        const rows = preview.rows.filter((r) =>
+          !r.issues.some((i) => i.level === 'error' && i.code !== 'NOT_IN_ROSTER'));
+        if (!rows.length) throw new Error('这张表里没有解析出可导入的战报行');
+        const oppRows = rows.filter((r) => r.playerId === null
+          && r.issues.some((i) => i.code === 'NOT_IN_ROSTER' && i.level === 'error')).length;
+        const res = await api.match.importCommit(
+          matchId,
+          { ...preview, rows, summary: { ...preview.summary, total: rows.length } },
+          { opp: storeOpp ? 'store' : 'skip' },
+        );
+        const msg = `已写入自己人 ${res.written} 条战报`
+          + (res.created ? `，自动建档 ${res.created} 人` : '')
+          + (res.oppWritten ? `；对方帮会 ${res.oppWritten} 条已存为对比数据（不评分，可在「对方数据」页签清空）` : '')
+          + (res.skipped ? `；跳过对方 ${res.skipped} 行` : '')
+          + (oppRows === 0 ? '' : `　（对方共 ${oppRows} 行）`);
+        setNotice(msg);
+        onDone(msg);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -147,13 +167,20 @@ export default function ImportWizard({ mode, matchId, matchLabel, onClose, onDon
             </label>
           )}
           {mode === 'stat' && (
-            <label className="field"><span>名单模式</span>
-              <Select className="select" value={joinMode}
-                      onChange={(e) => setJoinMode(e.target.value as 'roster' | 'full')}>
-                <option value="roster">严格：必须在成员主档里</option>
-                <option value="full">完整：不在档的自动建档</option>
-              </Select>
-            </label>
+            <>
+              <label className="field"><span>名单模式</span>
+                <Select className="select" value={joinMode}
+                        onChange={(e) => setJoinMode(e.target.value as 'roster' | 'full')}>
+                  <option value="roster">严格：必须在成员主档里</option>
+                  <option value="full">完整：不在档的自动建档</option>
+                </Select>
+              </label>
+              {/* 整场战报导出里必然混着对手：勾上就存下来当对比数据（不评分、不进主档） */}
+              <label className="check" title="对方帮会的数据只作对比基准：不进成员主档 / 报名 / 出勤，也不参与评分">
+                <input type="checkbox" checked={storeOpp} onChange={(e) => setStoreOpp(e.target.checked)} />
+                <span>存下对方数据</span>
+              </label>
+            </>
           )}
         </div>
 

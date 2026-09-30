@@ -9,6 +9,7 @@
  * 这里只取与成员主档相关的列。
  */
 import type { PlayerInput } from './types';
+import { NOTE_ROLE_VALUES } from './domain';
 
 type RawRow = Record<string, string>;
 
@@ -54,13 +55,18 @@ const HEADER_MAP: Record<string, keyof PlayerInput> = {
   '玩家名字': 'name', '名字': 'name', '昵称': 'name', 'name': 'name', '显示名': 'name',
   '入帮排序': 'joinedOrder', '入帮序': 'joinedOrder', '排序': 'joinedOrder', 'joinedorder': 'joinedOrder',
   '麦': 'mic', '麦克风': 'mic', '有无麦克风（必填）': 'mic', '有无麦克风': 'mic', 'mic': 'mic',
-  '备注': 'remark', '备注(角色)': 'noteRole', 'remark': 'remark',
+  /* 备注 / 备注角色：注意 normHeader 会先**剥掉括号内容**，所以旧表的「备注(角色)」
+     到这里已经变成「备注」→ 归 remark，再由 extractNoteRole 从备注文本里认角色。
+     而本系统自己导出的列名是「备注角色」（不带括号），必须单独映射 ——
+     否则导出的文件再导回来会丢掉整列备注角色（实测踩到）。 */
+  '备注': 'remark', '备注角色': 'noteRole', 'remark': 'remark',
   // 职业列（主职业/副职）在旧表里存在，但本系统职业只从报名表来 —— 这里**忽略**这些列，
   //  不映射到成员主档，避免导入时因未知字段报错。
   '状态': 'status', 'status': 'status',
+  // 历史用名：改名后旧战报/旧报名靠它认人（多个用 / 、 , 或 | 分隔）
+  '历史用名': 'aliases', '曾用名': 'aliases', '旧名': 'aliases', '别名': 'aliases',
 };
 
-const NOTE_ROLES = ['指挥', '统战', 'K龙', '替补指挥', '长期请假'];
 
 function normHeader(h: string): string {
   return h.replace(/\s+/g, '').replace(/[（(].*?[)）]/g, '').trim();
@@ -84,7 +90,7 @@ function mapHeader(h: string, index: number): keyof PlayerInput | null {
 
 /** 从「备注」列里识别备注角色（旧表 L 列存放 指挥/统战/K龙…） */
 function extractNoteRole(remark: string): PlayerInput['noteRole'] | null {
-  for (const r of NOTE_ROLES) if (remark.includes(r)) return r as PlayerInput['noteRole'];
+  for (const r of NOTE_ROLE_VALUES) if (remark.includes(r)) return r as PlayerInput['noteRole'];
   return null;
 }
 
@@ -131,6 +137,11 @@ export function parseTableText(text: string): PlayerInput[] {
     const mic = micRaw.includes('无') && !micRaw.includes('无需') ? '无'
       : micRaw.includes('无需') ? '无需作答'
       : micRaw.includes('有') ? '有' : '';
+    // 历史用名：允许一格塞多个（旧表里常见「旧名1/旧名2」）
+    const aliasList = (r.aliases ?? '')
+      .split(/[\/、,，|;；]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
     out.push({
       gameId: gameId || name,
       name: name || gameId,
@@ -139,6 +150,7 @@ export function parseTableText(text: string): PlayerInput[] {
       noteRole: note as PlayerInput['noteRole'],
       status: (r.status ?? '').trim() || 'active',
       remark,
+      ...(aliasList.length ? { aliases: aliasList } : {}),
     });
   }
   return out;
@@ -150,11 +162,13 @@ const EXPORT_HEADERS: { key: keyof PlayerInput; label: string }[] = [
   { key: 'mic', label: '麦克风' },
   { key: 'noteRole', label: '备注角色' },
   { key: 'status', label: '状态' },
+  { key: 'aliases', label: '历史用名' },
   { key: 'remark', label: '备注' },
 ];
 
 function cell(v: unknown): string {
-  const s = v === null || v === undefined ? '' : String(v);
+  // 数组（历史用名）用「/」拼成一格：直接用逗号会被当成列分隔符拆错列
+  const s = Array.isArray(v) ? v.join('/') : v === null || v === undefined ? '' : String(v);
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

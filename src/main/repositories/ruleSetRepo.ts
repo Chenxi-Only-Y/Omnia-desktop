@@ -9,7 +9,7 @@
  *  - 权重按「个人（按定位）/ 战术执行（按战术类型）」两组存 JSON，
  *    另外存职业系数与附加分。
  */
-import type { SqlDatabase, SqlValue } from '../db';
+import type { SqlDatabase } from '../db';
 import type { RuleSet, RuleSetInput, RuleSetValidation } from '../../shared/types';
 
 /** 内置默认规则：对齐设计基准 v2 与原表「数据处理1」第 4 行 */
@@ -39,7 +39,7 @@ export const DEFAULT_RULE_SET: RuleSetInput = {
 };
 
 interface RuleRow {
-  id: number; season_id: number | null; name: string;
+  id: number; name: string;
   base_score: number; cap_score: number; scale_team: number; scale_personal: number;
   death_pen: number; total_towers: number;
   weights_json: string; class_coef_json: string; bonus_json: string;
@@ -56,7 +56,11 @@ const parse = <T>(json: string, fallback: T): T => {
 };
 
 export class RuleSetRepo {
-  constructor(private db: SqlDatabase) {}
+  /* 库连接用"取当前连接"的函数而不是固定连接：多帮会模式下切帮会只换句柄，
+     仓储实例不用重建（见 src/main/guilds.ts）。 */
+  constructor(private getDb: () => SqlDatabase) {}
+
+  private get db(): SqlDatabase { return this.getDb(); }
 
   private toRuleSet(r: RuleRow): RuleSet {
     const weights = parse<{ personal?: RuleSetInput['personalWeights']; exec?: RuleSetInput['execWeights'] }>(
@@ -64,7 +68,6 @@ export class RuleSetRepo {
     );
     return {
       id: r.id,
-      seasonId: r.season_id,
       name: r.name,
       version: r.version,
       active: this.activeId() === r.id,
@@ -117,24 +120,21 @@ export class RuleSetRepo {
     return this.get(id);
   }
 
-  /** 新建规则集：版本号自动递增（同赛季内） */
-  create(input: RuleSetInput, seasonId: number | null = null): RuleSet {
+  /** 新建规则集：版本号自动递增（全局，不再按赛季） */
+  create(input: RuleSetInput): RuleSet {
     validate(input);
     const name = (input.name ?? '').trim() || `规则 v?`;
     const maxV = this.db.prepare(
       'SELECT COALESCE(MAX(version), 0) AS v FROM rule_set',
     ).get() as { v: number };
     const version = Number(maxV.v) + 1;
-    const sid = seasonId ?? (this.db.prepare(
-      "SELECT CAST(value AS INTEGER) AS v FROM app_setting WHERE key = 'activeSeasonId'",
-    ).get() as { v: number } | undefined)?.v ?? null;
 
     const info = this.db.prepare(
-      `INSERT INTO rule_set (season_id, name, base_score, cap_score, scale_team, scale_personal,
+      `INSERT INTO rule_set (name, base_score, cap_score, scale_team, scale_personal,
                              death_pen, total_towers, weights_json, class_coef_json, bonus_json, version)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     ).run(
-      sid as SqlValue, name, input.baseScore, input.capScore, input.scaleTeam, input.scalePersonal,
+      name, input.baseScore, input.capScore, input.scaleTeam, input.scalePersonal,
       input.deathPen, input.totalTowers,
       JSON.stringify({ personal: input.personalWeights, exec: input.execWeights }),
       JSON.stringify(input.classCoef), JSON.stringify(input.bonus), version,
@@ -166,7 +166,7 @@ export class RuleSetRepo {
     return this.create({
       ...cur,
       name: newName?.trim() || `${cur.name} 副本`,
-    }, cur.seasonId);
+    });
   }
 
   remove(id: number): boolean {

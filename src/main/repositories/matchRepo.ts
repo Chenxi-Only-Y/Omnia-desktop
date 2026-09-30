@@ -17,10 +17,11 @@ import type { MatchScoreInput, MatchScoreOutput } from '../../shared/scoreEngine
 import { SquadRepo } from './squadRepo';
 
 interface MatchRow {
-  id: number; season_id: number | null; date: string; index_in_day: number;
+  id: number; date: string; index_in_day: number;
   our_side: string; opp_side: string; result: string;
   our_towers_left: number; opp_towers_left: number;
   state: string; rule_set_id: number | null; remark: string;
+  score_stale: number;
   created_at: string; updated_at: string;
 }
 
@@ -47,7 +48,6 @@ const s = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 function toMatch(r: MatchRow): Match {
   return {
     id: r.id,
-    seasonId: r.season_id,
     date: r.date,
     indexInDay: n(r.index_in_day),
     ourSide: r.our_side,
@@ -58,6 +58,8 @@ function toMatch(r: MatchRow): Match {
     state: r.state || 'draft',
     ruleSetId: r.rule_set_id,
     remark: r.remark || '',
+    // 战报动过之后分数就是旧快照了（见 markScoreStale）；评分页据此提示"请重算"
+    scoreStale: n(r.score_stale) === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -89,9 +91,12 @@ const STAT_COLUMNS: [keyof CombatStat, string][] = [
 export class MatchRepo {
   private squads: SquadRepo;
 
-  constructor(private db: SqlDatabase) {
-    this.squads = new SquadRepo(db);
+  /* 同上：连接是"取当前"的，SquadRepo 也一起透传 */
+  constructor(private getDb: () => SqlDatabase) {
+    this.squads = new SquadRepo(getDb);
   }
+
+  private get db(): SqlDatabase { return this.getDb(); }
 
   // ── 对局 ─────────────────────────────────────────────────────
   list(): MatchSummary[] {
@@ -102,6 +107,8 @@ export class MatchRepo {
     const counts = this.db.prepare(
       `SELECT p.match_id,
               SUM(CASE WHEN p.side='our' AND p.state='PLAY' THEN 1 ELSE 0 END) AS our_cnt,
+              SUM(CASE WHEN p.side='our' AND p.squad <> '' AND p.state <> 'LEAVE' THEN 1 ELSE 0 END) AS our_assigned,
+              COUNT(DISTINCT CASE WHEN p.side='our' AND p.squad <> '' THEN p.squad END) AS squads_used,
               SUM(CASE WHEN p.side='opp' AND p.state='PLAY' THEN 1 ELSE 0 END) AS opp_cnt,
               SUM(CASE WHEN p.side='our' AND p.state='PLAY' AND cs.participation_id IS NOT NULL
                         AND (cs.kills+cs.fountain_kills+cs.assists+cs.resource+cs.dmg_player
@@ -111,7 +118,10 @@ export class MatchRepo {
        FROM participation p
        LEFT JOIN combat_stat cs ON cs.participation_id = p.id
        GROUP BY p.match_id`,
-    ).all() as unknown as { match_id: number; our_cnt: number; opp_cnt: number; stat_cnt: number }[];
+    ).all() as unknown as {
+      match_id: number; our_cnt: number; opp_cnt: number; stat_cnt: number;
+      our_assigned: number; squads_used: number;
+    }[];
 
     const map = new Map(counts.map((c) => [c.match_id, c]));
     return rows.map((r) => {
@@ -120,6 +130,8 @@ export class MatchRepo {
         ...toMatch(r),
         ourCount: n(c?.our_cnt),
         oppCount: n(c?.opp_cnt),
+        ourAssigned: n(c?.our_assigned),
+        squadsUsed: n(c?.squads_used),
         statFilled: n(c?.stat_cnt),
       };
     });
@@ -155,9 +167,9 @@ export class MatchRepo {
     }
 
     const info = this.db.prepare(
-      `INSERT INTO match (season_id, date, index_in_day, our_side, opp_side, result,
+      `INSERT INTO match (date, index_in_day, our_side, opp_side, result,
                           our_towers_left, opp_towers_left, state, remark)
-       VALUES ((SELECT CAST(value AS INTEGER) FROM app_setting WHERE key='activeSeasonId'), ?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?)`,
     ).run(
       date, index, ourSide, oppSide, s(input.result) || 'WIN',
       this.clampTowers(input.ourTowersLeft), this.clampTowers(input.oppTowersLeft),
@@ -179,6 +191,9 @@ export class MatchRepo {
   }
 
   update(id: number, patch: Partial<MatchInput>): Match {
+    /* 对局级字段（结果/推塔/守塔/旗）直接决定评分（scoreEngine.ts:168-170）→ 置 stale。
+       置 stale 只是打个标记，重复调用无害。 */
+    this.markScoreStale(id);
     const cur = this.get(id);
     if (!cur) throw new Error(`对局不存在：id=${id}`);
 
@@ -325,6 +340,62 @@ export class MatchRepo {
     return added;
   }
 
+  /**
+   * 把某一场的**排表**沿用到另一场（用户口径 2026-09-27：「场次的排表相互可以传递」）。
+   *
+   * 复制：小队 / 落位槽 / 用哪个职业 / 队内角色
+   * 不复制：战报数值（每场真实数据）、评分（数据变了要重算）、对方数据（对手不同）
+   * overwrite=false 时只补"目标场还没有的人"，true 时连已有的人也按源场重排。
+   * nameMap：小队重名映射（建制按场次独立，名字可能不同，由调用方按组内序号给出）。
+   */
+  copyLineup(
+    fromMatchId: number,
+    toMatchId: number,
+    overwrite = false,
+    nameMap: Record<string, string> = {},
+  ): { copied: number; skipped: number } {
+    if (fromMatchId === toMatchId) throw new Error('源场次与目标场次不能是同一场');
+    if (!this.get(fromMatchId)) throw new Error(`对局不存在：id=${fromMatchId}`);
+    if (!this.get(toMatchId)) throw new Error(`对局不存在：id=${toMatchId}`);
+
+    const src = this.participations(fromMatchId).filter(
+      (r) => r.side === 'our' && r.squad !== '' && r.state !== 'LEAVE',
+    );
+    let copied = 0;
+    let skipped = 0;
+    this.db.exec('BEGIN');
+    try {
+      for (const r of src) {
+        const exists = this.db.prepare(
+          'SELECT 1 FROM participation WHERE match_id = ? AND player_id = ? AND side = ?',
+        ).get(toMatchId, r.playerId, 'our');
+        if (exists && !overwrite) { skipped += 1; continue; }
+        this.upsertParticipation({
+          matchId: toMatchId,
+          playerId: r.playerId,
+          classUsed: r.classUsed,
+          squad: nameMap[r.squad] ?? r.squad,
+          noteRole: r.noteRole,
+          stat: undefined,                 // 战报绝不带过来
+        });
+        /* 落位槽：ParticipationInput 不接槽号，这里直接写 ——
+           复制过来的是源场**已经排好**的位置，不需要 nextFreeSlot 那套"找空位"逻辑。
+           -1 = 未指定，原样带过来。 */
+        this.db.prepare(
+          'UPDATE participation SET slot_no = ? WHERE match_id = ? AND player_id = ? AND side = ?',
+        ).run(Math.max(-1, r.slotNo), toMatchId, r.playerId, 'our');
+        copied += 1;
+      }
+      /* 排表变了 → 本场已存的分数就是旧快照（沿用既有机制，评分页会提示重算） */
+      if (copied > 0) this.markScoreStale(toMatchId);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return { copied, skipped };
+  }
+
   upsertParticipation(input: ParticipationInput): number {
     const { matchId, playerId } = input;
     if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
@@ -332,7 +403,28 @@ export class MatchRepo {
       .get(playerId) as { id: number; note_role: string; mic: string } | undefined;
     if (!pl) throw new Error(`成员不存在：id=${playerId}`);
 
+    // 改动前的状态（必须在 INSERT 之前取，用于判断本次是否真的换了小队）
+    const prev = this.db.prepare(
+      "SELECT squad FROM participation WHERE match_id = ? AND player_id = ? AND side = 'our'",
+    ).get(matchId, playerId) as { squad: string } | undefined;
+    const prevSquad = prev?.squad ?? null;
+
     const squadInput = s(input.squad);
+    // 只有**显式传了** squad 才写 squad/tactic/team_role。
+    // 原先是无条件 `squad = excluded.squad` —— 于是「只想改本场职业」的调用
+    // （不传 squad）会把 squad 写成空串，刚放进小队的人立刻被踢出去，
+    // 表现就是「选了二职，结果表里没有这个人」。
+    // 排表页靠「多传一个 squad」绕过了这个坑，对局详情那两处没有 → 一直坏着。
+    // 现在在仓储层根治：没传的字段一律不动（与 skillNote 的 COALESCE 同一个思路）。
+    /* ⚠️ 空串必须算"没传"（用户口径/审计 2026-09-30）：
+       战报导入那条链路传的是 `squad: row.squad`，而它**恒为空串** ——
+       原来只判 `!== undefined`，于是空串被当成"显式改小队" →
+       命中下面的 DO UPDATE SET squad/tactic/team_role = excluded.*（全被写成空 ✗）、
+       state = excluded.state（导入不带 state → 强置 PLAY ✗，请假的人被改成上场并参与评分 ✗）、
+       以及 slot_no = -1（排表被清空 ✗）。这与本文件"没传的字段一律不动"的口径冲突。 */
+    const hasSquadParam = input.squad !== undefined && input.squad !== '';
+    // 本次调用是否真的改了小队：只有显式传了 squad 且与改动前不同才算
+    const squadChanged = hasSquadParam && (prevSquad === null || prevSquad !== s(input.squad));
     let squad = squadInput;
     let tactic = '';
     let teamRole = '';
@@ -341,12 +433,13 @@ export class MatchRepo {
       const isBench = (BENCH_SQUADS as readonly string[]).includes(squadInput);
       if (!isBench) {
         // 走 resolve：历史战报/旧表里的「防守一2」要能对上本系统的「防守一-2」
-        const hit = this.squads.resolve(squadInput);
-        if (!hit) throw new Error(`未知小队：${squadInput}（可在「设置 → 战斗组与小队」里新增）`);
+        // ⚠️ 必须按**本场**的建制解析 —— 建制已改为每场独立
+        const hit = this.squads.resolve(matchId, squadInput);
+        if (!hit) throw new Error(`未知小队：${squadInput}（本场没有这个队，可在排表页「＋ 加一队」）`);
         // 关键：落库统一存正式名。否则 squad 存的是外来写法、tactic 却取自正式名，
         // 看板上同一支队会分裂成两个格子。
         squad = hit.name;
-        const params = this.squads.paramsForSquadName(hit.name);
+        const params = this.squads.paramsForSquadName(matchId, hit.name);
         tactic = params.tactic;
         teamRole = params.teamRole;
       }
@@ -357,50 +450,138 @@ export class MatchRepo {
     const signupMain = (this.db.prepare(
       'SELECT main_class FROM signup WHERE match_id = ? AND player_id = ?',
     ).get(matchId, playerId) as { main_class: string } | undefined)?.main_class ?? '';
-    const classUsed = s(input.classUsed) || signupMain;
+    const classUsed = input.classUsed === undefined ? signupMain : (s(input.classUsed) || signupMain);
     if (classUsed && !findClass(classUsed)) {
       throw new Error(`职业「${classUsed}」不在 12 职业表内（可用别名见职业字典）`);
     }
 
     // skillNote 是"没传就别动"：排表页只改技能备注时不该把小队/状态一起覆盖，
     // 所以用 COALESCE 只在显式传入时更新；新建时留空。
+    // 同样地，squad/tactic/team_role 只有显式传了才写（见上面 hasSquadParam）。
+    // 两条语句分开写而不是用 CASE：占位符个数不同，混在一起极易错位。
     const skillNote = input.skillNote === undefined ? null : s(input.skillNote);
-    this.db.prepare(
-      `INSERT INTO participation
-         (match_id, player_id, side, squad, tactic, team_role, class_used, note_role, skill_note, mic, state)
-       VALUES (?, ?, 'our', ?, ?, ?, ?, ?, COALESCE(?, ''), ?, ?)
-       ON CONFLICT(match_id, player_id, side) DO UPDATE SET
-         squad = excluded.squad, tactic = excluded.tactic, team_role = excluded.team_role,
-         class_used = excluded.class_used, note_role = excluded.note_role,
-         skill_note = COALESCE(?, participation.skill_note),
-         mic = excluded.mic, state = excluded.state`,
-    ).run(
-      matchId, playerId, squad, tactic, teamRole, classUsed,
-      s(input.noteRole) || pl.note_role, skillNote, pl.mic, s(input.state) || 'PLAY',
-      skillNote,
-    );
+    if (hasSquadParam) {
+      this.db.prepare(
+        `INSERT INTO participation
+           (match_id, player_id, side, squad, tactic, team_role, class_used, note_role, skill_note, mic, state)
+         VALUES (?, ?, 'our', ?, ?, ?, ?, ?, COALESCE(?, ''), ?, ?)
+         ON CONFLICT(match_id, player_id, side) DO UPDATE SET
+           squad = excluded.squad, tactic = excluded.tactic, team_role = excluded.team_role,
+           class_used = excluded.class_used, note_role = excluded.note_role,
+           skill_note = COALESCE(?, participation.skill_note),
+           mic = excluded.mic, state = COALESCE(?, state)`,
+      ).run(
+        matchId, playerId, squad, tactic, teamRole, classUsed,
+        s(input.noteRole) || pl.note_role, skillNote, pl.mic, s(input.state) || 'PLAY',
+        /* 没传 state 就传 null：ON CONFLICT 用 COALESCE(?, state) 保持原值 ——
+           否则导入战报会把「请假」改成「上场」并参与评分（审计 2026-09-30）*/
+        input.state === undefined ? null : s(input.state),
+        skillNote,
+      );
+    } else {
+      this.db.prepare(
+        `INSERT INTO participation
+           (match_id, player_id, side, squad, tactic, team_role, class_used, note_role, skill_note, mic, state)
+         VALUES (?, ?, 'our', '', '', '', ?, ?, COALESCE(?, ''), ?, ?)
+         ON CONFLICT(match_id, player_id, side) DO UPDATE SET
+           class_used = excluded.class_used, note_role = excluded.note_role,
+           skill_note = COALESCE(?, participation.skill_note),
+           mic = excluded.mic, state = COALESCE(?, state)`,
+      ).run(
+        matchId, playerId, classUsed,
+        s(input.noteRole) || pl.note_role, skillNote, pl.mic, s(input.state) || 'PLAY',
+        /* 没传 state 就传 null：ON CONFLICT 用 COALESCE(?, state) 保持原值 ——
+           否则导入战报会把「请假」改成「上场」并参与评分（审计 2026-09-30）*/
+        input.state === undefined ? null : s(input.state),
+        skillNote,
+      );
+    }
 
     const row = this.db.prepare(
-      'SELECT id FROM participation WHERE match_id = ? AND player_id = ? AND side = ?',
-    ).get(matchId, playerId, 'our') as { id: number };
+      'SELECT id, squad FROM participation WHERE match_id = ? AND player_id = ? AND side = ?',
+    ).get(matchId, playerId, 'our') as { id: number; squad: string };
 
-    // 落位槽号：显式传就用传入值；换队则清掉（原队的格号对新队无意义）；
-    // 同队且没传就保持不动（排表页点空位时由 assignBulk 随后写入）。
+    // 落位槽号：显式传就用传入值；**本次真的换了小队**才清掉（原队的格号对新队无意义）；
+    // 否则保持不动。
+    //
+    // 判据必须是「本次调用是否改了 squad」，不能拿「库里的 squad」和「最终 squad」比 ——
+    // 旧写法是 `WHERE squad <> ?`，而 assignBulk 是先调本方法、**之后**才写槽号，
+    // 那一刻库里还是旧值（''），于是被判定成"换队"、槽号当场清成 -1，
+    // 只靠 assignBulk 随后那条显式写入兜住。二职路径会再 upsert 一次（不带 squad），
+    // 又一次把刚写好的槽号冲掉 → 表现就是「点了第 N 格，人却跑到最左边」。
     if (input.slotNo !== undefined) {
       this.db.prepare('UPDATE participation SET slot_no = ? WHERE id = ?')
         .run(Math.floor(Number(input.slotNo)), row.id);
-    } else {
-      this.db.prepare(
-        "UPDATE participation SET slot_no = -1 WHERE id = ? AND squad <> ?",
-      ).run(row.id, squad);
+    } else if (squadChanged) {
+      this.db.prepare('UPDATE participation SET slot_no = -1 WHERE id = ?').run(row.id);
     }
 
     if (input.stat) this.saveStat(row.id, input.stat);
     return row.id;
   }
 
+  /**
+   * 写入/更新一条**对方帮会**参战记录（迁移 v15，用户口径选项 A）。
+   *
+   * 为什么不复用 upsertParticipation：那条路径整套逻辑都是"我方"语义 ——
+   * 解析本场小队建制、写入 squad/tactic/team_role、占槽位、要求职业在 12 职业表内。
+   * 对方既没有小队也没有槽位，硬套只会给后续埋坑（还会因为未知小队直接抛错）。
+   *
+   * 这里只做三件事：建档（若没有）、写 side='opp' 的参战记录、写 14 项战报。
+   * 评分引擎 / 排表 / 出勤全部只查 side='our'，所以这些数据天然只是"对比基准"。
+   */
+  upsertOppParticipation(input: {
+    matchId: number;
+    playerId: number;
+    classUsed?: string;
+    stat?: Partial<CombatStat>;
+  }): number {
+    const { matchId, playerId } = input;
+    if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
+    if (!this.db.prepare('SELECT 1 FROM player WHERE id = ?').get(playerId)) {
+      throw new Error(`成员不存在：id=${playerId}`);
+    }
+    // 对方职业可能超出 12 职业表（游戏里新门派/别名）—— 这里**不拦**，原样存下来对比用
+    const classUsed = s(input.classUsed);
+
+    this.db.prepare(
+      `INSERT INTO participation (match_id, player_id, side, class_used, state)
+       VALUES (?, ?, 'opp', ?, 'PLAY')
+       ON CONFLICT(match_id, player_id, side) DO UPDATE SET class_used = excluded.class_used`,
+    ).run(matchId, playerId, classUsed);
+
+    const row = this.db.prepare(
+      "SELECT id FROM participation WHERE match_id = ? AND player_id = ? AND side = 'opp'",
+    ).get(matchId, playerId) as { id: number };
+    if (input.stat) this.saveStat(row.id, input.stat);
+    return row.id;
+  }
+
+  /**
+   * 把某场标记成"分数已过期"。
+   * 触发点：战报被改/被清、参战记录被删 —— 这些都会让已保存的分数与实际数据对不上。
+   * 算分（saveScores）时清零，所以这个标记的含义就是"自上次算分后数据动过"。
+   */
+  /** 供其它层调用：报名状态/排表改动后置"评分快照已过期"（审计 2026-09-30） */
+  markStale(matchId: number): void { this.markScoreStale(matchId); }
+
+  private markScoreStale(matchId: number): void {
+    this.db.prepare('UPDATE match SET score_stale = 1 WHERE id = ?').run(matchId);
+  }
+
+  /** 同上，只是手上只有 participationId（saveStat / clearStatRow 这两个入口） */
+  private markScoreStaleByParticipation(participationId: number): void {
+    const row = this.db.prepare('SELECT match_id FROM participation WHERE id = ?')
+      .get(participationId) as { match_id: number } | undefined;
+    if (row) this.markScoreStale(row.match_id);
+  }
+
   removeParticipation(id: number): boolean {
-    return this.db.prepare('DELETE FROM participation WHERE id = ?').run(id).changes > 0;
+    const row = this.db.prepare('SELECT match_id FROM participation WHERE id = ?')
+      .get(id) as { match_id: number } | undefined;
+    const changed = this.db.prepare('DELETE FROM participation WHERE id = ?').run(id).changes > 0;
+    if (changed && row) this.markScoreStale(row.match_id);
+    return changed;
   }
 
   /**
@@ -415,6 +596,9 @@ export class MatchRepo {
    * 不传 slotIndex = 顺序追加（拖拽落点、批量调整用）。
    */
   assignBulk(input: AssignInput): number {
+    /* 排表改动会改变评分口径（scoreEngine 用 squad/tactic 定分）→ 立刻置 score_stale，
+       否则评分页不会提示"数据已变，请重算"，展示的是旧阵容算出的分（审计 2026-09-30）。 */
+    if (input && Number.isFinite(Number(input.matchId))) this.markScoreStale(Number(input.matchId));
     const { matchId, playerIds, squad } = input;
     if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
     if (!playerIds.length) throw new Error('没有要移动的队员');
@@ -423,8 +607,9 @@ export class MatchRepo {
     const isBench = (BENCH_SQUADS as readonly string[]).includes(squad);
     let size = 0;
     if (!isBench) {
-      const hit = this.squads.findByName(squad);
-      if (!hit) throw new Error(`未知小队：${squad}（可在「设置 → 战斗组与小队」里新增）`);
+      // 按**本场**建制校验（每场独立）
+      const hit = this.squads.findByName(matchId, squad);
+      if (!hit) throw new Error(`未知小队：${squad}（本场没有这个队，可在排表页「＋ 加一队」）`);
       size = hit.size;
     }
 
@@ -502,6 +687,8 @@ export class MatchRepo {
 
   /** 把队员移出小队（保留在名单里，成为"未分配"） */
   unassign(playerId: number, matchId: number): void {
+    /* 同上：移出小队也会改评分口径 */
+    this.markScoreStale(matchId);
     this.db.prepare(
       `UPDATE participation SET squad = '', tactic = '', team_role = '', slot_no = -1
        WHERE match_id = ? AND player_id = ? AND side = 'our'`,
@@ -518,6 +705,9 @@ export class MatchRepo {
 
   /** 只改某一条参战记录的战报（保存 14 项指标） */
   saveStat(participationId: number, stat: Partial<CombatStat>): void {
+    /* 战报一改，本场已存的分数就是"旧快照"了 —— 标记过期，评分页会提示重算。
+       （不自动重算：录一半就重算会刷出一堆没意义的分数） */
+    this.markScoreStaleByParticipation(participationId);
     const cur = this.db.prepare(
       'SELECT participation_id FROM combat_stat WHERE participation_id = ?',
     ).get(participationId);
@@ -543,14 +733,53 @@ export class MatchRepo {
     this.db.prepare(`UPDATE combat_stat SET ${sets.join(', ')} WHERE participation_id = ?`).run(...vals);
   }
 
-  /** 某场里已分配到小队的人数，用于阵容完整性提示 */
-  squadFill(matchId: number): Record<string, number> {
-    const rows = this.db.prepare(
-      `SELECT squad, COUNT(*) AS c FROM participation
-       WHERE match_id = ? AND side = 'our' AND state = 'PLAY' AND squad <> ''
-       GROUP BY squad`,
-    ).all(matchId) as unknown as { squad: string; c: number }[];
-    return Object.fromEntries(rows.map((r) => [r.squad, n(r.c)]));
+  /**
+   * 清空某场某一方的战报数值（用户口径：「战报录入为啥没有清空或者删除又或者更改」）。
+   *
+   *  · side='our' → 只删 combat_stat（14 项指标归零），**参战/阵容记录保留**：
+   *    队员还在名单里，只是"这一场还没录战报"。导错一批可以直接清空重来。
+   *  · side='opp' → 连参战记录一起删：对方数据是整批导入的对比数据，
+   *    留着没有小队/槽位意义，删干净才对；顺手清掉因此变成"没有任何参战记录"的对方成员，
+   *    免得库里的对手越攒越脏。
+   *
+   * 返回受影响的记录条数。
+   */
+  clearStats(matchId: number, side: 'our' | 'opp' = 'our'): number {
+    if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
+    this.markScoreStale(matchId);
+    if (side === 'our') {
+      const info = this.db.prepare(
+        `DELETE FROM combat_stat WHERE participation_id IN (
+           SELECT id FROM participation WHERE match_id = ? AND side = 'our')`,
+      ).run(matchId);
+      return Number(info.changes);
+    }
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare(
+        `DELETE FROM combat_stat WHERE participation_id IN (
+           SELECT id FROM participation WHERE match_id = ? AND side = 'opp')`,
+      ).run(matchId);
+      const info = this.db.prepare(
+        "DELETE FROM participation WHERE match_id = ? AND side = 'opp'",
+      ).run(matchId);
+      // 对方成员若在**所有场次**里都不再有参战记录 → 一起清掉（他们是导入时顺手建的档）
+      this.db.prepare(
+        'DELETE FROM player WHERE is_opp = 1 AND id NOT IN (SELECT player_id FROM participation)',
+      ).run();
+      this.db.exec('COMMIT');
+      return Number(info.changes);
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /** 清空单条参战记录的战报数值（队员保留在名单里，14 项归零） */
+  clearStatRow(participationId: number): boolean {
+    this.markScoreStaleByParticipation(participationId);
+    return this.db.prepare('DELETE FROM combat_stat WHERE participation_id = ?')
+      .run(participationId).changes > 0;
   }
 
   /**
@@ -646,6 +875,8 @@ export class MatchRepo {
            SELECT id FROM participation WHERE match_id = ? AND side = 'our' AND state <> 'PLAY'
          )`,
       ).run(ruleSetId, matchId);
+      /* 分数刚按当前数据算完 → 这场的"过期"标记清掉（时间戳以 computed_at 为准） */
+      this.db.prepare('UPDATE match SET score_stale = 0 WHERE id = ?').run(matchId);
       this.db.exec('COMMIT');
     } catch (err) {
       this.db.exec('ROLLBACK');

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { PersonalWeights, RuleSet, RuleSetInput, RuleSetValidation } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
 
 type Role = 'DPS' | 'T' | 'HEAL';
@@ -45,6 +45,13 @@ const EXEC_FIELDS: Record<Kind, { key: string; label: string }[]> = {
 const sum = (o: Record<string, number | undefined>): number =>
   Object.values(o).reduce<number>((a, b) => a + (typeof b === 'number' ? b : 0), 0);
 
+/**
+ * 权重与规则面板。
+ *
+ * 原先是独立一页（导航项「权重与规则」）。用户口径 2026-09：与「设置」合并，
+ * 所以这里改为**具名导出**，由 SettingsPage 当页签内容渲染 —— 组件本身自带
+ * `.card` 与提示条，直接嵌即可，不必把 400 多行搬进设置页。
+ */
 export default function RulesPage({ classes }: PageProps) {
   const [list, setList] = useState<RuleSet[]>([]);
   const [editing, setEditing] = useState<RuleSetInput | null>(null);
@@ -61,7 +68,7 @@ export default function RulesPage({ classes }: PageProps) {
       setList(await api.rules.list());
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, []);
 
@@ -69,8 +76,8 @@ export default function RulesPage({ classes }: PageProps) {
 
   /** 打开某套规则进行编辑（拷贝一份，改完再保存） */
   function edit(rs: RuleSet) {
-    const { id, seasonId, version, active, createdAt, ...input } = rs;
-    void id; void seasonId; void version; void active; void createdAt;
+    const { id, version, active, createdAt, ...input } = rs;
+    void id; void version; void active; void createdAt;
     setEditing(JSON.parse(JSON.stringify(input)) as RuleSetInput);
     setEditingId(rs.id);
     setValidation(null);
@@ -85,7 +92,7 @@ export default function RulesPage({ classes }: PageProps) {
       setValidation(null);
       setNotice('已载入内置默认值（可用「另存为新规则集」保存）');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -115,7 +122,7 @@ export default function RulesPage({ classes }: PageProps) {
       setEditingId(null);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -130,15 +137,15 @@ export default function RulesPage({ classes }: PageProps) {
       await load();
     } catch (err) {
       setNotice(null);
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
   }
 
   function exportJson(rs: RuleSet) {
-    const { id, seasonId, version, active, createdAt, ...input } = rs;
-    void id; void seasonId; void version; void active; void createdAt;
+    const { id, version, active, createdAt, ...input } = rs;
+    void id; void version; void active; void createdAt;
     const blob = new Blob([JSON.stringify(input, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

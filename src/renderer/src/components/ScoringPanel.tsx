@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { RuleSet, SavedScore, ScoreRunSummary } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 
 /**
  * 本场评分面板（M1）
@@ -10,7 +10,16 @@ import { api, ApiError } from '../api';
  * 触发重算 → 显示总分与分解 → 让人看得出「为什么是这个分」。
  * 每条分数都能展开看中间量（有效值、个人原始加权、归一、职业系数、小队执行分）。
  */
-export default function ScoringPanel({ matchId, playerCount }: { matchId: number; playerCount: number }) {
+export default function ScoringPanel({
+  matchId, playerCount, scoreStale = false, onRescored,
+}: {
+  matchId: number;
+  playerCount: number;
+  /** 战报改过/清过之后为 true：分数是旧快照（见 db 迁移 v16 与 matchRepo.markScoreStale） */
+  scoreStale?: boolean;
+  /** 重算完成后通知外层重新取对局（把 scoreStale 刷掉） */
+  onRescored?: () => void;
+}) {
   const [rule, setRule] = useState<RuleSet | null>(null);
   const [summary, setSummary] = useState<ScoreRunSummary | null>(null);
   const [scores, setScores] = useState<SavedScore[]>([]);
@@ -40,7 +49,7 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
       setComputedAt(latest[0]?.computedAt ?? '');
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, [matchId]);
 
@@ -54,9 +63,10 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
       setNotice(`已按「${res.ruleSetName}」算出 ${res.scored} 人分数`);
       setError(null);
       await load();
+      onRescored?.();            // 让外层把 match.scoreStale 一起刷新（标记在算分时清零）
     } catch (err) {
       setNotice(null);
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     } finally {
       setBusy(false);
     }
@@ -86,6 +96,14 @@ export default function ScoringPanel({ matchId, playerCount }: { matchId: number
 
       {error && <div className="msg msg--toast error">{error}</div>}
       {notice && <div className="msg msg--toast ok">{notice}</div>}
+
+      {/* 战报改动/清空之后：已存的分数是旧快照 —— 明说 + 一键重算（不自动重算） */}
+      {scoreStale && (
+        <div className="msg warn" style={{ marginTop: 8, whiteSpace: 'normal' }}>
+          本场战报在算分之后又改动过（或清空过），下面的分数是<b>旧快照</b>。
+          点「{scores.length ? '按当前规则重算' : '计算本场分数'}」刷新即可。
+        </div>
+      )}
 
       <div className="hint">
         引擎 <code>{engine || '未运行'}</code>

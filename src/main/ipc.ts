@@ -3,17 +3,18 @@
  * 所有处理函数都返回 IpcResult<T>，异常被捕获并转成 { ok:false, error }，
  * 避免 IPC 序列化丢失堆栈。
  */
-import { app, BrowserWindow, dialog, ipcMain, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron';
 import fs from 'node:fs';
 import { IPC, type AppInfo, type ClassInfo, type IpcResult, type PlayerInput } from '../shared/types';
 import type {
   MatchInput, ParticipationInput, AssignInput, CombatStat, ImportPreview, GroupInput,
-  RuleSetInput, SeasonInput, SignupImportRow, SignupInput, SquadInput,
+  OppImportMode, RuleSetInput, SignupImportRow, SignupInput, SquadInput,
 } from '../shared/types';
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import { parseSignupGrid } from '../shared/signupImport';
-import type { DbHandle } from './db';
+import type { SqlDatabase } from './db';
+import { GuildStore, isGlobalSetting } from './guilds';
 import { PlayerRepo } from './repositories/playerRepo';
 import { MatchRepo } from './repositories/matchRepo';
 import { SquadRepo } from './repositories/squadRepo';
@@ -21,10 +22,17 @@ import { DashboardRepo } from './repositories/dashboardRepo';
 import { SignupRepo } from './repositories/signupRepo';
 import { RuleSetRepo, validate as validateRuleSet } from './repositories/ruleSetRepo';
 import { scoreMatch } from '../shared/scoreEngine';
-import { SeasonRepo } from './repositories/seasonRepo';
 
 export interface IpcContext {
-  handle: DbHandle;
+  /**
+   * 当前帮会的库连接。**每次调用都取一次**，因为切帮会只换 GuildStore 里的句柄，
+   * 仓储实例与 IPC 处理器都不重建（见 src/main/guilds.ts）。
+   */
+  db: () => SqlDatabase;
+  /** 当前库文件路径（appInfo / 排障用） */
+  dbFile: () => string;
+  /** 帮会注册表；单库模式（OMNIA_DB_PATH）下为 null */
+  guilds: GuildStore | null;
 }
 
 function ok<T>(data: T): IpcResult<T> {
@@ -45,35 +53,154 @@ function safe<A extends unknown[], R>(fn: (...args: A) => R) {
 }
 
 export function registerIpc(ctx: IpcContext): void {
-  const players = new PlayerRepo(ctx.handle.db);
-  const matches = new MatchRepo(ctx.handle.db);
-  const squads = new SquadRepo(ctx.handle.db);
-  const dashboard = new DashboardRepo(ctx.handle.db);
-  const signup = new SignupRepo(ctx.handle.db);
-  const rules = new RuleSetRepo(ctx.handle.db);
-  const seasons = new SeasonRepo(ctx.handle.db);
+  const players = new PlayerRepo(ctx.db);
+  const matches = new MatchRepo(ctx.db);
+  const squads = new SquadRepo(ctx.db);
+  const dashboard = new DashboardRepo(ctx.db);
+  const signup = new SignupRepo(ctx.db);
+  const rules = new RuleSetRepo(ctx.db);
 
+  /* 战报导入的匹配基准：全部我方成员 + 各自的历史用名。
+     直接用仓储的 list()（它已经排除对方帮会并带好别名），
+     免得这里再抄一遍"查 player + 查 player_alias 再分组"的 SQL。 */
   const rosterEntries = (): RosterEntry[] =>
-    (ctx.handle.db.prepare('SELECT id, game_id, name FROM player')
-      .all() as unknown as { id: number; game_id: string; name: string }[])
-      // 职业不再来自主档（改由报名表提供），这里只给匹配用的 ID 与名字
-    .map((r) => ({ id: r.id, gameId: r.game_id, name: r.name, mainClass: '' }));
+    players.list().map((p) => ({
+      id: p.id,
+      gameId: p.gameId,
+      name: p.name,
+      // 职业不再来自主档（改由报名表提供），这里给匹配用的 ID、名字与**历史用名**
+      mainClass: '',
+      aliases: p.aliases,
+    }));
 
   const knownClassNames = (): string[] =>
-    (ctx.handle.db.prepare('SELECT name FROM class').all() as unknown as { name: string }[])
+    (ctx.db().prepare('SELECT name FROM class').all() as unknown as { name: string }[])
       .map((r) => r.name);
+
+  /* 设置分两类：
+       · 跨帮会的（壁纸 / 品牌名这类界面偏好）→ 写在注册表 guilds.json 里，
+         否则切一次帮会壁纸就"变回默认"了（用户很在意壁纸）；
+       · 跟帮会数据有关的（activeRuleSetId、中缝图 dividerImage…）→ 留在各帮会自己的库里。
+     单库模式（OMNIA_DB_PATH）下注册表只是内存里的一个虚拟帮会：**一律读写库里的 app_setting**，
+     否则设置只活在本次进程里（自检与开发都靠单库模式）。 */
+  const multi = (): boolean => !!ctx.guilds && !ctx.guilds.isSingle();
+  const readSetting = (key: string): string | undefined => {
+    if (multi() && isGlobalSetting(key)) {
+      const v = ctx.guilds?.globalSetting(key);
+      if (v !== undefined) return v;
+    }
+    const row = ctx.db().prepare('SELECT value FROM app_setting WHERE key = ?').get(key) as
+      { value: string } | undefined;
+    return row?.value;
+  };
+  const writeSetting = (key: string, value: string): void => {
+    if (multi() && isGlobalSetting(key)) {
+      ctx.guilds?.setGlobalSetting(key, value);
+      return;
+    }
+    ctx.db().prepare(
+      `INSERT INTO app_setting (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ).run(key, value);
+  };
 
   ipcMain.handle(IPC.appInfo, safe((): AppInfo => ({
     version: app.getVersion(),
     electron: process.versions.electron ?? '',
     node: process.versions.node ?? '',
     chrome: process.versions.chrome ?? '',
-    dbPath: ctx.handle.file,
+    dbPath: ctx.dbFile(),
     platform: `${process.platform} ${process.arch}`,
-    schemaVersion: Number((ctx.handle.db.prepare(
+    schemaVersion: Number((ctx.db().prepare(
       'SELECT COALESCE(MAX(version), 0) AS v FROM schema_migration',
     ).get() as { v: number }).v),
+    guild: ctx.guilds?.active() ?? null,
+    guildCount: ctx.guilds?.list().length ?? 1,
   })));
+  /* ── 帮会（一帮会一个库文件）────────────────────────────────────
+     存储/迁移细节都在 src/main/guilds.ts；这里只做 IPC 门面。
+     `guild:open` 之后，所有其它接口读写的都是新帮会的库（仓储拿的是"当前连接"）。 */
+  const needGuilds = (): GuildStore => {
+    if (!ctx.guilds) throw new Error('单库模式（OMNIA_DB_PATH）下没有帮会注册表');
+    return ctx.guilds;
+  };
+  ipcMain.handle(IPC.guildList, safe(() => needGuilds().list()));
+  ipcMain.handle(IPC.guildActive, safe(() => ctx.guilds?.active() ?? null));
+  ipcMain.handle(IPC.guildCreate, safe((name: string, note?: string) => needGuilds().create(name, note ?? '')));
+  ipcMain.handle(IPC.guildOpen, safe((id: string) => needGuilds().open(String(id))));
+  ipcMain.handle(IPC.guildUpdate, safe((id: string, patch: { name?: string; note?: string }) =>
+    needGuilds().rename(String(id), patch?.name ?? '', patch?.note)));
+  ipcMain.handle(IPC.guildRemove, safe((id: string) => {
+    if (!needGuilds().remove(String(id))) throw new Error(`帮会不存在：${id}`);
+    return true as const;
+  }));
+  ipcMain.handle(IPC.guildSetCover, safe((id: string, srcPath: string) =>
+    needGuilds().setCover(String(id), String(srcPath))));
+  ipcMain.handle(IPC.guildPickCover, safe(async (): Promise<string | null> => {
+    const res = await dialog.showOpenDialog({
+      title: '选择帮会封面图',
+      properties: ['openFile'],
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'] }],
+    });
+    return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
+  }));
+
+  /* ── 成员个人主页背景（用户口径 2026-09-27）─────────────────────────
+     每个成员可传一段 mp4 或一张图；文件拷进 guilds/<帮会>/players/<成员>/bg.<ext>
+     （单库模式落到 userData/media/players/<成员>/），库里只记绝对路径。 */
+  const bgDirOf = (playerId: number): string => {
+    const fsp = require('node:fs') as typeof import('node:fs');
+    const pth = require('node:path') as typeof import('node:path');
+    const g = ctx.guilds?.active();
+    const base = (g && ctx.guilds) ? ctx.guilds.dirOf(g.id) : pth.join(app.getPath('userData'), 'media');
+    const dir = pth.join(base, 'players', String(playerId));
+    fsp.mkdirSync(dir, { recursive: true });
+    return dir;
+  };
+  ipcMain.handle(IPC.playerPickBg, safe(async (): Promise<string | null> => {
+    const res = await dialog.showOpenDialog({
+      title: '选择个人主页背景（视频或图片）',
+      properties: ['openFile'],
+      filters: [
+        { name: '视频或图片', extensions: ['mp4', 'webm', 'mov', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] },
+        { name: '视频', extensions: ['mp4', 'webm', 'mov'] },
+        { name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] },
+      ],
+    });
+    return res.canceled || !res.filePaths.length ? null : res.filePaths[0];
+  }));
+  ipcMain.handle(IPC.playerSetBg, safe((id: number, srcPath: string) => {
+    const fsp = require('node:fs') as typeof import('node:fs');
+    const pth = require('node:path') as typeof import('node:path');
+    const src = String(srcPath ?? '');
+    if (!src || !fsp.existsSync(src)) throw new Error('文件不存在：' + src);
+    const ext = (pth.extname(src) || '.bin').toLowerCase();
+    const dir = bgDirOf(Number(id));
+    const cur = players.getById(Number(id));
+    /* ⚠️ 不能"先删旧文件再拷新的"：如果成员当前正用这个文件当背景，
+       <video> 播放会**锁住文件**，rmSync 抛 EBUSY（用户实测就是这个错）。
+       改成写一个**新文件名**，再把库指向它；旧的（可能正在播）先留着，
+       等下次导入或删帮会时自然清掉。 */
+    const dest = pth.join(dir, `bg-${Date.now()}${ext}`);
+    fsp.copyFileSync(src, dest);
+    const updated = players.setBgMedia(Number(id), dest);
+    for (const f of fsp.readdirSync(dir)) {
+      const p = pth.join(dir, f);
+      if (p === dest || p === cur?.bgMedia) continue;   // 刚写的、正在用的，都不动
+      try { fsp.rmSync(p, { force: true }); } catch { /* 被播放锁定，留着下次 */ }
+    }
+    return updated;
+  }));
+  ipcMain.handle(IPC.playerClearBg, safe((id: number) => {
+    const fsp = require('node:fs') as typeof import('node:fs');
+    const pth = require('node:path') as typeof import('node:path');
+    const cur = players.getById(Number(id));
+    /* 先把文件删掉再清库（否则库里清了、文件留在 guilds/<帮会>/players/<成员>/ 里占空间） */
+    if (cur?.bgMedia) {
+      try { fsp.rmSync(pth.dirname(cur.bgMedia), { recursive: true, force: true }); } catch { /* 文件不在就算了 */ }
+    }
+    return players.clearBgMedia(Number(id));
+  }));
 
   // ── 成员主档 ───────────────────────────────────────────────────
   ipcMain.handle(IPC.playerList, safe(() => players.list()));
@@ -89,11 +216,11 @@ export function registerIpc(ctx: IpcContext): void {
     const pth = require('node:path') as typeof import('node:path');
     const IMG = new Set(['.jpg', '.jpeg', '.png', '.bmp', '.webp', '.gif']);
     const VID = new Set(['.mp4', '.webm', '.mov', '.mkv']);
-    // 注意：这条 IPC 的参数会被丢（项目已知问题），所以路径**从 app_setting 读**：
-    // 设置页先把用户填的地址写进 app_setting['wallpaperLibrary']，再触发本方法。
-    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
-      .get('wallpaperLibrary') as { value: string } | undefined;
-    const roots = [String(dir ?? row?.value ?? '').trim()].filter(Boolean);
+    // 注意：这条 IPC 的参数会被丢（项目已知问题），所以路径**从设置读**：
+    // 设置页先把用户填的地址写进 wallpaperLibrary，再触发本方法。
+    const saved = readSetting('wallpaperLibrary');
+    // 候选目录（下面还会追加 WE 默认位置与系统目录，最后统一去重）
+    const rootsRaw = [String(dir ?? saved ?? '').trim()].filter(Boolean);
     // 默认壁纸库 = Wallpaper Engine 创意工坊（Steam AppID 431960）。
     // 没有就退回系统目录，再没有就空 —— 让用户在设置页填地址。
     const WE = ['C:\\Program Files (x86)\\Steam\\steamapps\\workshop\\content\\431960',
@@ -102,9 +229,9 @@ export function registerIpc(ctx: IpcContext): void {
       'D:\\SteamLibrary\\steamapps\\workshop\\content\\431960',
       'D:\\Steam\\steamapps\\workshop\\content\\431960',
       'E:\\SteamLibrary\\steamapps\\workshop\\content\\431960'];
-    for (const w of WE) { try { if (fsp.statSync(w).isDirectory()) { roots.push(w); break; } } catch { /* 没装 WE */ } }
-    if (!roots.length) {
-      roots.push(
+    for (const w of WE) { try { if (fsp.statSync(w).isDirectory()) { rootsRaw.push(w); break; } } catch { /* 没装 WE */ } }
+    if (!rootsRaw.length) {
+      rootsRaw.push(
         'C:\\Windows\\Web\\Wallpaper',
         pth.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Themes'),
         pth.join(app.getPath('pictures'), 'Wallpapers'),
@@ -180,6 +307,23 @@ export function registerIpc(ctx: IpcContext): void {
         out.push({ name: e.name.replace(/\.[^.]+$/, ''), file: fp, kind, ext: ext.slice(1) });
       }
     };
+    /* 去重 roots，否则同一个目录会被遍历两次、每个作品收录两遍。
+       实测（用户真实壁纸库，30 个工坊作品）：
+         roots = ["D:\\SteamLibrary\\...\\431960", "D:\\SteamLibrary\\...\\431960"]
+         out = 60  unique = 30  dup = 30
+       重复项会让 React 的 key={file} 撞成 30 对 → 控制台刷「two children with
+       the same key」，界面上同一张壁纸出现两次。
+       注意 walk() 里的 seen 只保护「散图」分支，project.json 分支**没有**去重，
+       所以必须在入口把 roots 本身去重（同时也修掉大小写/尾斜杠不一致的写法）。 */
+    const normRoot = (p: string) => p.replace(/[\\/]+$/, '');
+    const rootKey = (p: string) => normRoot(p).toLowerCase();
+    const seenRoot = new Set<string>();
+    const roots = rootsRaw.filter((r) => {
+      const k = rootKey(r);
+      if (!k || seenRoot.has(k)) return false;
+      seenRoot.add(k);
+      return true;
+    });
     for (const r of roots) walk(r, 0);
     // 动态排前面、其次静态，同组按名排（给设置页一个稳定顺序）
     out.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'video' ? -1 : 1));
@@ -187,9 +331,7 @@ export function registerIpc(ctx: IpcContext): void {
   }));
   // 视频壁纸转码：HEVC/H.265 Chromium 解不了 → 转成 H.264 并缓存（一次转、之后秒开）
   ipcMain.handle('meta:wallpaper-transcode', safe(() => {
-    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
-      .get('wallpaperImage') as { value: string } | undefined;
-    const src = String(row?.value ?? '');
+    const src = String(readSetting('wallpaperImage') ?? '');
     if (!src) throw new Error('没有选中的壁纸');
     const fsp = require('node:fs') as typeof import('node:fs');
     const pth = require('node:path') as typeof import('node:path');
@@ -220,9 +362,11 @@ export function registerIpc(ctx: IpcContext): void {
   ipcMain.handle(IPC.playerExport, safe(() => players.list().map((p): PlayerInput => ({
     gameId: p.gameId,
     name: p.name,
+    aliases: p.aliases,
     joinedOrder: p.joinedOrder,
     mic: p.mic,
     noteRole: p.noteRole,
+    orangeWeapon: p.orangeWeapon,
     status: p.status,
     remark: p.remark,
   }))));
@@ -246,6 +390,32 @@ export function registerIpc(ctx: IpcContext): void {
     return true as const;
   }));
   ipcMain.handle(IPC.matchParticipationList, safe((matchId: number) => matches.participations(matchId)));
+
+  /* 沿用另一场的排表（用户口径 2026-09-27）。
+     建制（小队）按场次独立存 → 先把源场的小队补到目标场，
+     再按「组名 + 组内序号」建立 源队名→目标队名 映射（名字不一定一样），最后复制落位。 */
+  ipcMain.handle(IPC.matchCopyLineup, safe((fromMatchId: number, toMatchId: number, overwrite = false) => {
+    const srcCat = squads.catalog(fromMatchId);
+    let squadsAdded = 0;
+    for (const g of srcCat.groups) {
+      const want = srcCat.squads.filter((s) => s.groupName === g.name).length;
+      for (;;) {
+        const cur = squads.catalog(toMatchId).squads.filter((s) => s.groupName === g.name).length;
+        if (cur >= want) break;
+        squads.appendSquad(toMatchId, g.name);
+        squadsAdded += 1;
+      }
+    }
+    const dstCat = squads.catalog(toMatchId);
+    const nameMap: Record<string, string> = {};
+    for (const s of srcCat.squads) {
+      const hit = dstCat.squads.find((d) => d.groupName === s.groupName && d.indexInGroup === s.indexInGroup);
+      if (!hit) continue;
+      nameMap[s.name] = hit.name;
+      if (s.tactic && hit.tactic !== s.tactic) squads.setTactic(toMatchId, hit.name, s.tactic);
+    }
+    return { ...matches.copyLineup(fromMatchId, toMatchId, overwrite, nameMap), squadsAdded };
+  }));
   ipcMain.handle(IPC.matchParticipationUpsert, safe((input: ParticipationInput) => ({
     id: matches.upsertParticipation(input),
   })));
@@ -312,23 +482,73 @@ export function registerIpc(ctx: IpcContext): void {
     matches.saveStat(participationId, stat);
     return true as const;
   }));
+  /* 清空战报（用户口径：「战报录入为啥没有清空或者删除又或者更改」）：
+     our → 14 项指标归零、参战记录保留；opp → 连对方参战记录一起删。 */
+  ipcMain.handle(IPC.matchStatClear, safe((matchId: number, side: 'our' | 'opp' = 'our') => ({
+    cleared: matches.clearStats(Number(matchId), side === 'opp' ? 'opp' : 'our'),
+  })));
+  ipcMain.handle(IPC.matchStatClearRow, safe((participationId: number) => {
+    matches.clearStatRow(Number(participationId));
+    return true as const;
+  }));
 
   ipcMain.handle(IPC.matchImportPreview, safe(
     (text: string, mode: 'roster' | 'full' = 'roster'): ImportPreview =>
       buildPreview(text, rosterEntries(), knownClassNames(), mode),
   ));
 
-  ipcMain.handle(IPC.matchImportCommit, safe((matchId: number, preview: ImportPreview) => {
+  /* 战报入库。
+     opts.opp（用户口径选项 A，2026-09）：
+       · 'store'（界面里默认勾选）→ 不在我主档的行**存成对方帮会数据**：
+         player 建档并标 is_opp=1、participation 写 side='opp'。不进主档/报名/出勤，
+         也不参与评分，只作对比基准。
+       · 'skip'  → 这些行直接丢掉。
+       · 'block'（IPC 默认）→ 老语义：有对不上的行就整批拦住（旧调用方保持原行为）。
+     注意：只有「不在成员主档（NOT_IN_ROSTER）」这一类**error**行能这样走
+     （= 严格模式下才成立；完整模式里它只是 warn，语义是自动建档成自己人）。
+     数字不对、同一人重复这类硬错误仍然一律拦住 —— 那是真问题。 */
+  ipcMain.handle(IPC.matchImportCommit, safe((
+    matchId: number, preview: ImportPreview, opts?: { opp?: OppImportMode },
+  ) => {
     if (!matches.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
+    const oppMode: OppImportMode = opts?.opp ?? 'block';
 
-    const blocked = preview.rows.filter((r) => r.issues.some((i) => i.level === 'error'));
-    if (blocked.length) {
-      throw new Error(`有 ${blocked.length} 行存在错误，已阻止入库；请先修正后再提交`);
+    const errRows = preview.rows.filter((r) => r.issues.some((i) => i.level === 'error'));
+    if (oppMode === 'block' && errRows.length) {
+      throw new Error(`有 ${errRows.length} 行存在错误，已阻止入库；请先修正后再提交`);
+    }
+    /* ⚠️ UNKNOWN_CLASS 在解析层是 warn 级 ✗，但仓储层写库时会因"职业不在 12 职业表内"抛错 ✓，
+       而循环没有事务 → 前面几行已经入库 = 半截数据（审计 2026-09-30）。
+       所以这里把它一并当硬错误拦住（与"整批拦住"的语义一致）✓ */
+    const hard = errRows.filter((r) =>
+      r.issues.some((i) => (i.level === 'error' && i.code !== 'NOT_IN_ROSTER') || i.code === 'UNKNOWN_CLASS'));
+    if (hard.length) {
+      throw new Error(`有 ${hard.length} 行存在错误，已阻止入库；请先修正后再提交`);
     }
 
     let written = 0;
     let created = 0;
+    let oppWritten = 0;
+    let oppCreated = 0;
+    let skipped = 0;
     for (const row of preview.rows) {
+      /* 判定"这是对方的人"：没匹配到主档，且原因是严格模式的「不在成员主档」错误。
+         其它情况（完整模式下预览没给 playerId 等）都按我方走 —— 会自动建档。 */
+      const isOpp = row.playerId === null
+        && row.issues.some((i) => i.code === 'NOT_IN_ROSTER' && i.level === 'error');
+      if (isOpp) {
+        if (oppMode !== 'store') { skipped++; continue; }
+        const made = players.upsertOpponent(row.gameId || row.name);
+        if (made.created) oppCreated++;
+        matches.upsertOppParticipation({
+          matchId,
+          playerId: made.id,
+          classUsed: row.classUsed,
+          stat: row.stat,
+        });
+        oppWritten++;
+        continue;
+      }
       let playerId = row.playerId;
       if (playerId === null) {
         // 完整名单模式：为不在主档的人自动建档
@@ -349,12 +569,12 @@ export function registerIpc(ctx: IpcContext): void {
       });
       written++;
     }
-    return { written, created };
+    return { written, created, oppWritten, oppCreated, skipped };
   }));
 
   // ── 元数据 ─────────────────────────────────────────────────────
   ipcMain.handle(IPC.metaClasses, safe((): ClassInfo[] => {
-    const rows = ctx.handle.db.prepare(
+    const rows = ctx.db().prepare(
       'SELECT name, aliases, color, icon_file, coef, role FROM class ORDER BY sort_order ASC',
     ).all() as unknown as {
       name: string; aliases: string; color: string;
@@ -371,10 +591,13 @@ export function registerIpc(ctx: IpcContext): void {
   }));
 
   ipcMain.handle(IPC.metaSettings, safe(() => {
-    const rows = ctx.handle.db.prepare('SELECT key, value FROM app_setting').all() as unknown as {
+    const rows = ctx.db().prepare('SELECT key, value FROM app_setting').all() as unknown as {
       key: string; value: string;
     }[];
-    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    const out: Record<string, string> = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    // 全局项以注册表为准（首次迁移时旧的壁纸设置已经搬过去了）
+    if (multi()) for (const [k, v] of Object.entries(ctx.guilds?.globalSettings() ?? {})) out[k] = v;
+    return out;
   }));
 
   // 渲染层拼好截图后写进设置；顺手清掉请求标记，避免误触发
@@ -382,34 +605,39 @@ export function registerIpc(ctx: IpcContext): void {
     const k = (key ?? '').trim();
     if (!k) throw new Error('设置项 key 不能为空');
     if (k === 'captureRequest') {
-      ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run('capturePng');
+      ctx.db().prepare('DELETE FROM app_setting WHERE key = ?').run('capturePng');
     }
-    ctx.handle.db.prepare(
-      `INSERT INTO app_setting (key, value) VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    ).run(k, String(value ?? ''));
+    writeSetting(k, String(value ?? ''));
     return true as const;
   }));
 
-  // ── 战斗组 / 小队建制（可新增） ─────────────────────────────────
-  ipcMain.handle(IPC.metaSquads, safe(() => squads.catalog()));
-  ipcMain.handle(IPC.metaGroupCreate, safe((input: GroupInput) => squads.createGroup(input)));
-  ipcMain.handle(IPC.metaGroupRemove, safe((id: number) => {
-    if (!squads.removeGroup(id)) throw new Error(`战斗组不存在：id=${id}`);
+  /* ── 战斗组 / 小队建制（**按场次独立**）─────────────────────────
+     用户口径：「不同场次的队伍数量啥的彼此独立，而不是改一个另外的
+     一样会被改」。所以这一组 IPC 全部以 matchId 为首参 ——
+     缺了 matchId 就没法确定改的是哪一场，宁可报错也不要静默改错场。
+     按名字（而不是自增 id）定位组与队，与 participation.squad 的文本口径一致。 */
+  ipcMain.handle(IPC.metaSquads, safe((matchId: number) => squads.catalog(Number(matchId))));
+  ipcMain.handle(IPC.metaGroupCreate, safe((matchId: number, input: GroupInput) =>
+    squads.createGroup(Number(matchId), input)));
+  ipcMain.handle(IPC.metaGroupRemove, safe((matchId: number, groupName: string) => {
+    const changed = squads.removeGroup(Number(matchId), String(groupName ?? ''));
+    return { removed: changed } as const;
+  }));
+  ipcMain.handle(IPC.metaSquadCreate, safe((matchId: number, input: SquadInput) =>
+    squads.createSquad(Number(matchId), input)));
+  ipcMain.handle(IPC.metaSquadAppend, safe((matchId: number, groupName: string) =>
+    squads.appendSquad(Number(matchId), String(groupName ?? ''))));
+  ipcMain.handle(IPC.metaSquadTactic, safe((matchId: number, squadName: string, tactic: string) =>
+    squads.setTactic(Number(matchId), String(squadName ?? ''), String(tactic ?? ''))));
+  ipcMain.handle(IPC.metaSquadRemove, safe((matchId: number, squadName: string) => {
+    if (!squads.removeSquad(Number(matchId), String(squadName ?? ''))) {
+      throw new Error(`小队不存在：${squadName}（本场）`);
+    }
     return true as const;
   }));
-  ipcMain.handle(IPC.metaSquadCreate, safe((input: SquadInput) => squads.createSquad(input)));
-  ipcMain.handle(IPC.metaSquadAppend, safe((groupId: number) => squads.appendSquad(groupId)));
-  ipcMain.handle(IPC.metaSquadTactic, safe((...a: unknown[]) => {
-    console.log('[tactic] 实收参数个数=', a.length, ' a=', JSON.stringify(a));
-    const id = Number(a[0]);
-    const tactic = String(a[1] ?? '');
-    return squads.setTactic(id, tactic);
-  }));
-  ipcMain.handle(IPC.metaSquadRemove, safe((id: number) => {
-    if (!squads.removeSquad(id)) throw new Error(`小队不存在：id=${id}`);
-    return true as const;
-  }));
+  // 每队人数（用户口径：人数也按场次独立）
+  ipcMain.handle(IPC.metaSquadSize, safe((matchId: number, squadName: string, size: number) =>
+    squads.setSize(Number(matchId), String(squadName ?? ''), Number(size))));
 
   // ── 截取排表功能区（导出 PNG） ──────────────────────────────────
   // **一次截完，不做分块拼接**。
@@ -428,10 +656,10 @@ export function registerIpc(ctx: IpcContext): void {
 
   // 分块截图：矩形由渲染层写进 app_setting.captureRect（这批 IPC 传不了实参）
   ipcMain.handle(IPC.captureRect, safe(async () => {
-    const rr = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+    const rr = ctx.db().prepare('SELECT value FROM app_setting WHERE key = ?')
       .get('captureRect') as { value: string } | undefined;
     if (!rr?.value) throw new Error('没有待截区域（app_setting.captureRect 为空）');
-    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run('captureRect');
+    ctx.db().prepare('DELETE FROM app_setting WHERE key = ?').run('captureRect');
     const rect = JSON.parse(rr.value) as { x: number; y: number; width: number; height: number };
     if (!(rect.width > 0) || !(rect.height > 0)) throw new Error(`分块区域无效：${rr.value}`);
     const w = BrowserWindow.getAllWindows()[0];
@@ -447,10 +675,10 @@ export function registerIpc(ctx: IpcContext): void {
   ipcMain.handle(IPC.captureRegion, safe(async () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
     if (!win) throw new Error('找不到窗口，无法截图');
-    const row = ctx.handle.db.prepare('SELECT value FROM app_setting WHERE key = ?')
+    const row = ctx.db().prepare('SELECT value FROM app_setting WHERE key = ?')
       .get('capturePng') as { value: string } | undefined;
     if (!row?.value) throw new Error('没有截图数据（渲染层未写入 capturePng）');
-    ctx.handle.db.prepare('DELETE FROM app_setting WHERE key = ?').run('capturePng');
+    ctx.db().prepare('DELETE FROM app_setting WHERE key = ?').run('capturePng');
 
     const buf = Buffer.from(row.value.replace(/^data:image\/png;base64,/, ''), 'base64');
     const size = nativeImage.createFromBuffer(buf).getSize();
@@ -477,9 +705,12 @@ export function registerIpc(ctx: IpcContext): void {
   // ── 报名 / 请假 ────────────────────────────────────────────────
   ipcMain.handle(IPC.signupBoard, safe((matchId: number) => signup.board(matchId)));
   ipcMain.handle(IPC.signupSet, safe((input: SignupInput) => signup.set(input)));
-  ipcMain.handle(IPC.signupApply, safe((matchId: number, playerIds: number[]) => ({
-    applied: signup.apply(matchId, playerIds),
-  })));
+  ipcMain.handle(IPC.signupApply, safe((matchId: number, playerIds: number[]) => {
+    const applied = signup.apply(matchId, playerIds);
+    /* 报名状态/小队改动也会改评分口径 → 置"评分快照过期"（审计 2026-09-30） */
+    matches.markStale(matchId);
+    return { applied };
+  }));
 
   // 解析报名表 xlsx：只出预览不入库；同时算出「报名有、主档没有」的 ID
   ipcMain.handle(IPC.signupParse, safe((matchId: number, data: Uint8Array) => {
@@ -517,20 +748,6 @@ export function registerIpc(ctx: IpcContext): void {
   }));
   ipcMain.handle(IPC.rulesValidate, safe((input: RuleSetInput) => validateRuleSet(input)));
 
-  // ── 赛季 ───────────────────────────────────────────────────────
-  ipcMain.handle(IPC.seasonList, safe(() => seasons.summaries()));
-  ipcMain.handle(IPC.seasonActive, safe(() => seasons.active()));
-  ipcMain.handle(IPC.seasonCreate, safe((input: SeasonInput) => seasons.create(input)));
-  ipcMain.handle(IPC.seasonUpdate, safe((id: number, patch: Partial<SeasonInput>) => seasons.update(id, patch)));
-  ipcMain.handle(IPC.seasonSetActive, safe((id: number) => seasons.setActive(id)));
-  ipcMain.handle(IPC.seasonRemove, safe((id: number) => {
-    if (!seasons.remove(id)) throw new Error(`赛季不存在：id=${id}`);
-    return true as const;
-  }));
-  ipcMain.handle(IPC.seasonAssignMatches, safe((seasonId: number, matchIds: number[]) => ({
-    moved: seasons.assignMatches(seasonId, matchIds),
-  })));
-
   // ── 数据看板（M6） ─────────────────────────────────────────────
   ipcMain.handle(IPC.dashboardData, safe(() => dashboard.load()));
 
@@ -566,12 +783,5 @@ export function registerIpc(ctx: IpcContext): void {
       previewBeforeHeader: before,
       totalRows: grid.length,
     };
-  }));
-
-  // 外部链接走系统浏览器，而不是在应用内开窗
-  ipcMain.handle('shell:openExternal', safe((url: string) => {
-    if (!/^https?:\/\//i.test(url)) throw new Error('只允许打开 http(s) 链接');
-    void shell.openExternal(url);
-    return true as const;
   }));
 }

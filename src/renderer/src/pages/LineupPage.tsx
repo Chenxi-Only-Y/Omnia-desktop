@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { MatchSummary, ParticipationRow, SignupRow, SquadCatalog } from '@shared/types';
-import { api, ApiError } from '../api';
+import { api, errText } from '../api';
 import type { PageProps } from '../App';
 import { BENCH_SQUADS } from '@shared/domain';
 import LineupBoard from '../components/LineupBoard';
@@ -32,6 +32,13 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   const [catalog, setCatalog] = useState<SquadCatalog | null>(null);
   const [cellPick, setCellPick] = useState<{ squad: string; slotIndex: number } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  /** 「沿用其它场次…」：选一场把它的排表套到本场 */
+  const [showInherit, setShowInherit] = useState(false);
+  const [inheritFrom, setInheritFrom] = useState<number | ''>('');
+  const [overwrite, setOverwrite] = useState(true);
+  /** 场次多了要能找：搜索词 + 只看已排表的 */
+  const [inheritQuery, setInheritQuery] = useState('');
+  const [onlyAssigned, setOnlyAssigned] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // 成功提示 2.5 秒后自动消失（报错不自动清，要留够时间看清）
@@ -45,7 +52,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       setMatchId((cur) => cur ?? (list.length ? list[0].id : null));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, []);
 
@@ -54,7 +61,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       const [parts, board, cat] = await Promise.all([
         api.match.participations(id),
         api.signup.board(id),
-        api.meta.squads(),
+        api.meta.squads(id),
       ]);
       setRows(parts);
       // 只留「本场填过报名表」的人：主档有但没填表的不进候选
@@ -62,7 +69,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       setCatalog(cat);
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }, []);
 
@@ -78,6 +85,33 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
     if (matchId === null) { setRows([]); return; }
     void loadDetail(matchId);
   }, [matchId, loadDetail]);
+
+  /** 「沿用其它场次」的候选：排除本场 → 可选只看已排表的 → 关键词过滤（日期 / 对手） */
+  const inheritCandidates = useMemo(() => {
+    const q = inheritQuery.trim().toLowerCase();
+    return matches
+      .filter((m) => m.id !== matchId)
+      .filter((m) => (onlyAssigned ? m.ourAssigned > 0 : true))
+      .filter((m) => !q
+        || `${m.date} 第${m.indexInDay}场 ${m.ourSide} ${m.oppSide}`.toLowerCase().includes(q));
+  }, [matches, matchId, inheritQuery, onlyAssigned]);
+
+  /** 沿用另一场的排表（只搬排表：小队 / 落位 / 职业 / 队内角色） */
+  const applyInherit = useCallback(async (from: number) => {
+    if (matchId === null || !from) return;
+    try {
+      const res = await api.match.copyLineup(from, matchId, overwrite);
+      setShowInherit(false);
+      setError(null);
+      setNotice(`已沿用排表：${res.copied} 人落位`
+        + (res.skipped ? `，${res.skipped} 人本场已有（未覆盖）` : '')
+        + (res.squadsAdded ? `，补了 ${res.squadsAdded} 个小队` : '')
+        + '（本场评分已标记为待重算）');
+      await loadDetail(matchId);
+    } catch (err) {
+      setError(errText(err));
+    }
+  }, [matchId, overwrite, loadDetail]);
 
   /** 我方参战（含替补/请假槽位），看板需要全量才知道谁是替补 */
   const our = useMemo(() => rows.filter((r) => r.side === 'our'), [rows]);
@@ -150,7 +184,7 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       if (matchId !== null) await loadDetail(matchId);
     } catch (err) {
       setNotice(null);
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
 
@@ -192,9 +226,8 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
   async function changeClass(playerId: number, cls: string) {
     if (matchId === null) return;
     await run(async () => {
-      // 必须把 squad / state 一起带上：upsertParticipation 是
-      // ON CONFLICT DO UPDATE SET squad = excluded.squad …，
-      // 只传 classUsed 会把 squad 写成空串 → 人从格子里消失。
+      // squad / state 不必再手动带上：仓储层已保证「没传的字段一律不动」
+      // （原来这里必须多传一个 squad 来绕过 ON CONFLICT 无条件覆盖的坑）。
       await api.match.upsertParticipation({
         matchId, playerId, classUsed: cls,
         squad: our.find((r) => r.playerId === playerId)?.squad ?? '',
@@ -212,9 +245,62 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
       setNotice(res.path ? `已保存截图：${res.path}` : '已取消截图');
     } catch (err) {
       setNotice(null);
-      setError(err instanceof ApiError ? err.message : String(err));
+      setError(errText(err));
     }
   }
+
+  /* 下面这批看板回调一律用 useCallback 固定引用。
+     原因（性能，用户反馈"排表反应慢"）：看板挂在 54+ 张卡片上，而拖动时每次
+     dragover 都会 setHoverSquad 触发一次渲染。回调若是内联箭头函数，每次渲染
+     身份都变 → 卡片的 memo 全部失效 → 一次 hover 就让整板 60 张卡重渲染。
+     引用稳定后，拖动时只有"高亮变化的那两行"会重渲染。 */
+  const handlePickSlot = useCallback((squad: string, slotIndex: number) => {
+    setCellPick({ squad, slotIndex });
+  }, []);
+  const handleAssign = useCallback((playerIds: number[], squad: string, slotIndex?: number) => {
+    void assign(playerIds, squad, slotIndex);
+    // assign 每次渲染都是新函数，故只依赖 matchId（它变了才需要换引用）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId]);
+  const handleUnassign = useCallback((playerId: number) => {
+    void unassign(playerId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId]);
+  const handleRemoveRow = useCallback((id: number) => {
+    const row = our.find((r) => r.id === id);
+    if (row) void removeRow(row);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [our]);
+  const handleSkillNote = useCallback((playerId: number, note: string) => {
+    if (matchId === null) return;
+    void run(() => api.match.setSkillNote(matchId, playerId, note));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId]);
+  /* 建制回调：全部带上 matchId —— 建制已按场次独立，
+     改一场不会影响其它场（用户口径）。 */
+  const handleAddSquad = useCallback((groupName: string) => {
+    if (matchId === null) return;
+    void run(async () => {
+      const s = await api.meta.appendSquad(matchId, groupName);
+      setNotice(`已在本场「${groupName}」加一队：${s.name}`);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId]);
+  const handleRemoveSquad = useCallback((squadName: string) => {
+    if (matchId === null) return;
+    void run(() => api.meta.removeSquad(matchId, squadName), `已在本场删掉「${squadName}」`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId]);
+  const handleChangeTactic = useCallback((squadName: string, tactic: string) => {
+    if (matchId === null) return;
+    void run(() => api.meta.setSquadTactic(matchId, squadName, tactic),
+      `本场「${squadName}」战术已改为「${tactic || '未定'}」`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId]);
+  const handleChangeClass = useCallback((playerId: number, cls: string) => {
+    void changeClass(playerId, cls);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, our]);
 
   if (loading) return <div className="card"><div className="empty">正在读取对局…</div></div>;
 
@@ -251,6 +337,29 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
               ))}
             </Select>
           </label>
+          <button className="btn" disabled={matchId === null}
+                  title={matches.length < 2
+                    ? '这个帮会还没有别的场次：先在「对局与战报」里建第二场'
+                    : '把另一场的排表（小队 / 落位 / 职业）套到本场'}
+                  onClick={() => {
+                    setError(null);
+                    /* 场次不足时**不要**给一个灰按钮（用户反馈"点不动"，看不出原因），
+                       直接把原因写在提示条里。 */
+                    if (matches.length < 2) {
+                      setNotice('这个帮会还没有别的场次可以沿用 —— 先去「对局与战报」建第二场，再回来套用排表');
+                      return;
+                    }
+                    /* 默认选中"最近一场有排表的" —— 等于一键沿用上一场，最常见的用法 */
+                    setInheritQuery('');
+                    const cands = matches.filter((m) => m.id !== matchId && m.ourAssigned > 0);
+                    /* 智能默认：只有当"确实存在有排表的场次"时才默认过滤，
+                       否则列表会空掉（用户看到"没有符合条件的场次"会以为坏了）。 */
+                    setOnlyAssigned(cands.length > 0);
+                    setInheritFrom(cands.length ? cands[0].id : '');
+                    setShowInherit(true);
+                  }}>
+            沿用其它场次…
+          </button>
           <div className="board__stat" style={{ marginLeft: 6 }}>
             已排 <b>{assigned}</b> / {capacity} 槽
             {missingSlots > 0 ? ` · 还空 ${missingSlots}` : ' · 已排满'}
@@ -280,49 +389,35 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
           classMap={classMap}
           rows={our}
           catalog={catalog}
-          onPickSlot={(squad, slotIndex) => setCellPick({ squad, slotIndex })}
-          onAssign={(playerIds, squad, slotIndex) => void assign(playerIds, squad, slotIndex)}
-          onUnassign={(playerId) => void unassign(playerId)}
-          onRemoveRow={(id) => {
-            const row = our.find((r) => r.id === id);
-            if (row) void removeRow(row);
-          }}
-          onSkillNote={(playerId, note) => {
-            if (matchId === null) return;
-            void run(() => api.match.setSkillNote(matchId, playerId, note));
-          }}
-          onAddSquad={(groupId) => void run(async () => {
-            const s = await api.meta.appendSquad(groupId);
-            setNotice(`已加一队「${s.name}」`);
-          })}
-          onRemoveSquad={(squadId, name) => void run(
-            () => api.meta.removeSquad(squadId), `已删掉「${name}」`,
-          )}
-          onChangeTactic={(squadId, tactic) => void run(
-            () => api.meta.setSquadTactic(squadId, tactic), `战术已改为「${tactic || '未定'}」`,
-          )}
-          onChangeClass={(playerId, cls) => void changeClass(playerId, cls)}
+          onPickSlot={handlePickSlot}
+          onAssign={handleAssign}
+          onUnassign={handleUnassign}
+          onRemoveRow={handleRemoveRow}
+          onSkillNote={handleSkillNote}
+          onAddSquad={handleAddSquad}
+          onRemoveSquad={handleRemoveSquad}
+          onChangeTactic={handleChangeTactic}
+          onChangeClass={handleChangeClass}
         />
       </div>
 
-      {cellPick && (
+      {cellPick && matchId !== null && (
         <CellPicker
           squad={cellPick.squad}
           candidates={candidates}
           rows={our}
           classMap={classMap}
+          matchId={matchId}
+          classes={classes}
+          onAdded={(msg) => setNotice(msg)}
           onClose={() => setCellPick(null)}
           onAssign={async (playerId, targetSquad, subClass) => {
             // 点的是第几格就放第几格 —— 不再总是挤到最左边
             await assign([playerId], targetSquad, cellPick.slotIndex);
-            // 选了二职：**落位之后**再把职业写实，并且把 squad/state 一起带上。
-            // 两个坑都在这一步：
-            //  ① 只带 classUsed 调 upsertParticipation 时，ON CONFLICT DO UPDATE
-            //     会把没传的 squad 写成空串 → 刚放进去的人被踢出小队（卡片空白）；
-            //  ② 落位本身也会把 class_used 覆盖掉，而读取有一条兜底
-            //     COALESCE(NULLIF(class_used,''), sg.main_class, '') ——
-            //     所以空值会**回退显示成报名表主职**（就是"选了副职还是主职"）。
-            // 现在一次把 squad + state + classUsed 全写进去，两边都不会被清。
+            // 选了二职：落位之后再写职业。
+            // 这里仍显式带上 squad，但**不再依赖它**来防丢 —— 仓储层已改成
+            // 「没传的字段不动」（原来不带 squad 会被写成空串，人立刻被踢出小队，
+            //  对局详情那两处就是这么坏的）。
             if (subClass && matchId !== null) {
               await run(() => api.match.upsertParticipation({
                 matchId, playerId, classUsed: subClass, squad: targetSquad, state: 'PLAY',
@@ -331,6 +426,64 @@ export default function LineupPage({ classes, classMap, initialMatchId = null }:
             setCellPick(null);
           }}
         />
+      )}
+
+      {showInherit && matchId !== null && (
+        <div className="modal" onClick={() => setShowInherit(false)}>
+          <div className="modal__box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal__head"><h3>沿用其它场次的排表</h3></div>
+            <div className="hint" style={{ marginBottom: 8 }}>
+              只搬排表（小队 / 落位 / 职业 / 队内角色）：战报数值、评分、对方数据都不会带过来。
+            </div>
+            {/* 场次会越来越多：搜索 + 只看已排表的 + 只渲染最近 50 场 */}
+            <div className="toolbar" style={{ marginBottom: 8 }}>
+              <input className="input" style={{ minWidth: 220 }} placeholder="搜索日期或对手…"
+                     value={inheritQuery} onChange={(e) => setInheritQuery(e.target.value)} />
+              <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={onlyAssigned}
+                       onChange={(e) => setOnlyAssigned(e.target.checked)} />
+                <span>只显示已排表的场次</span>
+              </label>
+              <div className="spacer grow" />
+              <span className="hint" style={{ margin: 0 }}>共 {inheritCandidates.length} 场可选</span>
+            </div>
+            <div style={{ maxHeight: 320, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {inheritCandidates.length === 0 && (
+                <div className="hint">没有符合条件的场次（换个关键词，或取消上面的勾选）</div>
+              )}
+              {inheritCandidates.slice(0, 50).map((m) => (
+                <label key={m.id} className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <input type="radio" name="inherit-from" checked={inheritFrom === m.id}
+                         onChange={() => setInheritFrom(m.id)} />
+                  <span>{m.date} 第 {m.indexInDay} 场 · {m.ourSide} vs {m.oppSide}</span>
+                  <div className="spacer grow" />
+                  <span className="hint" style={{ margin: 0, whiteSpace: 'nowrap' }}>
+                    {m.ourAssigned ? `已排 ${m.ourAssigned} 人 · ${m.squadsUsed} 个小队` : '空排表'}
+                  </span>
+                </label>
+              ))}
+              {inheritCandidates.length > 50 && (
+                <div className="hint">只显示最近 50 场 —— 用上面的搜索或勾选缩小范围</div>
+              )}
+            </div>
+            <label className="field" style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
+              <span>覆盖本场已有排表（不勾选 = 只补齐本场还没有的人）</span>
+            </label>
+            <div className="toolbar" style={{ marginTop: 6, marginBottom: 0 }}>
+              {inheritFrom === '' && (
+                <span className="hint" style={{ margin: 0 }}>↑ 先在上面选一场，「套用排表」才会亮</span>
+              )}
+              <div className="spacer grow" />
+              <button className="btn" onClick={() => setShowInherit(false)}>取消</button>
+              <button className="btn primary" disabled={inheritFrom === ''}
+                      onClick={() => void applyInherit(Number(inheritFrom))}>
+                套用排表
+              </button>
+            </div>
+            {error && <div className="msg error" style={{ marginTop: 8 }}>{error}</div>}
+          </div>
+        </div>
       )}
     </div>
   );

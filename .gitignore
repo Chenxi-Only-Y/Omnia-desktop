@@ -10,3 +10,7 @@ dev-data/
 *.tmp
 commit-msg.txt
 commitmsg.txt
+
+# 样式/文件的备份（回退用，不入库）
+*.bak-*
+*.bak

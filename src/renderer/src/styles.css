@@ -3396,8 +3396,14 @@ to {
   margin: 0 !important;
 }
 
-/* 页签栏整行藏掉（之前只藏了 button.tab，容器还占着约 170px，看起来就是"2、3 页之间有个卡片组"） */
-.gpage :has(> button.tab) { display: none !important; }
+/* 页签栏整行藏掉（之前只藏了 button.tab，容器还占着约 170px，看起来就是"2、3 页之间有个卡片组"）
+   ⚠️ 必须限定在成员主页（`.content.md-snap`）！原来漏了前缀，选择器是 `.gpage :has(> button.tab)` ——
+      而 App.tsx 给**每个帮会页**都套了 `.gpage`，于是「对局与战报 → 某场」那排页签
+      （阵容编排 / 战报录入 / **报名 / 请假** / 本场评分 / 批量导入战报）被整排 display:none 干掉，
+      用户根本点不到「报名」（2026-10-08 用户截图报障）。
+      自检抓不到它：探针用 `el.click()` 程序化点击，**隐藏元素照样能点**，所以一路 PASS ✗。
+      和下面 3407 那条同一个坑（那里的注释早就写了"不加 .content.md-snap 会把帮会首页一起隐藏"）。 */
+.content.md-snap .gpage :has(> button.tab) { display: none !important; }
 
 
 /* 清掉 .gpage 里"不是页"的占位元素（第 2→3 页之间那多余的 116px 就是它）

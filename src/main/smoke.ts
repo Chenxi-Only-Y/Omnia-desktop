@@ -1744,6 +1744,25 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         }
         const tab = await waitFor(() => [...document.querySelectorAll('button.tab')]
           .find(x => x.textContent.includes('报名')), '报名页签');
+
+        /* ⚠️ 必须断言"这排页签**真的看得见**"，不能只断言"点得到"：
+           2026-10-08 的线上 bug —— 样式表里那条 .gpage :has(> button.tab){display:none!important}
+           漏了 .content.md-snap 前缀，把「对局与战报 → 某场」整排页签
+           （阵容编排 / 战报录入 / **报名 / 请假** / 本场评分 / 批量导入战报）全藏了，
+           用户根本点不到「报名」；而这条探针用 tab.click() 程序化点击，
+           **隐藏元素照样能点**，所以自检一路 PASS ✗（这正是它没被发现的唯一原因）。
+           判据：页签栏容器与页签按钮都要有真实尺寸、且 display 不是 none。 */
+        /* 注意：本文件是 TS 模板字符串，注释里不能出现反引号（会提前结束字符串）✗ */
+        const tabsBox = tab.closest('.tabs') ?? tab.parentElement;
+        const tRect = tabsBox ? tabsBox.getBoundingClientRect() : { width: 0, height: 0 };
+        const bRect = tab.getBoundingClientRect();
+        const boxDisplay = tabsBox ? getComputedStyle(tabsBox).display : 'none';
+        const tabsVisible = !!tabsBox && tRect.width > 0 && tRect.height > 0
+          && bRect.width > 0 && bRect.height > 0 && boxDisplay !== 'none';
+        steps.push('页签栏可见性: 容器 ' + Math.round(tRect.width) + 'x' + Math.round(tRect.height)
+          + ' 页签「' + tab.textContent.trim() + '」 ' + Math.round(bRect.width) + 'x' + Math.round(bRect.height)
+          + ' display=' + boxDisplay + ' → ' + (tabsVisible ? '看得见 ✓' : '看不见 ✗（报名点不到！）'));
+
         tab.click();
         // 等报名表真的出现数据（只看 table 存在会太早）
         await waitFor(() => document.querySelector('.row-edit') ? true : null, '报名行（标记按钮组）');
@@ -1764,7 +1783,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
           && byName['smoke_sg_3'] === 'PLAY/未分配'
           && byName['smoke_sg_4'] === undefined
           && jia.squad === '防守一-1'
-          && rows >= 4 && marks >= 4;
+          && rows >= 4 && marks >= 4
+          && tabsVisible;   // ← 页签栏看得见（否则用户点不到「报名」）
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针9');

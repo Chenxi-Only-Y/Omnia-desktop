@@ -38,6 +38,12 @@ npm run dist         # 打 Windows 安装包 → release/Omnia-Setup-<版本>.ex
 安装包在 `release/` 里而它又不在 git 里，删掉就找不回来（2026-10-08 之前就这样丢过一次）。
 要连 `release/` 一起清，用 `npm run clean:release`（`npm run dist` 已经接上它）。
 
+⚠️ **跑 `npm run smoke` 之前必须先把应用窗口关掉**：主进程有**单实例锁**
+（`main.ts` 的 `requestSingleInstanceLock`），开发窗口开着时自检那个 Electron 实例会**秒退**，
+日志里只有构建那几行、最后一行是「`[smoke] 失败 ❌ (exit=0)`」—— 看着像探针失败，
+其实是**根本没跑**（2026-10-08 踩到）。`npm run dev` 起的窗口要留着看界面时，
+就等看完再跑自检，或者用另一份检出跑。
+
 - 调试口：`OMNIA_DEBUG_PORT=9222` → CDP `Runtime.evaluate` / `Page.captureScreenshot` 可做运行时验证 ✓
 - 单库模式：`OMNIA_DB_PATH=<file>`（自检用的模式；此模式下帮会增删改名被禁止）
 - **`smoke` 会把应用关掉** ✓ 跑完想看界面要重新 `npm run dev` ✓
@@ -147,6 +153,17 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
 10. ⚠️ **A/B 对照必须"同一份代码跑两次"才作数**：本轮 M3e 先出现"改 CSS 后 2 连红、改回去 1 连绿"，
     看着像 CSS 的锅 ✗ —— 结果第三跑（**同一份 CSS**）直接 PASS，说明是环境变体（看板 1361x862 ↔ 1351x856 两套布局）。
     **单次对照不算对照** ✓
+11. ⚠️ **探针用 `el.click()` 程序化点击 ⇒ 抓不到"元素被藏起来"**：`.click()` 对 `display:none`
+    的元素**照样生效**，所以"点得到"不等于"看得见"。2026-10-08 的线上 bug 就是这么漏掉的（见下条）。
+    **凡是"用户要能看见 / 点到"的东西，断言里必须查 `getBoundingClientRect()` 的真实尺寸
+    加上 `getComputedStyle().display`** —— 报名页签那条探针现在就是这么断言的（`tabsVisible`）。
+12. ⚠️ **给某个页面写的"隐藏 / 拍平"规则，一定要带页面限定前缀**：`.gpage` 是**所有帮会页共用的外壳**
+    （`App.tsx` 每页都套 `gpage`）。上一轮为成员主页写的
+    `.gpage :has(> button.tab) { display:none !important }` **漏了 `.content.md-snap`**，
+    于是「对局与战报 → 某场」**整排页签**（阵容编排 / 战报录入 / **报名 / 请假** / 本场评分 / 批量导入战报）
+    被整排藏掉 —— 用户点不到「报名」，以为报名数据丢了（2026-10-08 截图报障）。
+    同文件里那条 `display:none` 的注释**早就写过这个坑**（"不加 `.content.md-snap` 会把帮会首页一起隐藏"）
+    却还是漏了一条 ✗。现在两条都带前缀了 ✓。
 
 ---
 

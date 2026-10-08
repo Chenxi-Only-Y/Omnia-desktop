@@ -223,6 +223,13 @@ npm run smoke         # 全量探针（约 3 分钟）：几何/落位/首屏钉
 ```
 - **改样式必须跑 smoke**：探针里有几何与落位断言（`.home-card` 首屏高度、卡片落位、图标加载），
   样式写坏会直接变红，不用靠肉眼看。
+- ⚠️ **给"某一页"写的隐藏/拍平规则，必须带页面前缀**：`.gpage` 是**所有帮会页共用的外壳**。
+  2026-10-08 的事故：为成员主页写的 `.gpage :has(> button.tab){display:none!important}` 漏了
+  `.content.md-snap`，把「对局与战报 → 某场」整排页签（含**报名 / 请假**）全藏了 → 用户点不到报名。
+  **凡是 `.gpage` / `.theme-light` / `.page-fill` 开头的新规则，先问一句"这会不会命中别的页"。**
+- ⚠️ **"看得见"要单独断言**：探针用 `el.click()` 点按钮，**隐藏元素照样能点**，所以"点得到"≠"看得见"
+  （上面那次事故就是这样一路 PASS 的）。要查可见性就用真实尺寸 + `display`：
+  `getBoundingClientRect().width/height > 0 && getComputedStyle(el).display !== 'none'`。
 - 要**看真实观感**：`OMNIA_SMOKE_SHOTS=<目录> npm run smoke` 会把界面截图写出来。
 - 运行时验证：`OMNIA_DEBUG_PORT=9222` → CDP `Runtime.evaluate` 读计算样式/几何。
   ⚠️ 截图有 ~300ms 延迟，飞行动画抓不准 —— 用页内 `setInterval` 采样。

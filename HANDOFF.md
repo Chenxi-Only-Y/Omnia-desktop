@@ -1,7 +1,8 @@
 # 交接文档 · 万象·Omnia（lis-desktop）
 
 > 给**下一个全新会话**看。读完这份就能直接接手，不需要翻历史。
-> 最后更新：2026-10-08 18:10（v0.2.0 已就绪；新增「设计语言」章节 ✓）
+> 最后更新：2026-10-08（第二轮：待办 2/3 已修 + 新增 `DESIGN-APP.md` + 修掉「build 会删掉安装包」）
+> 上一轮：2026-10-08 18:10（v0.2.0 已就绪；新增「设计语言」章节 ✓）
 
 ---
 
@@ -26,35 +27,54 @@
 npm run dev          # 开发：Vite(5173) + Electron，渲染层热更新 ✓（改主进程要重启）
 npm run build:node   # 只编主进程（改 src/main/** 后必须跑）
 npm run typecheck    # tsc node + renderer（改完**立刻**跑，最省时间 ✓）
-npm run smoke        # 全量自检（约 3 分钟，2600+ 行探针）：改完必须跑 ✓
+npm run smoke        # 全量自检（约 3 分钟，2700+ 行探针）：改完必须跑 ✓
+npm run css:audit    # 样式表审计（只报告）：重复选择器组 / 候选死选择器
+npm run css:stats    # 样式表实测统计（token 数、字号/圆角分布、玻璃与阴影处数）
+npm run css:prune    # 预览「永不生效的旧声明」；`npm run css:prune -- --apply` 才写（自带校验+备份）
 npm run dist         # 打 Windows 安装包 → release/Omnia-Setup-<版本>.exe
 ```
+
+⚠️ **`npm run build` / `npm run smoke` 现在只清 `dist/`，会保留 `release/`** ——
+安装包在 `release/` 里而它又不在 git 里，删掉就找不回来（2026-10-08 之前就这样丢过一次）。
+要连 `release/` 一起清，用 `npm run clean:release`（`npm run dist` 已经接上它）。
 
 - 调试口：`OMNIA_DEBUG_PORT=9222` → CDP `Runtime.evaluate` / `Page.captureScreenshot` 可做运行时验证 ✓
 - 单库模式：`OMNIA_DB_PATH=<file>`（自检用的模式；此模式下帮会增删改名被禁止）
 - **`smoke` 会把应用关掉** ✓ 跑完想看界面要重新 `npm run dev` ✓
+- `smoke` 用**全新库** `dev-data/smoke.db`，**不碰真库** ✓；`OMNIA_SMOKE_SHOTS=<目录>` 会把界面截图写出来
 - 网络：GitHub 推送偶发 `Connection was reset` ✗ → **重试 1~2 次必通** ✓
+- `npm run dist` 偶发 `EPERM: rename release\win-unpacked.tmp`（杀软占着刚解压的目录）→ **直接重跑一次就好** ✓（9/30 与 10/8 各遇到一次，第二次都过）
 
 ---
 
-## 3. 当前状态（v0.2.0 发布就绪）
+## 3. 当前状态
 
 ```
-安装包   release\Omnia-Setup-0.2.0.exe   110.5 MB ✓（release/ 在 .gitignore 里，不入库 ✓）
-         release\Omnia-Setup-0.2.0.zip   备选（可拖进 GitHub 描述框 ✓）
+安装包   release\Omnia-Setup-0.2.0.exe   ✓ 已上传到 GitHub Releases（用户 2026-10-08 确认）
+         ⚠️ 本地 release/ 被清过一次（见第 7 节第 8 条）；要重建：npm run dist
 tag      v0.2.0 → 46a5702 ✓ 已推送 ✓（v0.1.1 也在 ✓）
-GitHub   只有 main 一条分支 ✓ 指向最新 ✓
-自检     结果: PASS ✓   schema 版本: 19 ✓
+GitHub   只有 main 一条分支 ✓
+自检     结果: PASS ✓   schema 版本: 19 ✓（2026-10-08 复跑，含新增的 M3c 原子性探针）
 typecheck 通过 ✓
 ```
 
-**还差最后一步（人来点）**：GitHub → Releases → Draft a new release → 选标签 `v0.2.0` →
-把 exe 拖到**页面最底部的 "Attach binaries"** 框（**不是**描述框 ✗ 拖描述框会报 "We don't support that file type" ✗）。
-装 `gh` CLI 后可代劳：`gh release create v0.2.0 release/Omnia-Setup-0.2.0.exe`。
+> **GitHub Release 那一步用户已经做完了**（2026-10-08），第 3 节原先留的"还差最后一步"已完成。
 
 ---
 
 ## 4. 已完成（近期）
+
+**第二轮（2026-10-08，本文件的"后续完成内容"）**
+
+| 项 | 内容 |
+|---|---|
+| 待办 2 · 战报导入无事务 | ✅ 循环收进 **`MatchRepo.importStats()`**，外面套一个 `db.ts` 的 **`inTransaction()`（SAVEPOINT，可嵌套）**：任一行写失败 → 整批回滚。IPC 只负责"分类"（我方/对方/丢弃）后交计划下去 |
+| 待办 2 · 验证 | ✅ 自检新增 **M3c 原子性探针**：手工拼一批"第 1 行合法、第 2 行小队名不存在"的预览 → 写库中途抛错 → 断言**库里一条没剩**（修复前会残留 1 条） |
+| 待办 3 · 目录穿越探针恒真 | ✅ 旧探针指向一个**不存在**的目录，删掉守卫也照样 PASS ✗。改用 `%2e%2e%2f`（斜杠一起编码，URL 解析器不折叠），并要求"若不拦就会命中一张真实存在的图" |
+| 待办 1 · 样式表清理 | ✅ 判据脚本化 + 已删 54 条"永不生效的旧声明"（`npm run css:prune --apply`，逐条列出、自带自校验与备份）。**不批量删**：只删"同一条选择器串、后面那条同名属性覆盖"的，可证不影响渲染 |
+| 新增交付物 | ✅ **`DESIGN-APP.md`**：两语域边界 + 全量 token + 实测字号/圆角/玻璃统计 + 组件前缀清单 + Motion + Do/Don't + 与 `DESIGN.md` 的三处偏差 |
+| 工程性修复 | ✅ `npm run clean` 原本**连 `release/` 一起删**（安装包在里面且不在 git 里 → 删了找不回，本项目已丢过一次）→ 现在默认只清 `dist`，要清 release 用 `npm run clean:release` |
+| 探针可信度 | ✅ M3e（主档拖动）那条历史偶发项：加了**诊断输出**（rAF 是否在跑 / dragstart 前后几何位移 / 网格列数），命中点从 80% 宽改到 **60%** 宽（余量翻倍；不能用 50%，那样 `below` 会反转、断言就不成立了） |
 
 **三批审计修复（已提交 7b528e7 / 46a5702）**
 
@@ -75,15 +95,19 @@ typecheck 通过 ✓
 
 ## 5. 待办（按优先级）
 
-1. **样式表清理（安全版）** —— 判据必须是「**按逗号拆分选择器、逐项判死**」✗ 不能按"含某个死类"整条删 ✓
-   - 已删：`.nav-current`、`.guild-home__hero/__shade/__head`、`.hero__brand`、`.pcard__cls--edit`、`.app.nav-collapsed`、2 个无引用 `@keyframes`、16 个死变量
-   - 待删：49 组重复选择器、约 20 组"永不生效的旧声明"、12 处"只能删分支"的（`.ico`/`.home-card` 那条**删了会毁首屏** ✗）
-   - 4 组"笔误候选"需人确认：`.mcard__media` 重复 `background`（删被吃的那条 ✓）· `.mcard__body…{position:relative}` 吃掉 4 处 `absolute`（**会改观感** ✗）· `.sel__btn` 磨砂被改回不透明 · `.drawer__*` 被压住
-   - 每次只删 1 条 → 校验 括号平衡 + **注释 `/* */` 成对** + 跑 `smoke` → 绿了再下一条
-2. **战报导入的行循环仍无事务**（已用硬拦缓解）；彻底解 = 收进仓储层开事务
-3. **自检里目录穿越探针是恒真的**：字面 `..` 会被 URL 归一化，要改用 `%2e%2e`
-4. 动画两层的**淡入是否恢复**（现在是立刻出现 ✓）
-5. **黑区旋钮**（用户口径"往右再黑点"）：素材遮罩 `transparent 0 → .55 20% → #000 45%`；色调层 `.92 0% → .88 32% → .45 58% → 0 82%`
+1. **样式表清理：剩下的部分** —— 判据仍然是「**按逗号拆分选择器、逐项判死**」✗ 不能按"含某个死类"整条删 ✓
+   - 已删（第二轮）：54 条"永不生效的旧声明"（脚本可证）。**49 组重复选择器里，多数是"后者重写同名前缀"的覆盖块，不能整组删** —— 只能删被覆盖的那条声明
+   - 剩余候选：**4 组"笔误候选"要人拍板**（`npm run css:prune` 的末尾会把它们列出来）：
+     `.mcard__media` 重复 `background`（后者胜，可删前一条 ✓）·
+     `.md-bg video, .md-bg img` 重复两条 `mask-image`（后者胜 = 现在的"黑区旋钮"，可删前一条 ✓）·
+     `.mcard__body{position:relative}` 吃掉 4 处 `absolute`（**会改观感** ✗ 不是笔误）·
+     `.sel__btn` 磨砂被后一条改回不透明（要恢复磨砂得改**后面**那条）
+   - `npm run css:audit` 还会报"候选死选择器"（必要条件，**必须人工确认**）：
+     `.brand` 那一组是活的（首页品牌块），扫不到引用是因为它由 JS 动态拼 —— 别照报告删 ✗
+2. **动画两层的淡入是否恢复**（现在是立刻出现 ✓）—— 需用户看观感后拍板
+3. **黑区旋钮**（用户口径"往右再黑点"）：素材遮罩 `transparent 0 → .55 20% → #000 45%`；色调层 `.92 0% → .88 32% → .45 58% → 0 82%` —— **已按此实现**，要再调就改这两行
+4. 排表页每个小队的**人数上限 UI 入口**（后端 `setSquadSize` + IPC 都就绪，只差界面）
+5. `DESIGN.md` 的三处偏差（`--accent` 口径 / 去掉的光晕 token / 轻阴影）—— 见 `DESIGN-APP.md` 第九节，需要产品拍板
 
 ---
 
@@ -108,8 +132,21 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
 3. **改注释前先确认 `/*` 与 `*/` 成对** —— 只替换跨行注释的**开头**会把后面的 CSS 一起吞掉（首屏高度 831→523 就是这么来的）
 4. **脚本自己的注释里别写 `*/`** —— 会把脚本的块注释提前结束 → `SyntaxError`
 5. **CSS 批量删**必须按逗号拆分逐项判死 ✗ 否则会连带删掉含活类的规则（本项目误删过 `:root` 变量块 / `.home-dark` / `.modal__box--wide` / 一条 `.app`）
+   → 2026-10-08 起有脚本了：`npm run css:audit` / `css:prune`（逐条列出 + 自校验 + 备份），**别再手写正则批量删** ✓
 6. **改完先 `node --check <脚本>` 再执行** ✓；**写完文件先跑 typecheck** ✓
 7. **CSV/MD 等中文文件读写用 `[System.IO.File]::ReadAllText(path, [Text.Encoding]::UTF8)`** ✓（`Get-Content` 会乱码 ✗）
+8. ⚠️ **`npm run build` 会跑 `scripts/clean.mjs`，而它原先连 `release/` 一起删** ——
+   `release/` 里是打好、要传 GitHub Releases 的安装包，而 `release/` 在 `.gitignore` 里 → **删了找不回**。
+   2026-10-08 就这么丢过一次（只能重跑 `npm run dist`）。现在 `clean` 默认**只清 `dist`** ✓，要清 release 用 `npm run clean:release`。
+   **教训：凡是"清理产物"的脚本，先看它删哪些目录，尤其删的是不在版本控制里的东西。**
+9. ⚠️ **"探针红了"先别急着改代码** —— 本项目探针有两类假红：
+   ① **自检偶发**（README 早就写了）：判定标准是**同一份代码连跑两次**，一红一绿就是环境问题；
+   ② **恒真/恒假探针**（本轮修掉的那个）：断言本身测不到东西，删掉被测逻辑它照样绿。
+   排查手段：给探针加**诊断输出**（本轮给 M3e 加了 rAF 是否在跑 / dragstart 前后几何位移 / 网格列数），
+   比对着日志猜快得多。
+10. ⚠️ **A/B 对照必须"同一份代码跑两次"才作数**：本轮 M3e 先出现"改 CSS 后 2 连红、改回去 1 连绿"，
+    看着像 CSS 的锅 ✗ —— 结果第三跑（**同一份 CSS**）直接 PASS，说明是环境变体（看板 1361x862 ↔ 1351x856 两套布局）。
+    **单次对照不算对照** ✓
 
 ---
 
@@ -119,12 +156,21 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
 src/renderer/src/styles.css.bak-deadcode   最初删死类之前
 src/renderer/src/styles.css.bak-clean1     两次 CSS 清理之前（= 现在的底子 ✓）
 src/renderer/src/styles.css.bak-mask2      "往右再黑点"之前
+src/renderer/src/styles.css.bak-prune-*    第二轮删"永不生效声明"之前（css:prune 自动生成的）
 dev-data/                                  全部临时产物（.gitignore 忽略 ✓）
   ├ dev-data/smoke-*.log                   各轮自检记录
   ├ dev-data/shots/ · captures/            自检截图
+  ├ dev-data/shots-before-1008/            第二轮改动前的截图（像素对照用）
+  ├ dev-data/styles-before-prune.css       裁剪前的那一份（可用 css:prune --file= 回看它删了什么）
   └ dev-data/dev-run.log                   最近一次 dev 日志
 ```
 ⚠️ `*.bak-*` 已在 `.gitignore` 里 ✓ 不进 Git ✓ 但**硬盘上还在** ✓ 回退随时可用 ✓
+
+**回退方式（样式表出问题时）**
+```bash
+git checkout -- src/renderer/src/styles.css            # 回到上一次提交
+cp src/renderer/src/styles.css.bak-prune-<时间戳> src/renderer/src/styles.css   # 回到裁剪前
+```
 
 ---
 
@@ -166,7 +212,12 @@ dev-data/                                  全部临时产物（.gitignore 忽�
 2. 规范的光晕三色 `--glow-cool/warm/cyan` **已从 `:root` 移除** ✗（清死变量时按"无引用"删的）→ 规范里的"光晕"目前**无 token 支撑**
 3. 规范说"不用重阴影" ✓，实现有 61 处轻阴影 ✗（不违反精神，偏离字面）
 
-**建议下一步**：把本节扩写成 **`DESIGN-APP.md`**（两语域边界清单 + 全 token + 圆角/玻璃规范 + 组件清单：药丸/卡片/眉题/输入/自绘选择器 `sel`/`dp`/`picker`/抽屉 `drawer`/飞行层 + Motion 两档 + Do/Don't），并在 `README`、本文件里各加一行指路 ✓；顺带把上面三处偏差写成待办 ✓
+**建议下一步**：~~把本节扩写成 `DESIGN-APP.md`~~ ✅ **已完成（2026-10-08）** ——
+`DESIGN-APP.md` 已写好：两语域边界清单 + 全量 token + 圆角/玻璃实测 + 组件前缀清单（含自绘控件 `sel`/`dp`/`cfm`）+ Motion 两档 + Do/Don't + 三处偏差 + 改 UI 前的检查清单。
+**本节保留为速查摘要**；要改 UI 以 `DESIGN-APP.md` 为准。
+数字来源：`npm run css:stats`（`:root` 51 个变量 · `backdrop-filter` 46 处 · `box-shadow` 50 处/含相关 65 处 ·
+字号 11px×28 · 12px×27 · 13px×17(+4 important) · 圆角 14 档 · 缓动 `ease`×27）。
+> ⚠️ 上一轮记的"`box-shadow` 61 处""13px×21""6~8s 呼吸"是**目测/估算**；实测值分别是 50（相关 65）、17(+4)、7.5s。
 
 ---
 

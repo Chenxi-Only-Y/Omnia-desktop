@@ -201,7 +201,6 @@ body.sb-dragging {
   gap:12px;
   padding:0 18px;
   border-bottom:1px solid var(--border);
-  background:var(--bg-panel);
   flex:0 0 auto;
   position:relative}
 .topbar h2 {
@@ -346,7 +345,6 @@ table.grid th,table.grid td {
   white-space:nowrap}
 table.grid thead th {
   background:var(--bg-panel-2);
-  color:var(--text-dim);
   font-weight:600;
   position:sticky;
   top:0;
@@ -594,17 +592,13 @@ to {
   align-items:stretch;
   overflow-x:auto;
   overflow-y:hidden;
-  padding:4px 2px 10px;
   scroll-snap-type:x proximity}
 .gcard {
   position:relative;
   flex:0 0 auto;
-  width:210px;
-  height:300px;
   border-radius:16px;
   overflow:hidden;
   border:1px solid var(--line-strong);
-  background:var(--surface-2);
   cursor:pointer;
   scroll-snap-align:start;
   transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
@@ -613,8 +607,6 @@ to {
   padding:0;
   color:inherit}
 .gcard:hover {
-  transform:translateY(-3px);
-  box-shadow:var(--shadow-lift);
   border-color:var(--accent)}
 .gcard__cover {
   position:absolute;
@@ -701,12 +693,6 @@ to {
   color:var(--text-dim);
   line-height:1.6}
 .gset-cover {
-  position:relative;
-  width:200px;
-  height:150px;
-  flex:0 0 auto;
-  border-radius:12px;
-  overflow:hidden;
   border:1px solid var(--border)}
 .gset-cover img {
   width:100%;
@@ -758,13 +744,10 @@ to {
   border-radius:14px;
   overflow:hidden}
 .guild-home__cover {
-  position:absolute;
   top:0;
   right:0;
   bottom:0;
   left:0;
-  width:100%;
-  height:100%;
   object-fit:cover}
 .guild-home__cover--text {
   display:flex;
@@ -793,11 +776,8 @@ to {
   gap:10px;
   color:#fff}
 .guild-home__name {
-  font-size:26px;
-  font-weight:800;
   letter-spacing:1px}
 .guild-home__note {
-  font-size:12px;
   opacity:.85;
   margin-top:4px;
   max-width:720px}
@@ -1426,7 +1406,6 @@ tr.row--leave>td {
   border:1px solid var(--line);
   padding:12px 12px 10px;
   cursor:pointer;
-  overflow:hidden;
   transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
 .mcard:hover {
   transform:translateY(-2px);
@@ -2198,10 +2177,6 @@ table.grid--sheet tr.sheet-row--before td.rownum {
   color:#0b0b0d!important;
   border-color:#0b0b0d2e!important}
 .topbar {
-  background:transparent!important;
-  backdrop-filter:none!important;
-  -webkit-backdrop-filter:none!important;
-  border:none!important;
   box-shadow:none!important}
 .stat,.roster-card,.picker-item,.modal,.home-card,.roster-cards__head {
   --text: #0B0B0D;
@@ -2529,20 +2504,11 @@ to {
   user-select:none;
   display:flex;
   align-items:center;
-  justify-content:space-between;
   gap:6px;
-  padding:5px 9px;
-  border-radius:10px;
-  background:#fffc;
-  color:#0b0b0d;
-  border:1px solid rgba(11,11,13,.18);
   font:inherit;
-  font-size:13px;
   line-height:1.35;
   min-width:0}
 .sel__txt {
-  overflow:hidden;
-  text-overflow:ellipsis;
   white-space:nowrap}
 .sel__btn::-webkit-details-marker {
   display:none}
@@ -2568,10 +2534,6 @@ to {
   flex-direction:column;
   gap:1px;
   padding:4px;
-  background:#fff;
-  border:1px solid rgba(11,11,13,.16);
-  border-radius:10px;
-  box-shadow:0 10px 26px #00000040;
   max-height:min(52vh,400px);
   overflow:auto}
 .sel__opt {
@@ -2599,8 +2561,6 @@ to {
   opacity:.45;
   cursor:not-allowed}
 .pcard .sel__btn {
-  background:transparent;
-  border:none;
   padding:0 16px 0 0;
   color:inherit;
   font-size:15px}
@@ -2611,8 +2571,6 @@ to {
 .sel__btn {
   max-width:100%;
   overflow:hidden;
-  border-radius:12px;
-  background:#ffffff8c!important;
   backdrop-filter:blur(18px) saturate(1.25);
   -webkit-backdrop-filter:blur(18px) saturate(1.25);
   border:1px solid rgba(255,255,255,.45)!important}
@@ -2643,19 +2601,15 @@ to {
   bottom:calc(100% + 4px);
   transform-origin:bottom center}
 .pcard .sel__btn {
-  background:transparent!important;
   -webkit-backdrop-filter:none!important;
   backdrop-filter:none!important;
   border:none!important}
 .sel[open]>.sel__btn {
-  background:#ffffffbd!important;
   color:#0b0b0d!important;
   border-color:#0b0b0d4d!important}
 .sel[open] .sel__list {
-  background:#fffc!important;
   backdrop-filter:blur(22px) saturate(1.3);
   -webkit-backdrop-filter:blur(22px) saturate(1.3);
-  border-color:#ffffff8c!important;
   box-shadow:0 12px 30px #00000042}
 .sel[open] .sel__opt {
   color:#0b0b0d}
@@ -2683,7 +2637,6 @@ to {
 .sel__btn:hover {
   border-color:#0b0b0d47!important}
 .sel[open]>.sel__btn {
-  background:#ffffffeb!important;
   border-color:#0b0b0d57!important}
 .input[type=date] {
   background:#fffc!important;
@@ -2740,11 +2693,9 @@ to {
   width:264px;
   padding:12px 12px 8px;
   border-radius:16px;
-  background:#fffc;
   backdrop-filter:blur(22px) saturate(1.3);
   -webkit-backdrop-filter:blur(22px) saturate(1.3);
   border:1px solid rgba(255,255,255,.55);
-  box-shadow:0 14px 34px #00000042;
   color:#0b0b0d}
 .dp__head {
   display:flex;
@@ -2824,7 +2775,6 @@ to {
   right:0;
   bottom:0;
   left:0;
-  z-index:200;
   display:grid;
   place-items:center;
   background:#00000059;
@@ -2834,7 +2784,6 @@ to {
   width:min(420px,86vw);
   padding:20px;
   border-radius:16px;
-  background:#ffffffdb;
   backdrop-filter:blur(24px) saturate(1.3);
   -webkit-backdrop-filter:blur(24px) saturate(1.3);
   border:1px solid rgba(255,255,255,.55);
@@ -2910,7 +2859,6 @@ to {
   position:absolute;
   right:0;
   top:calc(100% + 8px);
-  z-index:95;
   width:min(760px,78vw);
   padding:16px;
   border-radius:16px;
@@ -3072,7 +3020,6 @@ to {
   transform:none}
 }
 .app {
-  position:relative;
   overflow:hidden}
 @keyframes fold {
   0% {
@@ -3204,7 +3151,6 @@ to {
   to { opacity: 1; transform: none; }
 }
 .gpage--tab {
-  animation: tabGrow 220ms cubic-bezier(.22,.61,.36,1) both;
   transform-origin: var(--tab-l, 50%) top;   /* --tab-l = 被点按钮的中心 */
 }
 

@@ -7,7 +7,8 @@
 
 - 前身是一份 Excel 工作簿（`LIS 联赛集成系统v1.0`），本项目是对它的完整重做。
 - 数据落在本机 SQLite（`node:sqlite`，**不依赖 better-sqlite3**）。
-- 界面是 Electron + React，深色玻璃主题；视觉规范见根目录 `DESIGN.md`。
+- 界面是 Electron + React，深色玻璃主题；视觉规范见 `DESIGN.md`（**首页/剧场语域**）
+  与 `DESIGN-APP.md`（**全应用**：两语域边界 + 全量 token + 组件 + Motion）。
 
 当前版本：**v0.2.0**
 
@@ -157,7 +158,8 @@ npm run fix:electron              # 方案 B：手动跑修复脚本（已接在
 
 | 命令 | 作用 |
 |---|---|
-| `npm run clean` | 清理构建产物 |
+| `npm run clean` | 清理构建产物（**只清 `dist`**；`release/` 保留 —— 安装包在那里） |
+| `npm run clean:release` | 连 `release/` 一起清（重打包前用） |
 | `npm run typecheck` | 类型检查（主进程 + 渲染进程两套 tsconfig） |
 | `npm run build:node` | 编译主进程（tsc） |
 | `npm run build:renderer` | 构建渲染进程（vite） |
@@ -166,6 +168,9 @@ npm run fix:electron              # 方案 B：手动跑修复脚本（已接在
 | `npm run start:only` | 不构建，直接启动（用已有产物） |
 | `npm run dev` | 开发模式（`scripts/dev.mjs`） |
 | `npm run smoke` | **自检**：构建后跑无头自检（`scripts/smoke.mjs`） |
+| `npm run css:audit` | 样式表审计（只报告）：重复选择器组 / 候选死选择器 |
+| `npm run css:stats` | 样式表实测统计（token 数、字号/圆角分布、玻璃与阴影处数） |
+| `npm run css:prune` | 预览「永不生效的旧声明」（`-- --apply` 才写文件，自带校验与备份） |
 | `npm run dist` | 打 Windows 安装包（NSIS） |
 | `npm run dist:dir` | 只产出免安装目录（`release/win-unpacked`） |
 
@@ -203,8 +208,10 @@ lis-desktop/
 │  ├─ icon.svg             图标矢量源（**黑底圆角**，应用外用）
 │  └─ icon.png             512×512（electron-builder 自动生成多尺寸 .ico）
 ├─ docs/                   打包后自检日志等
-├─ scripts/                clean / dev / fix-electron / smoke 等
-├─ DESIGN.md               设计规范
+├─ scripts/                clean / dev / fix-electron / smoke / css-audit / css-prune 等
+│  └─ lib/css-parse.mjs    css-audit 与 css-prune 共用的解析器
+├─ DESIGN.md               设计规范 —— **首页（剧场语域）的唯一依据**
+├─ DESIGN-APP.md           设计规范 —— **全应用**（两语域 / 全 token / 组件 / Motion）
 └─ release/                打包产物（**已在 .gitignore 中**）
 ```
 
@@ -382,11 +389,25 @@ npm run dist
    本场治疗值 > 500 万 → 妙音，否则 → 惊鸿。字段/阈值常量在同文件顶部，要调只改一处。
 3. 排表页每个小队的**人数上限 UI 入口**（后端 `setSquadSize` + IPC 都已就绪，只差界面）。
 
-### 已知残留（v0.2.0 未做）
+### 上一轮残留 —— 2026-10-08 已处理
 
-- 战报导入的**行循环仍无事务**：已用「硬拦 UNKNOWN_CLASS」把已识别的风险堵住，彻底解需要把循环收进仓储层开事务
-- 自检里**目录穿越探针是恒真的**：字面 `..` 会被 URL 解析器先归一化，要改用 `%2e%2e` 才能真正测到
-- 样式表里仍有 49 组重复选择器与若干「永不生效的旧声明」，需按上面的逗号拆分判据逐条确认后再删
+| 原残留 | 处理 |
+|---|---|
+| 战报导入的**行循环无事务** | ✅ 循环收进仓储层：`MatchRepo.importStats()` 用一个 SAVEPOINT 事务包住整批，任一行写失败 → 整批回滚。自检新增 **M3c 原子性探针**（中途失败后库里必须一条不剩） |
+| 自检里**目录穿越探针恒真** | ✅ 原来字面 `..` 被 URL 解析器归一化，实际指向一个**不存在**的目录 → 删掉守卫也照样 PASS。改用 `%2e%2e%2f`（斜杠一起编码，解析器不会折叠），并且要求"若不拦就会命中一张真实存在的图"，探针才不再是空转 |
+| 样式表里 49 组重复选择器 + 永不生效的旧声明 | ✅ 判据脚本化：`npm run css:audit`（重复选择器组 / 候选死选择器）+ `npm run css:prune`（永不生效声明，逐条列出、`--apply` 才写、自带括号/注释/声明数自校验与备份）。**逐条判死，不做批量删** |
+
+### 仍在的残留
+
+- **`npm run build` 曾会连 `release/` 一起删**（安装包在 `release/`，而它在 .gitignore 里 → 删了找不回）。
+  2026-10-08 已修：`clean` 默认只清 `dist`，要清 `release` 用 `npm run clean:release`（`dist` 脚本已接上）。
+- 样式表里仍有约 4 组「笔误候选」需要人拍板才能删（脚本只报告不删）：
+  `.mcard__media` 重复 `background`（后者胜，可删前一条）·
+  `.md-bg video, .md-bg img` 重复两条 `mask-image`（后者胜 = 现在的"黑区旋钮"，可删前一条）·
+  `.mcard__body{position:relative}` 吃掉 4 处 `absolute`（**删了会改观感**，不是笔误）·
+  `.sel__btn` 的磨砂被后一条改回不透明（要恢复磨砂得改后面的）
+- 安装包尚未在干净机器上端到端装过；自检个别项偶发失败，复跑即过。
+
 ### 本项目的编码经验（省时间用）
 
 - `node -e` 里带中文 / 花括号 / 反斜杠，在 PowerShell 下容易被转义搞坏；**写成 `.cjs` 文件再 `node` 执行**更稳。

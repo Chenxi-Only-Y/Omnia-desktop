@@ -370,6 +370,70 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
     for (const s of m3.steps) log('[smoke] M3:', s);
     log('[smoke] M3 对局与战报      :', m3.ok ? 'PASS' : 'FAIL');
 
+    /* M3c：战报导入的**原子性**（HANDOFF 待办 2 / MatchRepo.importStats）
+       造一批"第 1 行合法、第 2 行写库必失败"的预览，直接调 importCommit：
+         · 第 2 行的小队名在本场不存在 → upsertParticipation 抛「未知小队」；
+         · 修复前（循环无事务）：第 1 行已经落库 = 半截数据；
+         · 修复后（整批一个 SAVEPOINT 事务）：整批回滚，库里一条都没有。
+       为什么只能这样测：正常入口的那些校验错误（数字不对 / 同一人重复 /
+       未知职业）在进循环**之前**就被硬拦了，构造不出"写到一半才炸"的输入。
+       所以这里手工拼一个 preview，绕过解析层，直接压仓储层的事务。 */
+    const atomic = await guarded(`(async () => {
+      const steps = smokeSteps();
+      const ids = [];
+      let mid = 0;
+      const api = window.omnia;
+      try {
+        const a = await api.player.create({ gameId: 'smoke_atom_a', name: '原子甲' });
+        if (!a.ok) throw new Error('建档甲失败: ' + a.error);
+        ids.push(a.data.id);
+        const b = await api.player.create({ gameId: 'smoke_atom_b', name: '原子乙' });
+        if (!b.ok) throw new Error('建档乙失败: ' + b.error);
+        ids.push(b.data.id);
+
+        const m = await api.match.create({
+          date: '2026-02-02', ourSide: '我方', oppSide: '对手', result: 'WIN',
+          ourTowersLeft: 5, oppTowersLeft: 0,
+        });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        mid = m.data.match.id;
+
+        const zero = { kills: 0, fountainKills: 0, assists: 0, resource: 0, dmgPlayer: 0,
+          dmgPlayerArmor: 0, dmgBuilding: 0, dmgBuildingArmor: 0, healing: 0,
+          damageTaken: 0, deaths: 0, revives: 0, boneBurn: 0 };
+        const mk = (pid, gid, squad, kills) => ({
+          row: 1, playerId: pid, gameId: gid, name: gid, classUsed: '神相', squad: squad,
+          stat: Object.assign({}, zero, { kills: kills }), issues: [],
+        });
+        const preview = {
+          rows: [mk(a.data.id, 'smoke_atom_a', '', 7), mk(b.data.id, 'smoke_atom_b', '不存在的队', 9)],
+          issues: [],
+          summary: { total: 2, matched: 2, unmatched: 0, errors: 0, warnings: 0 },
+        };
+
+        const res = await api.match.importCommit(mid, preview);
+        steps.push('中途失败时提交 = ' + (res.ok ? '竟然成功（异常！）' : '被拒: ' + res.error));
+
+        const parts = await api.match.participations(mid);
+        if (!parts.ok) throw new Error('读回失败: ' + parts.error);
+        const leaked = parts.data.filter((p) =>
+          p.gameId === 'smoke_atom_a' || p.gameId === 'smoke_atom_b').length;
+        steps.push('回滚后残留参战 = ' + leaked + ' 条（应为 0）');
+
+        return { ok: res.ok === false && leaked === 0, steps: steps };
+      } catch (e) {
+        return { ok: false, steps: steps.concat('ERR ' + String(e)) };
+      } finally {
+        try {
+          if (mid) await api.match.remove(mid);
+          for (const p of ids) await api.player.remove(p);
+        } catch (e2) { /* 清理失败不影响断言 */ }
+      }
+    })()`, '探针3c');
+
+    for (const s of atomic.steps) log('[smoke] M3c:', s);
+    log('[smoke] M3c 战报导入原子性  :', atomic.ok ? 'PASS' : 'FAIL');
+
     /* M3b：历史用名（改名兼容）—— 用户口径 2026-09：
        「成员主档每个人里面添加历史用名，以免后续改名导致排表数据和战报数据导入被清空和无法识别。
         且后续导入数据后自动改为最新名」
@@ -837,29 +901,55 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const src = cards[0];
         const dst = cards[3];
         const rc = dst.getBoundingClientRect();
+        const rcGrid0 = grid.getBoundingClientRect();
         const h0 = Math.round(grid.getBoundingClientRect().height);
         const scroll0 = content ? content.scrollTop : 0;
         const movedId = Number(src.dataset.playerId);
 
+        /* 诊断：这个探针历史上偶发"落点标记=0"（同代码两次跑一红一绿），
+           根因一直没定性。这里把几条可能性直接测出来，省得下次再猜：
+             · rAF 到底有没有在跑（拖拽命中判定挂在 requestAnimationFrame 上）
+             · dragstart 前后卡片/网格有没有位移（有位移 → 探针的旧坐标必然落空）
+             · 网格列数与内容宽度（跨过 @media 断点时卡片会整片重排） */
+        const rafAlive = await new Promise((resolve) => {
+          const t = setTimeout(() => resolve('超时(未触发)'), 600);
+          requestAnimationFrame(() => { clearTimeout(t); resolve('正常'); });
+        });
+        const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+
         fire(src, 'dragstart', 0, 0);
         await sleep(80);
+        const rc1 = dst.getBoundingClientRect();
+        const rcGrid1 = grid.getBoundingClientRect();
+        const dDst = Math.round(rc1.left - rc.left) + ',' + Math.round(rc1.top - rc.top);
+        const dGrid = Math.round(rcGrid1.left - rcGrid0.left) + ',' + Math.round(rcGrid1.top - rcGrid0.top);
         const hintEl = document.querySelector('.drag-hint');
+        steps.push('诊断 rAF=' + rafAlive + ' 网格列数=' + cols + ' 窗口宽=' + window.innerWidth
+          + ' 内容宽=' + (content ? Math.round(content.clientWidth) : -1));
+        steps.push('诊断 dragstart 位移 卡片Δ=(' + dDst + ') 网格Δ=(' + dGrid + ')'
+          + ' 提示条高=' + (hintEl ? hintEl.offsetHeight : -1) + ' 探针点=('
+          + Math.round(rc.left + rc.width * 0.6) + ',' + Math.round(rc.top + rc.height / 2) + ')');
         const hintStart = hintEl ? hintEl.textContent : '';
         const draggingCls = document.querySelectorAll('.mcard--dragging').length;
         const gridDragging = grid.className.indexOf('mcard-grid--dragging') >= 0;
 
         window.__countAppReads = true;
-        for (let i = 0; i < 20; i += 1) fire(dst, 'dragover', rc.left + rc.width * 0.8, rc.top + rc.height / 2);
+        for (let i = 0; i < 20; i += 1) fire(dst, 'dragover', rc.left + rc.width * 0.6, rc.top + rc.height / 2);
         window.__countAppReads = false;
         await sleep(80);
-        /* 偶发假报警（同代码两次跑一红一绿）的真正原因：
-           上面那批 dragover 打在卡片 **80% 宽**处 —— 那个点靠近右边缘，
-           布局稍有变化就落进卡片之间的空隙，命中测试失败 → 落点标记为 0。
-           这里改用**正中心**（一定在卡内）并最多重试 3 次。 */
+        /* 命中点统一用卡片宽度的 **60%**（不是 80%）：
+           与下面那批 dragover 一致，且离右边缘还有 ~40% 宽度（≈80px）余量。
+           2026-10-08 实测：这条探针同一份代码会一红一绿，且**与 CSS 无关** ——
+           同一份 styles.css 连跑三次得到 FAIL/FAIL/PASS，跑绿那次连
+           「排表尺寸」都跟着变（看板 1361x862 ↔ 1351x856），说明是环境里的
+           布局变体在决定 80% 那个点是否落进卡片空隙。
+           60% 仍在卡片中线右侧（探针要的是"插到目标后面"），但余量翻倍。
+           ⚠️ 别改成 50% 正中心：那时 x === 中线，below 会变成 false，
+              落点变成"插到目标前面"，断言 movedTo===3 就不成立了。 */
         for (let k = 0; k < 3; k += 1) {
           if (document.querySelectorAll('.mcard--drop-after,.mcard--drop-before').length > 0) break;
           const rc2 = dst.getBoundingClientRect();
-          fire(dst, 'dragover', rc2.left + rc2.width * 0.5, rc2.top + rc2.height / 2);
+          fire(dst, 'dragover', rc2.left + rc2.width * 0.6, rc2.top + rc2.height / 2);
           await sleep(200);
         }
         const marks = document.querySelectorAll('.mcard--drop-after,.mcard--drop-before').length;
@@ -867,7 +957,7 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const hintMid = hintEl ? hintEl.textContent : '';
 
         /* 松手后立刻密集采样：塌陷（卡片卸载）就发生在这一瞬间 */
-        fire(dst, 'drop', rc.left + rc.width * 0.8, rc.top + rc.height / 2);
+        fire(dst, 'drop', rc.left + rc.width * 0.6, rc.top + rc.height / 2);
         fire(src, 'dragend', 0, 0);
         const samples = [];
         for (const d of [0, 16, 33, 66, 150, 400]) {
@@ -2512,18 +2602,41 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
          而 file 源下 file:// 本来就通。它只钉住「omnia: 协议可用 + CSP 放行 +
          目录穿越被挡」，不宣称能防住「有人又改回 file://」—— 那需要 http 源下的验证。 */
     const wallOk = await (async () => {
+      const classIcon = path.join(APP_ROOT, 'src', 'renderer', 'public', 'class-icons', 'image1.png');
+      const guideImg = path.join(APP_ROOT, 'src', 'renderer', 'public', 'guide', 'image26.png');
       const wallAssets = [
-        path.join(APP_ROOT, 'src', 'renderer', 'public', 'class-icons', 'image1.png'),
-        path.join(APP_ROOT, 'src', 'renderer', 'public', 'guide', 'image26.png'),
+        classIcon,
+        guideImg,
         path.join(APP_ROOT, 'src', 'renderer', 'public', 'guide', 'image22.png'),
       ];
       const existing = wallAssets.filter((p) => fs.existsSync(p));
       const localUrls = existing.map(toLocalUrl);
       const fileUrls = existing.map((p) => 'file:///' + p.split(/[\\/]+/).filter(Boolean).join('/'));
 
+      /* ── 目录穿越探针（2026-10-08 重做，HANDOFF 待办 3）──────────────────────
+         旧写法是 `urls[0].replace('/class-icons/', '/../class-icons/')` —— **恒真**：
+         字面 `..` 会被 URL 解析器（omnia: 注册成了 standard scheme）先归一化掉，
+         于是它指向 `src/renderer/class-icons/imageX.png`：一个**根本不存在的目录**。
+         "加载失败"跟 main.ts 里那条 403 守卫毫无关系 ——
+         把守卫删掉，旧探针**照样 PASS**（= 它测的是"文件不存在"，不是"守卫有效"）。
+
+         修法：把斜杠也一起百分号编码（`%2e%2e%2f`）。这样一个 path 段不再匹配
+         URL 标准的 "double-dot path segment"（只认 `..` / `.%2e` / `%2e.` / `%2e%2e`），
+         解析器不会折叠它；主进程 `decodeURIComponent` 之后才变回 `../`。
+         于是**只有** `rel.includes('..')` 那条守卫能拦住它。
+
+         同时保证"若不拦就会命中一张**真实存在**的图"（classIcon 必须存在），
+         否则探针又会退化成"测文件在不在"。                                         */
+      const evasionUrl = (() => {
+        if (!fs.existsSync(classIcon) || !fs.existsSync(guideImg)) return '';
+        const tail = '%2e%2e%2fclass-icons%2f' + path.basename(classIcon);
+        return toLocalUrl(guideImg).replace(/\/[^/]*$/, '/' + tail);
+      })();
+
       const wallProbe = await guarded(`(async () => {
         const urls = ${JSON.stringify(localUrls)};
         const fileUrls = ${JSON.stringify(fileUrls)};
+        const evasion = ${JSON.stringify(evasionUrl)};
         const load = (u) => new Promise((resolve) => {
           const img = new Image();
           img.onload = () => resolve({ u, ok: img.naturalWidth > 0, w: img.naturalWidth });
@@ -2537,9 +2650,11 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         let fetchStatus = 'n/a';
         try { const r = await fetch(urls[0]); fetchStatus = r.ok ? String(r.status) : 'fail ' + r.status; }
         catch (e) { fetchStatus = 'threw: ' + String(e).slice(0, 60); }
-        // 3) 目录穿越必须被挡
-        const bad = await load(urls[0].replace('/class-icons/', '/../class-icons/'));
-        const blockedTraversal = !bad.ok;
+        // 3) 目录穿越必须被挡（见主进程里 evasionUrl 的注释：只有真守卫能拦住它）
+        const bad = evasion
+          ? await load(evasion)
+          : { u: '', ok: false, w: 0 };
+        const blockedTraversal = !!evasion && !bad.ok;
         // 4) CSS background-image 走 omnia://（全局壁纸层的真实加载方式）
         const d = document.createElement('div');
         d.style.backgroundImage = 'url("' + urls[0] + '")';
@@ -2559,6 +2674,7 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         return {
           ok: true, steps: [],
           value: { results, fetchStatus, blockedTraversal, cssOk, cssVal, dataOk, fileRes,
+                   evasion, evasionOk: bad.ok,
                    origin: location.origin, csp: (document.querySelector('meta[http-equiv="Content-Security-Policy"]') || {}).content || '' },
         };
       })()`, '探针13');
@@ -2566,22 +2682,32 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
       type WallProbe = {
         results: { u: string; ok: boolean; w: number }[];
         fetchStatus: string; blockedTraversal: boolean; cssOk: boolean; cssVal: string;
-        dataOk: boolean; fileRes: { ok: boolean; w: number }; origin: string; csp: string;
+        dataOk: boolean; fileRes: { ok: boolean; w: number };
+        evasion: string; evasionOk: boolean;
+        origin: string; csp: string;
       };
       const wp = (wallProbe.value as WallProbe | undefined) ?? {
         results: [], fetchStatus: 'n/a', blockedTraversal: false, cssOk: false, cssVal: '',
-        dataOk: false, fileRes: { ok: false, w: 0 }, origin: '', csp: '',
+        dataOk: false, fileRes: { ok: false, w: 0 },
+        evasion: '', evasionOk: false, origin: '', csp: '',
       };
       const cspAllowsOmnia = /img-src[^;]*omnia:/.test(wp.csp) && /media-src[^;]*omnia:/.test(wp.csp);
       const allLoaded = wp.results.length > 0 && wp.results.every((x) => x.ok);
+      /* 探针是否"真的架起来了"：拿不到 evasionUrl（样本图缺失）就不算通过，
+         免得又退化成一条永远 PASS 的空转断言。 */
+      const traversalArmed = evasionUrl !== '' && wp.evasion === evasionUrl;
       const wallOk = cspAllowsOmnia && allLoaded && wp.fetchStatus === '200'
-        && wp.blockedTraversal && wp.cssOk && wp.dataOk;
+        && traversalArmed && wp.blockedTraversal && wp.cssOk && wp.dataOk;
       log('[smoke] 壁纸页面来源      :', wp.origin);
       log('[smoke] CSP 含 omnia:      :', cspAllowsOmnia ? 'PASS' : 'FAIL');
       log('[smoke] omnia:// 图片加载  :', allLoaded ? 'PASS' : 'FAIL',
         wp.results.map((x) => `${x.u.split('/').pop()}:${x.ok ? x.w + 'px' : '失败'}`).join(' '));
       log('[smoke] omnia:// fetch     :', wp.fetchStatus === '200' ? 'PASS' : 'FAIL', `status=${wp.fetchStatus}`);
-      log('[smoke] 目录穿越被挡      :', wp.blockedTraversal ? 'PASS' : 'FAIL');
+      log('[smoke] 目录穿越被挡      :', wp.blockedTraversal && traversalArmed ? 'PASS' : 'FAIL',
+        `试探=${wp.evasion || '（未构造出）'} 结果=${wp.evasionOk ? '竟然加载成功 ✗' : '已挡住 ✓'}`);
+      if (!traversalArmed) {
+        log('[smoke] ⚠️ 目录穿越探针没架起来（样本图缺失或 URL 没送到渲染层）→ 按 FAIL 计');
+      }
       log('[smoke] CSS 背景 omnia://  :', wp.cssOk ? 'PASS' : 'FAIL');
       log('[smoke] dataURL 兜底       :', wp.dataOk ? 'PASS' : 'FAIL');
       return wallOk;
@@ -2589,7 +2715,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
 
     const pass =
       r.preload && r.appInfo && r.classes === 12 && r.players >= 0 &&
-      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && alias.ok === true
+      Number(rootHtml) > 100 && crud.ok === true && m3.ok === true && atomic.ok === true
+      && alias.ok === true
       && opp.ok === true && manual.ok === true && rdrag.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
       && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true

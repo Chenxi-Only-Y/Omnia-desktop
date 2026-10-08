@@ -7,7 +7,7 @@
  *     → combat_stat（14 项战报）
  * 参战名单默认从上一场的阵容继承（原表是手工维护「排表」，这里做成一键继承）。
  */
-import type { SqlDatabase, SqlValue } from '../db';
+import { inTransaction, type SqlDatabase, type SqlValue } from '../db';
 import type {
   AssignInput, CombatStat, Match, MatchInput, MatchSummary, NoteRole, PartState,
   ParticipationInput, ParticipationRow,
@@ -15,6 +15,27 @@ import type {
 import { BENCH_SQUADS, EMPTY_COMBAT_STAT, findClass, tacticKind } from '../../shared/domain';
 import type { MatchScoreInput, MatchScoreOutput } from '../../shared/scoreEngine';
 import { SquadRepo } from './squadRepo';
+import { PlayerRepo } from './playerRepo';
+
+/** 战报导入的单行计划：分类（我方 / 对方 / 丢弃）由调用方判定，仓储只负责写 */
+export interface StatImportRow {
+  kind: 'our' | 'opp' | 'skip';
+  /** kind='our' 且为 null 时按 gameId/name 自动建档（完整名单模式） */
+  playerId: number | null;
+  gameId: string;
+  name: string;
+  classUsed: string;
+  squad: string;
+  stat: CombatStat;
+}
+
+export interface StatImportSummary {
+  written: number;
+  created: number;
+  oppWritten: number;
+  oppCreated: number;
+  skipped: number;
+}
 
 interface MatchRow {
   id: number; date: string; index_in_day: number;
@@ -91,9 +112,14 @@ const STAT_COLUMNS: [keyof CombatStat, string][] = [
 export class MatchRepo {
   private squads: SquadRepo;
 
-  /* 同上：连接是"取当前"的，SquadRepo 也一起透传 */
+  /* 战报导入要"给不在主档的人建档 / 收编对手"，所以这里也持有一个成员仓储。
+     与 SquadRepo 同样只透传 getDb，不共享可变状态（见 playerRepo 的构造注释）。 */
+  private players: PlayerRepo;
+
+  /* 同上：连接是"取当前"的，SquadRepo / PlayerRepo 也一起透传 */
   constructor(private getDb: () => SqlDatabase) {
     this.squads = new SquadRepo(getDb);
+    this.players = new PlayerRepo(getDb);
   }
 
   private get db(): SqlDatabase { return this.getDb(); }
@@ -555,6 +581,59 @@ export class MatchRepo {
     ).get(matchId, playerId) as { id: number };
     if (input.stat) this.saveStat(row.id, input.stat);
     return row.id;
+  }
+
+  /**
+   * 战报导入入库 —— **整批一个事务**。
+   *
+   * 为什么要有这个方法（HANDOFF 待办 2 / README「已知残留」）：
+   * 导入的行循环原先直接写在 `ipc.ts` 的 IPC 处理器里，**没有事务**：
+   * 只要某一行在**写库时**抛错（小队名对不上、职业不在 12 职业表内、库约束…），
+   * 前面几行就已经落库了 = 半截数据（审计 2026-09-30）。
+   * 当时的缓解办法是"把 UNKNOWN_CLASS 提前当硬错误拦住"——治标不治本：
+   * 校验拦得住今天认识的错误，拦不住明天新增的任何一种。
+   * 现在把循环收进仓储层、外面套一个 SAVEPOINT 事务：任一行失败 → 整批回滚，
+   * 库里要么全是这一批，要么一行都没有。
+   *
+   * 事务用 SAVEPOINT 而不是 BEGIN：见 `db.ts` 的 `inTransaction` 注释
+   * （node:sqlite 不支持嵌套事务，而 create() 内部还会用 SAVEPOINT）。
+   */
+  importStats(matchId: number, plan: StatImportRow[]): StatImportSummary {
+    if (!this.get(matchId)) throw new Error(`对局不存在：id=${matchId}`);
+    const out: StatImportSummary = {
+      written: 0, created: 0, oppWritten: 0, oppCreated: 0, skipped: 0,
+    };
+    inTransaction(this.db, 'stat_import', () => {
+      for (const row of plan) {
+        if (row.kind === 'skip') { out.skipped += 1; continue; }
+
+        if (row.kind === 'opp') {
+          const made = this.players.upsertOpponent(row.gameId || row.name);
+          if (made.created) out.oppCreated += 1;
+          this.upsertOppParticipation({
+            matchId, playerId: made.id, classUsed: row.classUsed, stat: row.stat,
+          });
+          out.oppWritten += 1;
+          continue;
+        }
+
+        let playerId = row.playerId;
+        if (playerId === null) {
+          // 完整名单模式：为不在主档的人自动建档（职业不进主档，它只从报名表来）
+          const made = this.players.create({
+            gameId: row.gameId || row.name,
+            name: row.name,
+          });
+          playerId = made.id;
+          out.created += 1;
+        }
+        this.upsertParticipation({
+          matchId, playerId, classUsed: row.classUsed, squad: row.squad, stat: row.stat,
+        });
+        out.written += 1;
+      }
+    });
+    return out;
   }
 
   /**

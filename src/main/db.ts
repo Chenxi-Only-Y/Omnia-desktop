@@ -789,3 +789,32 @@ export function runMigrations(db: SqlDatabase): { from: number; to: number; appl
   }
   return { from, to: currentVersion(db), applied };
 }
+
+/**
+ * 把一段写操作包成一个事务（用 **SAVEPOINT** 而不是 BEGIN，因此可以安全嵌套）。
+ *
+ * 为什么不用 BEGIN：`node:sqlite` 不支持嵌套事务 —— 仓储里已经有多处 BEGIN
+ * （`PlayerRepo.importMany` / `reorder`、`MatchRepo.assignBulk` / `saveScores` …），
+ * 外层再来一个 BEGIN 会抛 `cannot start a transaction within a transaction`
+ * （自检实测到过，见 `PlayerRepo.sp` 的注释）。
+ * SAVEPOINT 在"事务里"和"事务外"都能用：在最外层用它等于开一个延迟事务，
+ * RELEASE 时提交；内层已有的 SAVEPOINT（如 `PlayerRepo.sp`）也能正常叠进去。
+ *
+ * ⚠️ 仍然**不能**在 fn 里调用自己会 `BEGIN` 的方法（importMany / reorder /
+ *    assignBulk / saveScores / clearStats …）—— 那是 SQLite 的硬限制，这里绕不开。
+ *    战报导入那条链路调用的是 create / upsertOpponent / upsertParticipation
+ *    / upsertOppParticipation，它们都不开事务，所以安全。
+ */
+export function inTransaction<T>(db: SqlDatabase, name: string, fn: () => T): T {
+  const sp = `sp_${name}`.replace(/[^A-Za-z0-9_]/g, '_');
+  db.exec(`SAVEPOINT ${sp}`);
+  try {
+    const out = fn();
+    db.exec(`RELEASE ${sp}`);
+    return out;
+  } catch (err) {
+    db.exec(`ROLLBACK TO ${sp}`);
+    db.exec(`RELEASE ${sp}`);
+    throw err;
+  }
+}

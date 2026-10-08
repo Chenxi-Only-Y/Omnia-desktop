@@ -7,6 +7,7 @@
   "main": "dist/main/main.js",
   "scripts": {
     "clean": "node scripts/clean.mjs",
+    "clean:release": "node scripts/clean.mjs --release",
     "fix:electron": "node scripts/fix-electron.mjs",
     "postinstall": "node scripts/fix-electron.mjs",
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
@@ -17,8 +18,11 @@
     "dev": "node scripts/dev.mjs",
     "start:only": "electron .",
     "smoke": "npm run build && node scripts/smoke.mjs",
-    "dist": "npm run build && electron-builder --win --x64",
-    "dist:dir": "npm run build && electron-builder --win --x64 --dir"
+    "css:audit": "node scripts/css-audit.mjs",
+    "css:stats": "node scripts/css-audit.mjs --only=stats",
+    "css:prune": "node scripts/css-prune.mjs",
+    "dist": "npm run clean:release && npm run build && electron-builder --win --x64",
+    "dist:dir": "npm run clean:release && npm run build && electron-builder --win --x64 --dir"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

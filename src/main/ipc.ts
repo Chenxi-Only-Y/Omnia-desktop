@@ -16,7 +16,7 @@ import { parseSignupGrid } from '../shared/signupImport';
 import type { SqlDatabase } from './db';
 import { GuildStore, isGlobalSetting } from './guilds';
 import { PlayerRepo } from './repositories/playerRepo';
-import { MatchRepo } from './repositories/matchRepo';
+import { MatchRepo, type StatImportRow } from './repositories/matchRepo';
 import { SquadRepo } from './repositories/squadRepo';
 import { DashboardRepo } from './repositories/dashboardRepo';
 import { SignupRepo } from './repositories/signupRepo';
@@ -517,59 +517,34 @@ export function registerIpc(ctx: IpcContext): void {
     if (oppMode === 'block' && errRows.length) {
       throw new Error(`有 ${errRows.length} 行存在错误，已阻止入库；请先修正后再提交`);
     }
-    /* ⚠️ UNKNOWN_CLASS 在解析层是 warn 级 ✗，但仓储层写库时会因"职业不在 12 职业表内"抛错 ✓，
-       而循环没有事务 → 前面几行已经入库 = 半截数据（审计 2026-09-30）。
-       所以这里把它一并当硬错误拦住（与"整批拦住"的语义一致）✓ */
+    /* ⚠️ UNKNOWN_CLASS 在解析层是 warn 级 ✗，但仓储层写库时会因"职业不在 12 职业表内"抛错 ✓。
+        现在写入已经收进 `MatchRepo.importStats` 的**一个事务**里（HANDOFF 待办 2），
+        半截数据在结构上已经不可能出现；这里仍然把它当硬错误拦住，
+        是为了"整批拦住"的语义一致（能提前告诉用户哪一行不对，而不是等到写库才报）。 */
     const hard = errRows.filter((r) =>
       r.issues.some((i) => (i.level === 'error' && i.code !== 'NOT_IN_ROSTER') || i.code === 'UNKNOWN_CLASS'));
     if (hard.length) {
       throw new Error(`有 ${hard.length} 行存在错误，已阻止入库；请先修正后再提交`);
     }
 
-    let written = 0;
-    let created = 0;
-    let oppWritten = 0;
-    let oppCreated = 0;
-    let skipped = 0;
-    for (const row of preview.rows) {
+    /* 分类在这里判定（它依赖预览行的 issues 语义），**写入交给仓储层**：
+       仓储层用一个 SAVEPOINT 事务包住整批 —— 任一行写失败则整批回滚。 */
+    const plan: StatImportRow[] = preview.rows.map((row) => {
       /* 判定"这是对方的人"：没匹配到主档，且原因是严格模式的「不在成员主档」错误。
          其它情况（完整模式下预览没给 playerId 等）都按我方走 —— 会自动建档。 */
       const isOpp = row.playerId === null
         && row.issues.some((i) => i.code === 'NOT_IN_ROSTER' && i.level === 'error');
-      if (isOpp) {
-        if (oppMode !== 'store') { skipped++; continue; }
-        const made = players.upsertOpponent(row.gameId || row.name);
-        if (made.created) oppCreated++;
-        matches.upsertOppParticipation({
-          matchId,
-          playerId: made.id,
-          classUsed: row.classUsed,
-          stat: row.stat,
-        });
-        oppWritten++;
-        continue;
-      }
-      let playerId = row.playerId;
-      if (playerId === null) {
-        // 完整名单模式：为不在主档的人自动建档
-        // （职业不进主档：它只从报名表来，这里只建 ID）
-        const made = players.create({
-          gameId: row.gameId || row.name,
-          name: row.name,
-        });
-        playerId = made.id;
-        created++;
-      }
-      matches.upsertParticipation({
-        matchId,
-        playerId,
+      return {
+        kind: isOpp ? (oppMode === 'store' ? 'opp' : 'skip') : 'our',
+        playerId: row.playerId,
+        gameId: row.gameId || row.name,
+        name: row.name,
         classUsed: row.classUsed,
         squad: row.squad,
         stat: row.stat,
-      });
-      written++;
-    }
-    return { written, created, oppWritten, oppCreated, skipped };
+      };
+    });
+    return matches.importStats(matchId, plan);
   }));
 
   // ── 元数据 ─────────────────────────────────────────────────────

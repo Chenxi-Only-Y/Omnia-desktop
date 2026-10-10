@@ -134,7 +134,10 @@ typecheck 通过 ✓
    - 剩余候选：**4 组"笔误候选"要人拍板**（`npm run css:prune` 的末尾会把它们列出来）：
      `.mcard__media` 重复 `background`（后者胜，可删前一条 ✓）·
      `.md-bg video, .md-bg img` 重复两条 `mask-image`（后者胜 = 现在的"黑区旋钮"，可删前一条 ✓）·
-     `.mcard__body{position:relative}` 吃掉 4 处 `absolute`（**会改观感** ✗ 不是笔误）·
+     ~~`.mcard__body{position:relative}` 吃掉 4 处 `absolute`~~ ✅ **2026-10-10 已修**：
+     用户截图报障「状态 / 麦克风三角标没了」—— 那条统一抬层级的规则把
+     `.mcard__order/__tri/__more/__quick` 一起改成了 relative，行内 `<span>` 宽高归零 → 看不见。
+     现在只有 `.mcard__body` 保留 `position:relative;z-index:1`，其余四个保持各自的 absolute 贴角 ✓
      `.sel__btn` 磨砂被后一条改回不透明（要恢复磨砂得改**后面**那条）
    - `npm run css:audit` 还会报"候选死选择器"（必要条件，**必须人工确认**）：
      `.brand` 那一组是活的（首页品牌块），扫不到引用是因为它由 JS 动态拼 —— 别照报告删 ✗
@@ -191,6 +194,10 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
     的元素**照样生效**，所以"点得到"不等于"看得见"。2026-10-08 的线上 bug 就是这么漏掉的（见下条）。
     **凡是"用户要能看见 / 点到"的东西，断言里必须查 `getBoundingClientRect()` 的真实尺寸
     加上 `getComputedStyle().display`** —— 报名页签那条探针现在就是这么断言的（`tabsVisible`）。
+    ⚠️ 同族的第三种漏法（2026-10-10）：**元素在流里、但宽高归零**。卡片上的状态/麦克风三角标是
+    行内 `<span>` + `clip-path`，本该 `position:absolute` 贴角落；被别的规则改成 `relative` 之后
+    宽高归零 → 用户完全看不见，而"卡片数 / 卡片高度"这些断言**照样全绿** ✗。
+    所以断言要连**位置**一起查：`卡片角落: 状态三角 26x26 贴右=1 贴上=1 ✓`（self-check 探针3c）。
 12. ⚠️ **给某个页面写的"隐藏 / 拍平"规则，一定要带页面限定前缀**：`.gpage` 是**所有帮会页共用的外壳**
     （`App.tsx` 每页都套 `gpage`）。上一轮为成员主页写的
     `.gpage :has(> button.tab) { display:none !important }` **漏了 `.content.md-snap`**，

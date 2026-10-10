@@ -828,6 +828,33 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         steps.push('在帮列表里还看得到离帮的人吗: ' + (stillInActive ? '看得到（异常！）' : '看不到')
           + ' ｜ 卡片数=' + document.querySelectorAll('.mcard').length);
         steps.push('卡片高度对照 离帮=' + leftH + ' 在帮=' + activeH + '（必须相等）');
+
+        /* ⚠️ 卡片角落元素必须**真的看得见、并且贴在角上**（2026-10-10 用户截图报障：
+           状态 / 麦克风两个三角标整块消失）。原因：它们靠 absolute 贴右上/右下，
+           一旦被别的规则改成 relative，行内 span 的宽高归零 → 用户看不见，
+           而"卡片数 / 卡片高度"这类断言**照样通过** ✗ —— 又是一次"探针看不见用户看到的"。
+           判据：尺寸 > 0、display 不是 none、并且真的贴在那条边上（1px 容差给卡片边框）。 */
+        const cornerCheck = (sel, side) => {
+          const el = document.querySelector('.mcard ' + sel);
+          const card = el && el.closest('.mcard');
+          if (!el || !card) return { ok: false, info: sel + ' 找不到' };
+          const r = el.getBoundingClientRect();
+          const c = card.getBoundingClientRect();
+          const right = Math.round(c.right - r.right);
+          const edge = side === 'top' ? Math.round(r.top - c.top) : Math.round(c.bottom - r.bottom);
+          const visible = r.width > 0 && r.height > 0 && getComputedStyle(el).display !== 'none';
+          const ok = visible && right <= 2 && edge <= 2;
+          return {
+            ok,
+            info: sel + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)
+              + ' 贴右=' + right + ' 贴' + (side === 'top' ? '上' : '下') + '=' + edge
+              + (ok ? ' ✓' : ' ✗'),
+          };
+        };
+        const triStatus = cornerCheck('.mcard__tri--status', 'top');
+        const triMic = cornerCheck('.mcard__tri--mic', 'bottom');
+        const cornerOk = triStatus.ok && triMic.ok;
+        steps.push('卡片角落: 状态三角 ' + triStatus.info + ' ｜ 麦克风三角 ' + triMic.info);
         clickTab('离帮人员');
         const back2 = await waitFor(() => [...document.querySelectorAll('.mcard')]
           .find(c => c.textContent.includes('smoke_manual_1')), '回到离帮列表');
@@ -851,7 +878,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
             && rowBtns.includes('删除') && rowBtns.includes('复帮') && !rowBtns.includes('编辑')
             && !stillInActive
             && bd.stats.joined >= 1
-            && popOnTop,   // 浮层必须真的在最上层（不能被后面的卡片/表格盖住）
+            && popOnTop      // 浮层必须真的在最上层（不能被后面的卡片/表格盖住）
+            && cornerOk,     // 卡片两个三角标必须看得见且贴在右上/右下
           steps,
         };
       } catch (e) {

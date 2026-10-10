@@ -411,7 +411,9 @@ npm run dist
 - 样式表里仍有约 4 组「笔误候选」需要人拍板才能删（脚本只报告不删）：
   `.mcard__media` 重复 `background`（后者胜，可删前一条）·
   `.md-bg video, .md-bg img` 重复两条 `mask-image`（后者胜 = 现在的"黑区旋钮"，可删前一条）·
-  `.mcard__body{position:relative}` 吃掉 4 处 `absolute`（**删了会改观感**，不是笔误）·
+  ~~`.mcard__body{position:relative}` 吃掉 4 处 `absolute`~~ → **2026-10-10 已修**：
+  那条规则连带把 `.mcard__order/__tri/__more/__quick` 改成 relative，行内 span 宽高归零
+  → 卡片上的状态 / 麦克风三角标整块消失（用户截图报障）。现在只给 `.mcard__body` 加定位。
   `.sel__btn` 的磨砂被后一条改回不透明（要恢复磨砂得改后面的）
 - 安装包尚未在干净机器上端到端装过；自检个别项偶发失败，复跑即过。
 

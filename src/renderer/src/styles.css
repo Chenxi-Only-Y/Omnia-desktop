@@ -3462,8 +3462,19 @@ to {
     rgba(0, 0, 0, .88) 0%, rgba(0, 0, 0, .88) 25%,
     rgba(0, 0, 0, 0) 75%, rgba(0, 0, 0, 0) 100%);
 }
-/* 卡片里的文字与按钮浮在媒体之上 */
-.mcard__body, .mcard__order, .mcard__tri, .mcard__more, .mcard__quick { position: relative; z-index: 1; }
+/* 卡片里的文字与按钮浮在媒体之上。
+   ⚠️ 只能给 .mcard__body 加 position —— **别把下面那组也写成 position:relative** ✗：
+   .mcard__order / .mcard__tri / .mcard__more / .mcard__quick 的定位本来就是
+   **absolute 贴角落**（各自规则里写着 top/right/bottom/left），一旦被改成 relative：
+     · `.mcard__tri` 是行内 <span> → 宽高归零 → **两个三角标彻底看不见**
+       （2026-10-10 用户截图报障：「状态/麦克风三角标没了」）
+     · `.mcard__more`（···）被挤到卡片下方 9px，被 `.mcard{overflow:hidden}` 裁掉
+     · `.mcard__order`（序）从 top:8/left:12 变成随波逐流
+   实测（CDP）：修复前 状态三角 `position:relative` `display:inline` 尺寸 **0×17**、可见=false；
+   修复后 `absolute` 26×26、贴右上 / 右下 ✓ */
+.mcard__body { position:relative; z-index:1 }
+/* 这四个保持 absolute，只补 z-index，保证压在 `.mcard__media`（z-index:0）之上 */
+.mcard__order, .mcard__tri, .mcard__more, .mcard__quick { z-index:1 }
 
 
 /* ═══ 成员卡片 → 详情页 的共享元素动画（用户口径 2026-09-27）══════════════

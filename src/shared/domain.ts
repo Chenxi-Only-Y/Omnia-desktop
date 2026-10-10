@@ -19,20 +19,27 @@ export interface ClassDef {
   aliases: string[];
 }
 
-/** 12 职业：名称 / 色板 / 平衡系数 / 定位 / 别名 */
+/**
+ * 12 职业：名称 / 色板 / 平衡系数 / 定位 / 别名
+ *
+ * 别名口径（2026-10-10 用户确认）：玩家在群里接龙、填表时会写简称 ——
+ * 单字（素/玄/沧/血/铁/龙/碎/潮/神/妙）与数字俗称（90）都要认。
+ * 这里放的是**无歧义**的写法；带上下文的（「沧鸿」里的鸿算惊鸿还是妙音）
+ * 由 `signupRollcall.ts` 的接龙解析器处理，不放这儿。
+ */
 export const CLASSES: readonly ClassDef[] = [
-  { name: '素问', color: '#EF949F', coef: 0.95, role: 'HEAL', aliases: [] },
-  { name: '妙音', color: '#A4D663', coef: 1.05, role: 'HEAL', aliases: [] },
+  { name: '素问', color: '#EF949F', coef: 0.95, role: 'HEAL', aliases: ['素'] },
+  { name: '妙音', color: '#A4D663', coef: 1.05, role: 'HEAL', aliases: ['妙'] },
   { name: '惊鸿', color: '#F0BC06', coef: 1.0, role: 'DPS', aliases: ['鸿音'] },
-  { name: '九灵', color: '#B086D7', coef: 1.0, role: 'DPS', aliases: [] },
-  { name: '神相', color: '#4470C8', coef: 1.2, role: 'DPS', aliases: [] },
-  { name: '玄机', color: '#97965F', coef: 1.1, role: 'DPS', aliases: [] },
-  { name: '血河', color: '#E35569', coef: 1.1, role: 'DPS', aliases: [] },
-  { name: '铁衣', color: '#F98B1F', coef: 1.1, role: 'T', aliases: [] },
-  { name: '龙吟', color: '#32CC97', coef: 1.0, role: 'DPS', aliases: [] },
-  { name: '碎梦', color: '#27C3CD', coef: 1.4, role: 'DPS', aliases: [] },
-  { name: '沧澜', color: '#91AADF', coef: 0.95, role: 'DPS', aliases: [] },
-  { name: '潮光', color: '#2BCBFF', coef: 0.95, role: 'DPS', aliases: [] },
+  { name: '九灵', color: '#B086D7', coef: 1.0, role: 'DPS', aliases: ['90', '九零', '九〇'] },
+  { name: '神相', color: '#4470C8', coef: 1.2, role: 'DPS', aliases: ['神'] },
+  { name: '玄机', color: '#97965F', coef: 1.1, role: 'DPS', aliases: ['玄'] },
+  { name: '血河', color: '#E35569', coef: 1.1, role: 'DPS', aliases: ['血'] },
+  { name: '铁衣', color: '#F98B1F', coef: 1.1, role: 'T', aliases: ['铁'] },
+  { name: '龙吟', color: '#32CC97', coef: 1.0, role: 'DPS', aliases: ['龙'] },
+  { name: '碎梦', color: '#27C3CD', coef: 1.4, role: 'DPS', aliases: ['碎'] },
+  { name: '沧澜', color: '#91AADF', coef: 0.95, role: 'DPS', aliases: ['沧'] },
+  { name: '潮光', color: '#2BCBFF', coef: 0.95, role: 'DPS', aliases: ['潮'] },
 ] as const;
 
 /**

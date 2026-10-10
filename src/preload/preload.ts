@@ -106,6 +106,7 @@ const api = {
     set: (input: SignupInput) => invoke('signup:set', input),
     apply: (matchId: number, playerIds: number[]) => invoke('signup:apply', matchId, playerIds),
     parseSignup: (matchId: number, data: Uint8Array) => invoke('signup:parse', matchId, data),
+    parseSignupText: (matchId: number, text: string) => invoke('signup:parse-text', matchId, text),
     importSignups: (matchId: number, rows: unknown) => invoke('signup:import', matchId, rows),
     reviewSignups: (matchId: number) => invoke('signup:review', matchId),
     createMissingPlayers: (matchId: number, gameIds: string[]) =>

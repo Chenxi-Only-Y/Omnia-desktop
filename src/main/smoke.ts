@@ -1763,9 +1763,19 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
           + ' 页签「' + tab.textContent.trim() + '」 ' + Math.round(bRect.width) + 'x' + Math.round(bRect.height)
           + ' display=' + boxDisplay + ' → ' + (tabsVisible ? '看得见 ✓' : '看不见 ✗（报名点不到！）'));
 
+        /* 「粘贴接龙」入口也要**看得见**（2026-10-08 那次的教训：探针 click 得到 ≠ 用户点得到）。
+           ⚠️ 必须**点进报名页签之后**再查 —— 报名面板是 tab === 'signup' 时才挂载的，
+              在页签外面查会得到"找不到"，那是探针自己的错（第一次就是这么误报的）。 */
         tab.click();
         // 等报名表真的出现数据（只看 table 存在会太早）
         await waitFor(() => document.querySelector('.row-edit') ? true : null, '报名行（标记按钮组）');
+        const rcBtn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === '粘贴接龙');
+        const rcRect = rcBtn ? rcBtn.getBoundingClientRect() : { width: 0, height: 0 };
+        const rcVisible = !!rcBtn && rcRect.width > 0 && rcRect.height > 0
+          && getComputedStyle(rcBtn).display !== 'none';
+        steps.push('「粘贴接龙」入口: '
+          + (rcBtn ? Math.round(rcRect.width) + 'x' + Math.round(rcRect.height) : '找不到')
+          + ' → ' + (rcVisible ? '看得见 ✓' : '看不见 ✗'));
         const rows = document.querySelectorAll('table.grid tbody tr').length;
         const marks = document.querySelectorAll('table.grid .row-edit').length;
         const title = (document.querySelector('.card h3')?.textContent ?? '');
@@ -1784,12 +1794,124 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
           && byName['smoke_sg_4'] === undefined
           && jia.squad === '防守一-1'
           && rows >= 4 && marks >= 4
-          && tabsVisible;   // ← 页签栏看得见（否则用户点不到「报名」）
+          && tabsVisible && rcVisible;   // 页签栏 + 「粘贴接龙」入口都要看得见
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针9');
     for (const s of signup.steps) log('[smoke] 报名:', s);
     log('[smoke] 报名与请假        :', signup.ok ? 'PASS' : 'FAIL');
+
+    /* 探针9b：群「接龙」报名导入（用户口径 2026-10-10）
+       接龙不是表格：一行一条自由文本，写法很脏。这里把**真实样本里出现过的每种脏点**
+       都固化成断言：
+         · 简称：90→九灵、素→素问、玄→玄机、沧→沧澜
+         · 鸿（**保序**，另一个职业是奶→妙音，否则→惊鸿）：
+             奶鸿→妙音（两个字一个职业）· 素鸿→素问+妙音 · 沧鸿→沧澜+惊鸿
+             鸿潮→惊鸿+潮光 · 鸿素奶→妙音+素问 · 潮鸿→潮光+惊鸿
+         · 白龙吟→龙吟 · d鸿→惊鸿
+         · 状态与名字粘连（参加浅言九零潮光）· 名字与职业粘连（大乃霸丶素问 那种）
+         · 隐形字符（U+FFF0）挡在状态词前面
+         · 标题行「10.10联赛报名」不能被当成第 10 条
+         · 请假行写了职业 → 按现有约定清空 + 一条提示
+         · 同一人接龙两次 → duplicates
+         · 只差尾部装饰字（桃酥 ↔ 主档的 桃酥丿）→ 一条提示，不能静默算未匹配
+       ⚠️ 本文件是 TS 模板字符串：注释与字符串里**不能出现反引号**；换行要写 \\n。 */
+    const rollcall = await guarded(`(async () => {
+      const steps = smokeSteps();
+      const api = window.omnia;
+      const ids = [];
+      let mid = 0;
+      try {
+        for (const gid of ['烟雨', '桃酥丿']) {
+          const r = await api.player.create({ gameId: gid, name: gid });
+          if (!r.ok) throw new Error('建成员失败 ' + gid + ': ' + r.error);
+          ids.push(r.data.id);
+        }
+        const m = await api.match.create({
+          date: '2026-03-03', ourSide: '我方', oppSide: '对手', result: 'WIN',
+          ourTowersLeft: 5, oppTowersLeft: 0,
+        });
+        if (!m.ok) throw new Error('建对局失败: ' + m.error);
+        mid = m.data.match.id;
+
+        const SAMPLE = [
+          '#接龙',
+          '',
+          '10.10联赛报名',
+          '不接龙不默认请假！！',
+          '例 参加/请假+ID+报名职业+报名副职业',
+          '',
+          '1. 参加 烟雨 玄机',
+          '2. 参加浅言九零潮光',
+          '3. 参加 桃酥 素问',
+          '4. 参加 厌蠢 素鸿',
+          '5. 参加 我是大帅哥 沧鸿',
+          '6. 参加 欲離 鸿潮',
+          '7. 参加 忘约 鸿素奶',
+          '8. 参加 周日 奶鸿',
+          '9. 参加 梦灯此夜 潮鸿',
+          '10. 请假 寒大王 龙吟',
+          '11. 参加 素爻 妙音',
+          '12. 参加 顷歌 白龙吟',
+          '13. 参加 沉睡 d鸿',
+          '14. 参加 雲边 玄',
+          '15. 参加 左柚 素',
+          '16. 参加 诺許 沧',
+          '17. 参加 \\uFFF0\\uFFF0兮瞳90',
+          '18. 参加 烟雨 玄机',
+        ].join('\\n');
+
+        const res = await api.signup.parseSignupText(mid, SAMPLE);
+        if (!res.ok) throw new Error('解析接龙失败: ' + res.error);
+        const P = res.data;
+        const by = {};
+        for (const r of P.rows) { (by[r.gameId] = by[r.gameId] || []).push(r); }
+        const cls = (n) => (by[n] || []).map((r) => (r.mainClass || '-') + '/' + (r.subClass || '-')).join(' | ');
+        const st = (n) => (by[n] || []).map((r) => r.status).join(' | ');
+        const warns = (P.warnings || []).map((w) => w.reason);
+        const hasWarn = (frag) => warns.some((w) => w.indexOf(frag) >= 0);
+
+        const joinN = P.rows.filter((r) => r.status === 'JOIN').length;
+        const leaveN = P.rows.filter((r) => r.status === 'LEAVE').length;
+        steps.push('条目=' + P.rows.length + '（参加 ' + joinN + ' / 请假 ' + leaveN + '）'
+          + ' 无效=' + P.invalid.length + ' 提示=' + warns.length);
+        steps.push('简称: 烟雨=' + cls('烟雨') + ' · 浅言=' + cls('浅言') + ' · 雲边=' + cls('雲边')
+          + ' · 左柚=' + cls('左柚') + ' · 诺許=' + cls('诺許') + ' · 兮瞳=' + cls('兮瞳'));
+        steps.push('鸿: 厌蠢=' + cls('厌蠢') + ' · 我是大帅哥=' + cls('我是大帅哥') + ' · 欲離=' + cls('欲離')
+          + ' · 忘约=' + cls('忘约') + ' · 周日=' + cls('周日') + ' · 梦灯此夜=' + cls('梦灯此夜'));
+        steps.push('其它: 顷歌=' + cls('顷歌') + ' · 沉睡=' + cls('沉睡') + ' · 素爻=' + cls('素爻')
+          + ' · 寒大王[' + st('寒大王') + ']=' + cls('寒大王'));
+        steps.push('重复=' + JSON.stringify(P.duplicates.map((d) => d.gameId + '(' + d.lines.join(',') + ')')));
+        steps.push('未匹配里含桃酥=' + (P.unmatched.indexOf('桃酥') >= 0)
+          + ' 含烟雨=' + (P.unmatched.indexOf('烟雨') >= 0) + ' 共 ' + P.unmatched.length + ' 个');
+        steps.push('提示: 标题行=' + hasWarn('编号后不是') + ' 尾饰字=' + hasWarn('桃酥丿')
+          + ' 请假写职业=' + hasWarn('请假行写了职业') + ' 粘连=' + hasWarn('没有空格'));
+
+        const ok = P.rows.length === 18 && joinN === 17 && leaveN === 1
+          && cls('烟雨') === '玄机/- | 玄机/-'
+          && cls('浅言') === '九灵/潮光'
+          && cls('雲边') === '玄机/-' && cls('左柚') === '素问/-'
+          && cls('诺許') === '沧澜/-' && cls('兮瞳') === '九灵/-'
+          && cls('厌蠢') === '素问/妙音' && cls('我是大帅哥') === '沧澜/惊鸿'
+          && cls('欲離') === '惊鸿/潮光' && cls('忘约') === '妙音/素问'
+          && cls('周日') === '妙音/-' && cls('梦灯此夜') === '潮光/惊鸿'
+          && cls('顷歌') === '龙吟/-' && cls('沉睡') === '惊鸿/-' && cls('素爻') === '妙音/-'
+          && st('寒大王') === 'LEAVE' && cls('寒大王') === '-/-'
+          && P.duplicates.length === 1 && P.duplicates[0].gameId === '烟雨'
+          && P.unmatched.indexOf('桃酥') >= 0 && P.unmatched.indexOf('烟雨') < 0
+          && hasWarn('编号后不是') && hasWarn('桃酥丿') && hasWarn('请假行写了职业');
+        return { ok, steps };
+      } catch (e) {
+        return { ok: false, steps: steps.concat('ERR ' + String(e)) };
+      } finally {
+        try {
+          if (mid) await api.match.remove(mid);
+          for (const id of ids) await api.player.remove(id);
+        } catch (e2) { /* 清理失败不影响断言 */ }
+      }
+    })()`, '探针9b');
+    for (const s of rollcall.steps) log('[smoke] 接龙:', s);
+    log('[smoke] 接龙报名导入      :', rollcall.ok ? 'PASS' : 'FAIL');
 
     // 规则集：默认值/校验/新建/版本递增/编辑/另存/激活/删除保护/页面渲染
     const rules = await guarded(`(async () => {
@@ -2739,7 +2861,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
       && alias.ok === true
       && opp.ok === true && manual.ok === true && rdrag.ok === true && m5.ok === true
       && m6.ok === true && m7.ok === true && wizard.ok === true && dnd.ok === true
-      && detail.ok === true && signup.ok === true && rules.ok === true && guide.ok === true
+      && detail.ok === true && signup.ok === true && rollcall.ok === true
+      && rules.ok === true && guide.ok === true
       && scoring.ok === true && iconOk && lineup.ok === true
       && geom.ok === true && slot.ok === true && cap.ok === true && sgImp.ok === true
       && wallOk === true

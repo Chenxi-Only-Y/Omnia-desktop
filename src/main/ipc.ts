@@ -13,6 +13,7 @@ import type {
 import { buildPreview, type RosterEntry } from '../shared/statImport';
 import { detectHeaderRow, listSheets, readXlsx } from './xlsx';
 import { parseSignupGrid } from '../shared/signupImport';
+import { parseSignupRollcall } from '../shared/signupRollcall';
 import type { SqlDatabase } from './db';
 import { GuildStore, isGlobalSetting } from './guilds';
 import { PlayerRepo } from './repositories/playerRepo';
@@ -694,6 +695,49 @@ export function registerIpc(ctx: IpcContext): void {
     const inRoster = new Set(signup.board(matchId).rows.map((r) => r.gameId));
     const unmatched = [...new Set(preview.rows.map((r) => r.gameId).filter((id) => !inRoster.has(id)))];
     return { ...preview, unmatched, matchedCount: preview.rows.length - unmatched.length };
+  }));
+
+  /* 解析群「接龙」文本：输出与 xlsx **同一个**预览结构，所以后面的
+     「逐行编辑 → 入库 → 未匹配补建」整条链路一行都不用改。
+     这里额外做两件 xlsx 那条链路不需要的事：
+       ① 把库里「职业字典」的别名喂给解析器（用户在设置页加的写法也能认）；
+       ② 名字只差尾部装饰字（丶丿丷…）时给一条**提示** —— 接龙里「桃酥丿」常写成
+          「桃酥」，直接算未匹配会让用户补建出一个重复成员。只提示、不自动匹配：
+          认错人比多点一下更糟（用户口径：导入过后可以检查修改）。 */
+  ipcMain.handle(IPC.signupParseText, safe((matchId: number, text: string) => {
+    const aliasMap: Record<string, string> = {};
+    for (const r of ctx.db().prepare('SELECT name, aliases FROM class').all() as
+      { name: string; aliases: string }[]) {
+      for (const a of String(r.aliases || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+        if (!aliasMap[a]) aliasMap[a] = r.name;
+      }
+    }
+    const preview = parseSignupRollcall(text, aliasMap);
+
+    const roster = signup.board(matchId).rows;
+    // 名字与角色ID都可能被写进接龙 → 两个键都算「在主档里」
+    const inRoster = new Set<string>();
+    for (const r of roster) { inRoster.add(r.gameId); inRoster.add(r.name); }
+    const unmatched = [...new Set(preview.rows.map((r) => r.gameId).filter((id) => !inRoster.has(id)))];
+
+    const strip = (s: string) => s.replace(/[丶乄丿丷乀乁丨卩彡灬゛〃·．.,、]+$/u, '');
+    const byStripped = new Map<string, string>();
+    for (const r of roster) {
+      const k = strip(r.gameId);
+      if (k && !byStripped.has(k)) byStripped.set(k, r.gameId);
+    }
+    const warnings = [...(preview.warnings ?? [])];
+    for (const id of unmatched) {
+      const hit = byStripped.get(strip(id));
+      if (hit && hit !== id) {
+        warnings.push({
+          line: 0,
+          reason: `「${id}」在主档里没有，但去掉尾部装饰字后有「${hit}」`
+            + `——确认是同一人就把预览里的名字改成「${hit}」`,
+        });
+      }
+    }
+    return { ...preview, unmatched, warnings, matchedCount: preview.rows.length - unmatched.length };
   }));
 
   ipcMain.handle(IPC.signupImport, safe((matchId: number, rows: SignupImportRow[]) => {

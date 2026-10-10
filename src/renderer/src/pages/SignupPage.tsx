@@ -46,8 +46,15 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
   const [q, setQ] = useState('');
   /** 导入预览：**可直接编辑**的行（改完再入库） */
   const [importRows, setImportRows] = useState<SignupImportRow[] | null>(null);
-  /** 解析出来的元信息（列名、无法识别行）—— 这些不随编辑变化 */
-  const [importMeta, setImportMeta] = useState<Pick<SignupImportPreview, 'headers' | 'headerRow' | 'invalid'> | null>(null);
+  /** 解析出来的元信息（列名、无法识别行、提示）—— 这些不随编辑变化 */
+  const [importMeta, setImportMeta] = useState<
+    Pick<SignupImportPreview, 'headers' | 'headerRow' | 'invalid' | 'warnings'> | null
+  >(null);
+  /** 预览来源：xlsx 表单 / 群「接龙」—— 只影响标题与提示措辞 */
+  const [importSource, setImportSource] = useState<'xlsx' | 'rollcall'>('xlsx');
+  /** 粘贴接龙：浮层开关与文本 */
+  const [rollcallOpen, setRollcallOpen] = useState(false);
+  const [rollcallText, setRollcallText] = useState('');
   /** 交叉核对：本场未填表 / 报名有主档没有 */
   const [review, setReview] = useState<SignupReview | null>(null);
   const [busy, setBusy] = useState(false);
@@ -125,7 +132,8 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
       const data = new Uint8Array(await file.arrayBuffer());
       const pv = await api.signup.parse(matchId, data);
       setImportRows(pv.rows.map((r) => ({ ...r })));
-      setImportMeta({ headers: pv.headers, headerRow: pv.headerRow, invalid: pv.invalid });
+      setImportMeta({ headers: pv.headers, headerRow: pv.headerRow, invalid: pv.invalid, warnings: pv.warnings });
+      setImportSource('xlsx');
       setError(null);
       setNotice(null);
       setImportError(null);
@@ -139,9 +147,35 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
     }
   }
 
+  /**
+   * 粘贴群「接龙」→ 解析出预览（不入库）。
+   * 与 xlsx 走**同一个**预览/编辑/入库流程（用户口径 2026-10-10：
+   * 「导入过后可以检查修改」）—— 所以这里只负责拿到 rows，后面的处理完全一致。
+   */
+  async function handleRollcallParse() {
+    const text = rollcallText.trim();
+    if (!text) { setImportError('请先把接龙内容粘贴进来'); return; }
+    setBusy(true);
+    try {
+      const pv = await api.signup.parseText(matchId, text);
+      setImportRows(pv.rows.map((r) => ({ ...r })));
+      setImportMeta({ headers: pv.headers, headerRow: pv.headerRow, invalid: pv.invalid, warnings: pv.warnings });
+      setImportSource('rollcall');
+      setRollcallOpen(false);
+      setError(null);
+      setNotice(null);
+      setImportError(null);
+    } catch (err) {
+      setImportRows(null);
+      setImportMeta(null);
+      setError(`解析接龙失败：${errText(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /** 改预览里的一行（ID / 参加请假 / 麦 / 主职 / 副职 都可改） */
-  function patchImportRow(idx: number, patch: Partial<SignupImportRow>) {
-    setImportRows((rows) => (rows ? rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)) : rows));
+  function patchImportRow(idx: number, patch: Partial<SignupImportRow>) {    setImportRows((rows) => (rows ? rows.map((r, i) => (i === idx ? { ...r, ...patch } : r)) : rows));
   }
 
   function removeImportRow(idx: number) {
@@ -324,6 +358,41 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
           <button className="btn primary" disabled={busy} onClick={() => fileRef.current?.click()}>
             {busy ? '处理中…' : '导入报名表 xlsx'}
           </button>
+          {/* 群接龙：报名不止 xlsx 一种来源（用户口径 2026-10-10）。
+              整条粘贴即可 —— 标题行/群公告会自动跳过，职业可写简称。 */}
+          <span className="pop-wrap">
+            <button className="btn" disabled={busy} onClick={() => setRollcallOpen((v) => !v)}>
+              粘贴接龙
+            </button>
+            {rollcallOpen && (
+              <div className="pop pop--in" onClick={(e) => e.stopPropagation()} style={{ width: 480 }}>
+                <div className="pop__head">
+                  <h3 style={{ margin: 0 }}>粘贴群接龙</h3>
+                  <span className="grow" />
+                  <button className="btn ghost sm" onClick={() => setRollcallOpen(false)}>关闭</button>
+                </div>
+                <div className="hint" style={{ marginBottom: 6 }}>
+                  把群里那条接龙整条复制进来就行（标题行、群公告会自动跳过）。
+                  每条形如「1. 参加 名字 职业」，职业可以写简称：90 / 素 / 玄 / 沧 / 血 / 铁 / 龙 / 碎 / 潮 / 神。
+                  解析完会出现预览表，逐行都能改。
+                </div>
+                <textarea
+                  className="input"
+                  style={{ width: '100%', minHeight: 190, fontFamily: 'inherit', fontSize: 12, resize: 'vertical' }}
+                  placeholder={'#接龙\n\n10.10联赛报名\n\n1. 参加 秋丶 玄机\n2. 参加 浅言 素问'}
+                  value={rollcallText}
+                  onChange={(e) => setRollcallText(e.target.value)}
+                />
+                {importError && <div className="msg error">{importError}</div>}
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button className="btn primary" disabled={busy} onClick={() => void handleRollcallParse()}>
+                    {busy ? '解析中…' : '解析预览'}
+                  </button>
+                  <button className="btn ghost" onClick={() => setRollcallText('')}>清空</button>
+                </div>
+              </div>
+            )}
+          </span>
           <button className="btn" onClick={() => void markAllPendingJoin()}>
             未报名者全部标为参加
           </button>
@@ -466,11 +535,26 @@ export default function SignupPage({ matchId, matchLabel, classes, classMap, onB
         <div className="modal" onClick={() => setImportRows(null)}>
           <div className="modal__box modal__box--wide" onClick={(e) => e.stopPropagation()}>
             <div className="modal__head">
-              <h3>报名表预览 · 共 {importRows.length} 条（可直接修改）</h3>
+              <h3>
+                {importSource === 'rollcall' ? '接龙预览' : '报名表预览'} · 共 {importRows.length} 条（可直接修改）
+              </h3>
               <button className="btn sm ghost" onClick={() => { setImportRows(null); setImportError(null); }}>关闭</button>
             </div>
 
             {importError && <div className="msg error">{importError}</div>}
+            {/* 接龙解析的**提示**（不是错误）：粘连、简称、鸿 的判定、请假行写了职业…
+                用户口径：导入过后可以检查修改 —— 所以一律列出来，不静默吞掉。 */}
+            {importSource === 'rollcall' && importMeta?.warnings && importMeta.warnings.length > 0 && (
+              <details className="msg warn" open>
+                <summary>解析提示 {importMeta.warnings.length} 条（不影响入库，照着预览改即可）</summary>
+                <div style={{ maxHeight: 132, overflow: 'auto', marginTop: 6, fontSize: 12, lineHeight: 1.6 }}>
+                  {importMeta.warnings.slice(0, 40).map((w, i) => (
+                    <div key={i}>{w.line ? `第 ${w.line} 行：` : '整体：'}{w.reason}</div>
+                  ))}
+                  {importMeta.warnings.length > 40 && <div>…其余 {importMeta.warnings.length - 40} 条</div>}
+                </div>
+              </details>
+            )}
             {importDup.length > 0 && (
               <div className="msg error">
                 有 {importDup.length} 个 ID 重复（同 ID 出现多次），就地把 ID 改掉或删掉多余行即可：{' '}

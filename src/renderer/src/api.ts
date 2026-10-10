@@ -330,6 +330,9 @@ export const api = {
     /** 解析报名表 xlsx（只预览，不入库） */
     parse: (matchId: number, data: Uint8Array): Promise<SignupImportPreview> =>
       unwrap(bridge().signup.parseSignup(matchId, data)),
+    /** 解析群「接龙」文本（只预览，不入库；与 xlsx 共用同一套预览/入库流程） */
+    parseText: (matchId: number, text: string): Promise<SignupImportPreview> =>
+      unwrap(bridge().signup.parseSignupText(matchId, text)),
     importRows: (matchId: number, rows: SignupImportRow[]):
       Promise<{ imported: number; unmatched: string[] }> =>
       unwrap(bridge().signup.importSignups(matchId, rows)),

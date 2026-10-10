@@ -166,6 +166,11 @@ export interface SignupImportPreview {
   headerRow: number;
   /** 已经在主档里的数量（方便用户判断补建范围） */
   matchedCount?: number;
+  /**
+   * 行级**提示**（不是错误）：名字与职业粘连、认不出的职业写法、请假行写了职业、
+   * 尾饰字疑似同一人… 导入后用户可以照着预览逐行改（用户口径 2026-10-10）。
+   */
+  warnings?: { line: number; reason: string }[];
 }
 
 /** 报名 vs 主档 的交叉核对结果 */
@@ -814,6 +819,8 @@ export interface OmniaApi {
     apply(matchId: number, playerIds: number[]): Promise<IpcResult<{ applied: number }>>;
     /** 解析报名表 xlsx，返回预览（含重复/无效行与未匹配 ID），不入库 */
     parseSignup(matchId: number, data: Uint8Array): Promise<IpcResult<SignupImportPreview>>;
+    /** 解析「接龙」文本，返回同一个预览结构（不入库） */
+    parseSignupText(matchId: number, text: string): Promise<IpcResult<SignupImportPreview>>;
     /** 提交报名导入；重复报名会直接报错（用户口径：手动处理） */
     importSignups(matchId: number, rows: SignupImportRow[]):
       Promise<IpcResult<{ imported: number; unmatched: string[] }>>;
@@ -888,6 +895,8 @@ export const IPC = {
   signupBoard: 'signup:board',
   /** 解析报名 xlsx（只预览，不入库） */
   signupParse: 'signup:parse',
+  /** 解析「接龙」文本（只预览，不入库） */
+  signupParseText: 'signup:parse-text',
   /** 提交报名导入 */
   signupImport: 'signup:import',
   /** 报名 vs 主档 交叉核对 */

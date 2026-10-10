@@ -38,11 +38,24 @@ npm run dist         # 打 Windows 安装包 → release/Omnia-Setup-<版本>.ex
 安装包在 `release/` 里而它又不在 git 里，删掉就找不回来（2026-10-08 之前就这样丢过一次）。
 要连 `release/` 一起清，用 `npm run clean:release`（`npm run dist` 已经接上它）。
 
-⚠️ **跑 `npm run smoke` 之前必须先把应用窗口关掉**：主进程有**单实例锁**
-（`main.ts` 的 `requestSingleInstanceLock`），开发窗口开着时自检那个 Electron 实例会**秒退**，
-日志里只有构建那几行、最后一行是「`[smoke] 失败 ❌ (exit=0)`」—— 看着像探针失败，
-其实是**根本没跑**（2026-10-08 踩到）。`npm run dev` 起的窗口要留着看界面时，
-就等看完再跑自检，或者用另一份检出跑。
+⚠️ **应用窗口开着时 `npm run smoke` 会秒退**：主进程有**单实例锁**（`main.ts` 的
+`requestSingleInstanceLock`），自检那个 Electron 实例抢不到锁就直接退出，日志里只有构建那几行、
+最后一行是「`[smoke] 失败 ❌ (exit=0)`」—— 看着像探针失败，其实是**根本没跑**（2026-10-08 踩到）。
+
+✅ **不用关窗口的跑法（2026-10-10 验证有效）**：给自检换一个 `userData` 就不会抢锁 ——
+```
+$env:OMNIA_DATA_DIR = Join-Path $env:TEMP 'omnia-smoke-iso'   # 锁按 userData 分，换一个就互不干扰
+npm run smoke
+```
+用户正开着应用看界面时特别有用（自己也不用先关掉）。
+
+- 调试口：`OMNIA_DEBUG_PORT=9222` → CDP `Runtime.evaluate` / `Page.captureScreenshot` 可做运行时验证 ✓
+- 单库模式：`OMNIA_DB_PATH=<file>`（自检用的模式；此模式下帮会增删改名被禁止）
+- **想另起一个实例做验证而不打扰用户那个窗口**：`OMNIA_DATA_DIR=<临时目录>` + `OMNIA_DB_PATH=<真库的副本>`
+  + `OMNIA_DEBUG_PORT=9223` → 独立 userData、独立锁、独立库 ✓（真库只拷不写）
+  ⚠️ 起 Electron 前必须 `Remove-Item Env:\ELECTRON_RUN_AS_NODE` —— 否则它**退化成纯 Node**，
+  报 `Cannot read properties of undefined (reading 'registerSchemesAsPrivileged')`（2026-10-10 踩到）
+- **`smoke` 会把应用关掉** ✓ 跑完想看界面要重新 `npm run dev` ✓
 
 - 调试口：`OMNIA_DEBUG_PORT=9222` → CDP `Runtime.evaluate` / `Page.captureScreenshot` 可做运行时验证 ✓
 - 单库模式：`OMNIA_DB_PATH=<file>`（自检用的模式；此模式下帮会增删改名被禁止）
@@ -144,6 +157,12 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
 ⚠️ 两个坑：**截图有 ~300ms 延迟**（飞行动画抓不准 ✗ 用页内 `setInterval` 采样 ✓）；
 **ESM 的 `import('x?t=...')` 绕不过 CJS 的 require 缓存**（A/B 对照要分两个进程跑 ✓）
 
+**验证弹层/浮层的层级，只能靠 `elementFromPoint` 采样**（2026-10-10 立的规矩）：
+在浮层矩形内取 4×3 个点，`document.elementFromPoint(x,y)` 必须**全部**落在浮层内部。
+只看"按钮找得到、点了有反应"是不够的 —— 浮层可能被整块盖住（`elementFromPoint` 会告诉你
+拿到的是 `div.stat` 还是 `div.pop__head`）。自检里 `探针3c` 已经这么断言了（`浮层层级: 采 12/12 点`）。
+⚠️ 采样要等**入场动画跑完**：`.pop--in` 用 `clip-path` 展开，动画中点在裁剪区外会误判成"被盖住"。
+
 ---
 
 ## 7. 血泪教训（今天踩过的，别再踩）
@@ -179,6 +198,18 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
     被整排藏掉 —— 用户点不到「报名」，以为报名数据丢了（2026-10-08 截图报障）。
     同文件里那条 `display:none` 的注释**早就写过这个坑**（"不加 `.content.md-snap` 会把帮会首页一起隐藏"）
     却还是漏了一条 ✗。现在两条都带前缀了 ✓。
+13. ⚠️ **弹层被盖住 ≠ z-index 不够，先查祖先有没有"叠加上下文"**（2026-10-10 踩到）：
+    `.pop`（＋ 手动加人 / 粘贴接龙）自己写着 `z-index:310`，却被后面的统计卡片与报名表整块盖住 ——
+    根因是 **`.card` 上有 `backdrop-filter`（磨砂）**，[它自己就是叠加上下文]，
+    于是弹层再高的 z-index 也只是"卡内第一名"，整张卡照样被后面的**在流**内容压在下面。
+    实测（CDP）：点弹层正中，`elementFromPoint` 拿到的是 `div.stat` ✗。
+    **修法**：把承载弹层的祖先一起抬起来 ——
+    `:is(.card,.board,.home-card,.toolbar,.picker-item,.field):has(.pop){position:relative;z-index:1}`；
+    取 **1** 是有讲究的：在流元素在第 3 步绘制、定位元素在第 6/7 步，所以 1 就够压住所有在流内容，
+    而顶栏是 `position:relative;z-index:2` —— 卡片滚动时要能从顶栏**下面**穿过去，不能抬过头 ✓。
+    判定叠加上下文的口径：`position+z-index≠auto` / `transform` / `filter` / `backdrop-filter` /
+    `opacity<1` / `isolation:isolate` / `contain` / `perspective` / `will-change` 命中任意一个即是。
+    A/B 对照（同一实例、同一状态，只切换这条规则）：**有 → 12/12 命中；反向覆盖 → 3/12**（被 `div.stat`/`th`/`td` 盖住）✓
 
 ---
 

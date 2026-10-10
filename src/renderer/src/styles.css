@@ -2936,6 +2936,16 @@ to {
 :is(.roster-card,.roster-card__edit,.roster-cards,.toolbar,.card,.stat,.field,.home-card,.board,.picker-item,.modal__box) :has(.dp__pop) {
   position:relative;
   z-index:88}
+/* 「弹出层」.pop（＋ 手动加人 / 粘贴接龙）：**必须连 .card 一起抬**。
+   .card 上有 backdrop-filter（上面「磨砂底统一」那段）→ **它自己就是一个叠加上下文** ✗，
+   所以只抬内部元素没用：弹层再高的 z-index 也被关在这张卡里，
+   后面的统计卡片 / 报名表是"在流"内容但 DOM 更靠后 → 整块盖住弹层。
+   实测（CDP，2026-10-10 用户截图报障）：点弹层正中，elementFromPoint 拿到的是 div.stat ✗。
+   层级取 1 的讲究：在流元素在第 3 步绘制、定位元素在第 6/7 步，所以 1 就足以压住所有在流内容；
+   而顶栏是 position:relative + z-index:2 —— 卡片滚动时要能从顶栏下面穿过去，不能抬过头。 */
+:is(.card,.board,.home-card,.toolbar,.picker-item,.field):has(.pop) {
+  position:relative;
+  z-index:1}
 .pcard--ow .pcard__id {
   background-image:repeating-linear-gradient(100deg,color-mix(in srgb,var(--pc, #333) 75%,#0B0B0D),color-mix(in srgb,var(--pc, #333) 88%,#0B0B0D) 35px,color-mix(in srgb,var(--pc, #333) 88%,#0B0B0D) 105px,color-mix(in srgb,var(--pc, #333) 75%,#0B0B0D) 140px);
   background-size:auto;

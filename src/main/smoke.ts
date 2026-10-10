@@ -731,6 +731,35 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         popBtn.click();
         const idInput = await waitFor(() => [...document.querySelectorAll('input.input')]
           .find(i => (i.placeholder || '').includes('ID / 名字')), '手动加人 ID 输入框');
+
+        /* ⚠️ 浮层**真的在最上层**吗？—— 光"能找到按钮、点了有反应"是不够的。
+           2026-10-10 的事故：.card 带 backdrop-filter（磨砂）→ **它自己就是叠加上下文**，
+           浮层再高的 z-index 也被关在这张卡里，后面的统计卡片 / 报名表把它整块盖住：
+           用户看得见浮层、点上去却点在统计卡片上 ✗（而本探针当时一路 PASS）。
+           判据：在浮层矩形内**采 12 个点**，elementFromPoint 必须都落在浮层内部。 */
+        const popLayer = await (async () => {
+          const pop = document.querySelector('.pop');
+          if (!pop) return { hit: 0, total: 0, who: '浮层不在' };
+          const r = pop.getBoundingClientRect();
+          let hit = 0; let total = 0; const who = {};
+          for (const fy of [0.15, 0.35, 0.55, 0.75]) {
+            for (const fx of [0.2, 0.5, 0.8]) {
+              const el = document.elementFromPoint(
+                Math.round(r.left + r.width * fx), Math.round(r.top + r.height * fy));
+              total += 1;
+              if (el && pop.contains(el)) hit += 1;
+              else {
+                const k = el ? el.tagName.toLowerCase() + '.' + String(el.className || '').trim().split(/\\s+/)[0] : 'null';
+                who[k] = (who[k] || 0) + 1;
+              }
+            }
+          }
+          return { hit, total, who: Object.keys(who).map((k) => k + '×' + who[k]).join(' ') };
+        })();
+        const popOnTop = popLayer.total > 0 && popLayer.hit === popLayer.total;
+        steps.push('浮层层级: 采 ' + popLayer.hit + '/' + popLayer.total + ' 点命中浮层内'
+          + (popOnTop ? ' ✓' : ' ✗ 被盖住 → ' + popLayer.who));
+
         /* React 会给 DOM 节点的 value 属性装自己的 setter 并缓存旧值，
            直接 idInput.value = x 之后派发 input 事件会被判成"没变化"，onChange 不触发。
            必须走**原型上的原生 setter**，让 React 的 value tracker 看到真实变化。 */
@@ -821,7 +850,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
             && leftH > 0 && leftH === activeH
             && rowBtns.includes('删除') && rowBtns.includes('复帮') && !rowBtns.includes('编辑')
             && !stillInActive
-            && bd.stats.joined >= 1,
+            && bd.stats.joined >= 1
+            && popOnTop,   // 浮层必须真的在最上层（不能被后面的卡片/表格盖住）
           steps,
         };
       } catch (e) {

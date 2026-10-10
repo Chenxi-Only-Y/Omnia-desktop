@@ -69,15 +69,23 @@ npm run smoke
 ## 3. 当前状态
 
 ```
-安装包   release\Omnia-Setup-0.2.0.exe   ✓ 已上传到 GitHub Releases（用户 2026-10-08 确认）
-         ⚠️ 本地 release/ 被清过一次（见第 7 节第 8 条）；要重建：npm run dist
-tag      v0.2.0 → 46a5702 ✓ 已推送 ✓（v0.1.1 也在 ✓）
-GitHub   只有 main 一条分支 ✓
-自检     结果: PASS ✓   schema 版本: 19 ✓（2026-10-08 复跑，含新增的 M3c 原子性探针）
+版本     0.2.1（package.json + package-lock.json 都已升；exe 里也是 0.2.1，读过 asar 确认 ✓）
+安装包   release\Omnia-Setup-0.2.1.exe   110.5 MB ✓（release/ 在 .gitignore 里，不入库）
+tag      v0.2.1 → 9547b14 ✓ 已推送 ✓（v0.2.0 → 46a5702 也在 ✓）
+GitHub   main 一条分支 ✓ 已推送 ✓（origin/main = 9547b14）
+自检     结果: PASS ✓   schema 版本: 19 ✓
+         （含：M3c 原子性 / 接龙解析 / 浮层层级 12-12 / 卡片角落 贴右上右下 / 目录穿越）
 typecheck 通过 ✓
 ```
 
-> **GitHub Release 那一步用户已经做完了**（2026-10-08），第 3 节原先留的"还差最后一步"已完成。
+**还差最后一步（人来点）**：GitHub → Releases → 选标签 `v0.2.1` → 把
+`release\Omnia-Setup-0.2.1.exe` 拖到**页面最底部的 "Attach binaries"** 框
+（**不是**描述框 ✗ 拖描述框会报 "We don't support that file type"）。
+本机没装 `gh` CLI；装了之后可以一行代劳：
+`gh release create v0.2.1 release/Omnia-Setup-0.2.1.exe`。
+（v0.2.0 那次的 asset 是用户 2026-10-08 手动传的 ✓）
+> ⚠️ v0.2.0 的安装包里**带着**「报名页签被藏」那个 bug（引入提交 7b528e7 是 v0.2.0 的祖先）
+> → 用 v0.2.0 的人点不到报名，建议尽快让大家都换到 v0.2.1。
 
 ---
 

@@ -412,7 +412,8 @@ npm run dist
 
 安装包**不要提交进 git**（`release/` 已在 `.gitignore`；且 GitHub 单文件上限 100 MB，收紧后约 110 MB 会被直接拒绝）。
 
-正确做法是走 **GitHub Releases**：建 tag（如 `v0.2.0`），把 `Omnia-Setup-0.2.0.exe` 作为 release asset 附上。
+正确做法是走 **GitHub Releases**：建 tag（如 `v0.2.1`），把 `Omnia-Setup-0.2.1.exe` 作为 release asset 附上。
+**完整流程（升版本号 → 打包 → 打 tag → 用 API 建 Release 并传 asset，全程不用点网页）见 `RELEASE.md`。**
 
 ---
 

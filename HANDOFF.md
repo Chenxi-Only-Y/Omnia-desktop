@@ -72,13 +72,15 @@ npm run smoke
 版本     0.2.1（package.json + package-lock.json 都已升；exe 里也是 0.2.1，读过 asar 确认 ✓）
 安装包   release\Omnia-Setup-0.2.1.exe   110.5 MB ✓（release/ 在 .gitignore 里，不入库）
 tag      v0.2.1 → 9547b14 ✓ 已推送 ✓（v0.2.0 → 46a5702 也在 ✓）
-GitHub   main 一条分支 ✓ 已推送 ✓（origin/main = 9547b14）
+GitHub   main 一条分支 ✓ 已推送 ✓（origin/main = a6b9021）
+Release  v0.2.1 ✓ draft=false ✓ asset = Omnia-Setup-0.2.1.exe 110.5 MB ✓（2026-10-10 已发布）
+         https://github.com/Chenxi-Only-Y/Omnia-desktop/releases/download/v0.2.1/Omnia-Setup-0.2.1.exe
 自检     结果: PASS ✓   schema 版本: 19 ✓
          （含：M3c 原子性 / 接龙解析 / 浮层层级 12-12 / 卡片角落 贴右上右下 / 目录穿越）
 typecheck 通过 ✓
 ```
 
-**还差最后一步（人来点）**：GitHub → Releases → 选标签 `v0.2.1` → 把
+**此步已于 2026-10-10 用 API 自动完成 ✓**（完整流程见根目录 `RELEASE.md`；下面是手动备用方式）：GitHub → Releases → 选标签 `v0.2.1` → 把
 `release\Omnia-Setup-0.2.1.exe` 拖到**页面最底部的 "Attach binaries"** 框
 （**不是**描述框 ✗ 拖描述框会报 "We don't support that file type"）。
 本机没装 `gh` CLI；装了之后可以一行代劳：

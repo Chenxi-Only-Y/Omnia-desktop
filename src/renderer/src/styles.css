@@ -3605,3 +3605,39 @@ body.roster-leaving .md-bg__tone { opacity: 0; }
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .55) 20%, #000 45%);
   mask-image: linear-gradient(90deg, transparent 0%, rgba(0, 0, 0, .55) 20%, #000 45%);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   下拉面板改「portal 到 body + position:fixed」（2026-10-16）
+
+   原因：面板原先是 absolute，挂在触发器旁边 → 会被**最近的滚动容器**裁掉。
+   实测：报名页搜索后表格只剩 1 行，`.table-wrap` 只有 75px 高，
+   面板（13 个职业）只露出 34/110px = 31%，用户看见的就一条
+   （截图报障「看不到了」）。挂在 body 上之后没有任何祖先能裁它，
+   边界改用**窗口**：坐标 / 宽度 / 限高全部由 Select.tsx 的 measure() 内联给出。
+
+   ⚠️ 面板因此离开了 `.sel` / `.pcard` 的祖先链 —— 下面这几条必须把
+   `.sel[open] .sel__opt*` 与 `.sel[open] .sel__list` 的观感**照抄一份**，
+   否则选中高亮（.on）与悬停底色会丢。
+   本块放在文件末尾：靠源码顺序赢过 `.sel--up .sel__list` / `.sel.menu .sel__list`（同优先级）。
+   ⚠️ 不要给下面这些属性加 !important —— 坐标是内联的，!important 会把它压掉 ✗ */
+.sel__list.sel__list--fixed {
+  position:fixed;
+  left:auto;
+  right:auto;
+  top:auto;
+  bottom:auto;
+  width:max-content;
+  min-width:0;
+  max-width:calc(100vw - 16px);
+  z-index:320;
+  background:#fffffff2!important;
+  border-color:#0b0b0d1a!important;
+  box-shadow:0 12px 30px #00000042}
+.sel__list--fixed .sel__opt {
+  color:#0b0b0d}
+.sel__list--fixed .sel__opt:hover {
+  background:#0b0b0d12}
+.sel__list--fixed .sel__opt.on {
+  background:#0b0b0d1f;
+  color:#0b0b0d;
+  font-weight:700}

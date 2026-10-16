@@ -1,4 +1,5 @@
-import { Children, isValidElement, useLayoutEffect, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Children, isValidElement, useCallback, useLayoutEffect, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * 原生 <select> 的替身：样式可控的下拉。
@@ -69,9 +70,16 @@ export default function Select({
        · 下面装不下、上面更宽裕 → 翻到上面（.sel--up）；
        · 上下都紧张 → 仍然向下，但把 max-height 收到可用高度（列表自己滚动）。
      高度用 px 内联写死，而不是只靠 CSS，才能保证面板永远落在窗口里。 */
-  const [up, setUp] = useState(false);
-  const [maxH, setMaxH] = useState<number | null>(null);
+  /* 面板的定位：**portal 到 body + position:fixed**。
+     为什么不能留在原地：它是 absolute，会被**最近的滚动容器**裁掉 —— 报名表搜索后只剩一行时
+     `.table-wrap` 只有 75px 高（实测），13 个职业用户只看得见 1 个（2026-10-16 用户报障「看不到了」）。
+     挂到 body 之后没有任何祖先能裁它，边界改用**窗口**，装不下就在窗口内滚动。
+     坐标/宽度/高度都内联写死（面板宽度是 max-content → 必须先渲染一帧量出来，见 measure）。 */
+  const [pos, setPos] = useState<{
+    left: number; top: number; minW: number; maxW: number; maxH: number | null; origin: string;
+  } | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const timer = useRef(0);
   const close = () => {
     setOpen(false);
@@ -90,7 +98,11 @@ export default function Select({
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) close();
+      const t = e.target as Node;
+      // 面板已经 portal 到 body、不在 box 里 —— 必须一起放行，
+      // 否则点选项会被当成「点了外面」先 close()，选项就白点了
+      if (box.current?.contains(t) || listRef.current?.contains(t)) return;
+      close();
     };
     document.addEventListener('mousedown', onDoc);
     /* ⚠️ 这里**不能**顺手 clearTimeout(timer.current)：
@@ -103,36 +115,59 @@ export default function Select({
   // 定时器只在组件真正卸载时清
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  /* 量一次：列表要在 open 之后、绘制之前决定方向与高度，所以用 useLayoutEffect（不会闪一下再翻）。
-     ⚠️ 关键：可用空间要按**最近的裁剪容器**算，不能只按窗口算 ——
-     报名表的 `.table-wrap` 是 overflow:auto、`table.grid` 又 overflow:hidden，
-     面板伸出去的部分会被直接切掉，看起来就是"下拉被下面的行/卡片盖住了"（用户反馈：被覆盖了）。
-     所以：边界 = min(窗口, 裁剪容器)，高度不超过边界，装不下就翻到另一侧，再装不下就自己滚动。 */
-  useLayoutEffect(() => {
-    if (!open) { setUp(false); setMaxH(null); return; }
+  /* 量一次并算好坐标：面板现在挂在 body 上，边界就是**窗口**（不再看滚动容器 —— 看不住，
+     容器该裁还是会裁）。用 useLayoutEffect 是为了在浏览器绘制前就把 pos 定下来，不会闪。
+     ⚠️ 面板宽度是 max-content：第一帧先以自然宽度渲染出来量一次，同一帧内 setPos，
+     React 会在绘制前重渲染 → 用户看不到中间态。 */
+  const measure = useCallback(() => {
     const el = box.current;
-    const list = el?.querySelector('.sel__list') as HTMLElement | null;
-    if (!el || !list) return;
+    const panel = listRef.current;
+    if (!el || !panel) return;
     const r = el.getBoundingClientRect();
-    let clipTop = 0;
-    let clipBottom = window.innerHeight;
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const cs = getComputedStyle(p);
-      if (/(auto|scroll|hidden)/.test(cs.overflowY) || /(auto|scroll|hidden)/.test(cs.overflowX)) {
-        const cr = p.getBoundingClientRect();
-        clipTop = Math.max(clipTop, cr.top);
-        clipBottom = Math.min(clipBottom, cr.bottom);
-        break;   // 最近的一个就够了（更外层的窗口已经夹过一次）
-      }
-    }
-    const natural = list.scrollHeight;              // 未受 max-height 限制时的内容高度
-    const roomBelow = clipBottom - r.bottom - 10;
-    const roomAbove = r.top - clipTop - 10;
-    const flip = natural > roomBelow && roomAbove > roomBelow;
-    setUp(flip);
+    const pr = panel.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const naturalH = panel.scrollHeight;            // 未受 max-height 限制时的内容高度
+    const roomBelow = vh - r.bottom - 12;
+    const roomAbove = r.top - 12;
+    // 下面装不下、上面更宽裕 → 翻到上面
+    const flip = naturalH > roomBelow && roomAbove > roomBelow;
     const room = flip ? roomAbove : roomBelow;
-    setMaxH(natural > room ? Math.max(110, Math.round(room)) : null);
-  }, [open]);
+    /* 限高**不许超过可用空间**。原来是 Math.max(110, room)：那个 110px 下限会让面板比
+       可用空间更高，多出来的部分被容器直接裁掉 —— 正是 "13 个职业只看得见 1 个" 的根因 ✗ */
+    const capped = naturalH > room;
+    const maxH = capped ? Math.max(72, Math.round(room)) : null;
+    const h = maxH ?? naturalH;
+    // 左对齐；`.sel.menu` 那套是右对齐（原来靠 CSS 的 right:0）。再整体夹进窗口
+    const menu = el.classList.contains('menu');
+    let left = menu ? r.right - pr.width : r.left;
+    left = Math.max(8, Math.min(left, vw - 8 - pr.width));
+    let top = flip ? r.top - 4 - h : r.bottom + 4;
+    top = Math.max(8, Math.min(top, vh - 8 - h));
+    setPos({
+      left, top, minW: Math.max(r.width, menu ? 168 : 0), maxW: vw - 16, maxH,
+      origin: flip ? 'bottom center' : 'top center',
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    measure();
+  }, [open, measure]);
+
+  /* 面板开着时跟着触发器走：表格内部滚动 / 窗口缩放都要重新定位，否则面板会脱节 */
+  useEffect(() => {
+    if (!open) return;
+    let raf = 0;
+    const onMove = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(measure); };
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [open, measure]);
 
   const curVal = String(value ?? '');
   /* 值不在选项里时的兜底 —— **不能退回第一个选项**：
@@ -143,7 +178,7 @@ export default function Select({
     ?? (curVal ? { value: curVal, label: curVal, disabled: false } : opts[0]);
 
   return (
-    <div ref={box} className={'sel' + (cls ? ' ' + cls : '') + (up ? ' sel--up' : '')} style={style} onClick={onClick}>
+    <div ref={box} className={'sel' + (cls ? ' ' + cls : '')} style={style} onClick={onClick}>
       <button type="button" className="sel__btn" title={title} disabled={disabled}
               onClick={() => (open ? close() : setOpen(true))}>
         {icon && <img className="sel__ico" src={icon} alt="" />}
@@ -154,9 +189,17 @@ export default function Select({
               onChange={(e) => onChange?.({ target: { value: e.target.value } })}>
         {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      {(open || closing) && (
-      <div className={'sel__list' + (open ? ' sel__list--in' : ' sel__list--out')}
-           style={maxH ? { maxHeight: `${maxH}px` } : undefined}>
+      {/* 面板 portal 到 body：这样任何滚动容器（.table-wrap / table.grid）都裁不到它。
+          坐标、宽度、限高都由 measure() 内联给出；.sel__list--fixed 只负责定位方式与层级。 */}
+      {(open || closing) && createPortal(
+      <div ref={listRef}
+           className={'sel__list sel__list--fixed' + (open ? ' sel__list--in' : ' sel__list--out')}
+           style={pos ? {
+             left: pos.left, top: pos.top,
+             minWidth: pos.minW, maxWidth: pos.maxW,
+             maxHeight: pos.maxH ? pos.maxH + 'px' : undefined,
+             transformOrigin: pos.origin,
+           } : undefined}>
         {(placeholder ? opts.filter((o) => o.value !== '') : opts).map((o) => (
           <button key={o.value} type="button"
                   className={'sel__opt' + (o.value === curVal ? ' on' : '')}
@@ -165,8 +208,7 @@ export default function Select({
             {o.label}
           </button>
         ))}
-      </div>
-      )}
+      </div>, document.body)}
     </div>
   );
 }

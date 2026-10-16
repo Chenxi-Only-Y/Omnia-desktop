@@ -975,6 +975,18 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         });
         const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
 
+        /* 诊断②：dragover 的命中判定是 **rAF 合并**的（见 RosterPage.onGridDragOver：
+           dragover 只记坐标 + 排一个 requestAnimationFrame，真正的 hitTest 在回调里跑）。
+           窗口被别的窗口盖住时 Chromium 会**暂停 rAF 回调** → 落点永远画不出来 →
+           「落点标记=0」红，而同代码窗口在最前面时是绿的（这就是历史偶发项的真因）。
+           把"调度了几次 / 回调跑了几次"直接数出来，失败时一眼能分辨是环境还是回归。 */
+        const origRaf = window.requestAnimationFrame.bind(window);
+        let rafCalls = 0; let rafFired = 0;
+        window.requestAnimationFrame = (cb) => {
+          rafCalls += 1;
+          return origRaf((t) => { rafFired += 1; return cb(t); });
+        };
+
         fire(src, 'dragstart', 0, 0);
         await sleep(80);
         const rc1 = dst.getBoundingClientRect();
@@ -1012,6 +1024,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         }
         const marks = document.querySelectorAll('.mcard--drop-after,.mcard--drop-before').length;
         const tinted = document.querySelectorAll('.mcard--drop-target').length;
+        steps.push('dragover rAF 调度=' + rafCalls + ' 回调=' + rafFired
+          + (rafCalls > 0 && rafFired === 0 ? '（回调=0 → 窗口被遮挡，Chromium 暂停了 rAF：环境问题，不是回归）' : ''));
         const hintMid = hintEl ? hintEl.textContent : '';
 
         /* 松手后立刻密集采样：塌陷（卡片卸载）就发生在这一瞬间 */
@@ -1029,6 +1043,7 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
           });
         }
         Element.prototype.getBoundingClientRect = orig;
+        window.requestAnimationFrame = origRaf;   // 别把打过补丁的 rAF 留给后面的探针
 
         const after = [...document.querySelectorAll('.mcard')].slice(0, 6).map(c => Number(c.dataset.playerId));
         const orders = [...document.querySelectorAll('.mcard__order')].slice(0, 6).map(e => e.textContent.trim());
@@ -1839,6 +1854,48 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const title = (document.querySelector('.card h3')?.textContent ?? '');
         steps.push('报名页 行数=' + rows + ' 每行标记按钮组=' + marks + ' 标题=' + JSON.stringify(title));
 
+        /* ⚠️ 下拉面板必须**真的看得见**（2026-10-16 用户截图报障「看不到了」）：
+           面板原本 absolute 挂在触发器旁边 → 会被**最近的滚动容器**裁掉
+           （报名表搜索后只剩一行时 table-wrap 只有 75px 高，13 个职业只露出 1 个）。
+           现在改成 portal 到 body + position:fixed，边界按窗口。
+           判据：挂在 body 上 + position:fixed + 整个落在窗口内 + 面板内**至少 3 个选项在可视区**
+           （"DOM 里有 13 个按钮"不算数 ✗ —— 看不见就是看不见），并且点选要真的生效。
+           ⚠️ 探针本体是模板字符串：注释里**不能出现反引号** ✗ 会直接把字符串截断（踩过） */
+        const firstSel = document.querySelector('table.grid tbody tr .sel');
+        let dropdown = { ok: false, info: '找不到表格里的下拉' };
+        if (firstSel) {
+          firstSel.querySelector('.sel__btn').click();
+          const panel = await waitFor(() => document.querySelector('.sel__list'), '下拉面板');
+          const pr = panel.getBoundingClientRect();
+          /* ⚠️ getComputedStyle 返回的是**活对象**：点完选项面板就被卸载了，
+             那时候再读 .position 会读到空串、parentElement 变 null（第一版就是这么误报的 ✗）。
+             所以要在**点选项之前**把值取出来。 */
+          const pcsPosition = getComputedStyle(panel).position;
+          const onBody = panel.parentElement === document.body;
+          const parentTag = String(panel.parentElement?.tagName ?? 'null');
+          const optTotal = panel.querySelectorAll('.sel__opt').length;
+          const inWin = pr.top >= 0 && pr.bottom <= innerHeight + 0.5
+            && pr.left >= 0 && pr.right <= innerWidth + 0.5;
+          const optsVisible = [...panel.querySelectorAll('.sel__opt')].filter((o) => {
+            const b = o.getBoundingClientRect();
+            return b.top >= pr.top - 0.5 && b.bottom <= pr.bottom + 0.5
+              && b.top >= 0 && b.bottom <= innerHeight;
+          }).length;
+          const optPick = [...panel.querySelectorAll('.sel__opt')]
+            .find((o) => o.textContent.trim() === '素问');
+          if (optPick) optPick.click();
+          await new Promise((r) => setTimeout(r, 250));   // 这个探针没有 sleep 助手，内联等一下
+          const applied = (firstSel.querySelector('.sel__txt')?.textContent ?? '').trim() === '素问';
+          dropdown = {
+            ok: pcsPosition === 'fixed' && onBody && inWin && optsVisible >= 3 && applied,
+            info: pcsPosition + ' 挂在' + (onBody ? 'body' : '✗' + parentTag)
+              + ' 面板 ' + Math.round(pr.width) + 'x' + Math.round(pr.height)
+              + ' 在窗口内=' + inWin + ' 可视选项=' + optsVisible + '/' + optTotal
+              + ' 点选生效=' + applied,
+          };
+        }
+        steps.push('下拉面板: ' + dropdown.info + (dropdown.ok ? ' ✓' : ' ✗'));
+
         for (const id of made.matches) await api.match.remove(id);
         for (const id of made.players) await api.player.remove(id);
 
@@ -1852,7 +1909,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
           && byName['smoke_sg_4'] === undefined
           && jia.squad === '防守一-1'
           && rows >= 4 && marks >= 4
-          && tabsVisible && rcVisible;   // 页签栏 + 「粘贴接龙」入口都要看得见
+          && tabsVisible && rcVisible    // 页签栏 + 「粘贴接龙」入口都要看得见
+          && dropdown.ok;                // 下拉面板要真的看得见（portal + fixed）
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针9');

@@ -93,6 +93,24 @@ typecheck 通过 ✓
 
 ## 4. 已完成（近期）
 
+**第四轮（2026-10-16）：下拉面板被滚动容器裁掉（用户截图报障「看不到了」）**
+
+| 项 | 内容 |
+|---|---|
+| 现象 | 报名页搜出某个人（表格只剩 1 行）后点「主职业」，13 个职业**只看得见 1 个** |
+| 根因 | 面板是 `absolute` 挂在触发器旁边 → 被**最近的滚动容器**裁掉（搜索后 `.table-wrap` 只有 **75px** 高）；且 `Select.tsx` 里 `setMaxH(natural > room ? Math.max(110, room) : null)` 的 **110px 下限故意让面板比可用空间更高** → 实测可见 **34/110 = 31%** ✗ |
+| 修法 | 面板 **portal 到 body + `position:fixed`**：没有任何祖先能裁它，边界改用**窗口**；坐标/宽度/限高由 `measure()` 内联给出（宽度是 max-content → 先渲染一帧量出来，在 `useLayoutEffect` 里 setPos，绘制前重渲染，不闪）。开着时跟随触发器（scroll/resize 重定位）；外部点击关闭要**放行 portal 节点**，否则点选项会被当成"点外面" ✗ |
+| 实测 | 同一现场：**100% 在窗口内、13 个选项全可见、点选生效** ✓（修复前 31% / 1 个）。对照图 `dev-data/shots/sel-ab.png` |
+| 自检 | 报名探针新增 `下拉面板`：必须 `position:fixed` + 挂在 body + 整个在窗口内 + 面板内**≥3 个选项在可视区** + 点选生效（"DOM 里有 13 个按钮"不算数 ✗） |
+
+顺带把 M3e 那条历史偶发项**定性了**（2026-10-08 记的"一红一绿、与 CSS 无关"）：
+- `RosterPage.onGridDragOver` 的命中判定是 **rAF 合并**的；**窗口被别的窗口盖住时 Chromium 会暂停 rAF 回调**
+  → 落点永远画不出来 →「落点标记=0」红；同代码窗口在最前面时是绿的 ✓
+- `OMNIA_SMOKE=1` 时主进程现在会 `setBackgroundThrottling(false)`（`main.ts`），探针里也加了
+  `dragover rAF 调度=N 回调=M` 诊断 —— **回调=0 就是环境（被遮挡），不是回归** ✓
+- ⚠️ 环境坑：自己起过的**隔离实例窗口会累积**（`node_modules\electron\dist\electron.exe`，一次 5 个进程），
+  它们会盖住自检窗口 → rAF 被暂停。跑自检前先清，**按 exe 路径筛**（别误杀用户的打包版 `万象Omnia.exe` ✗）
+
 **第三轮（2026-10-10）：报名「接龙」导入（用户给的格式与口径）**
 
 用户口径：报名不止 xlsx，群里还有**接龙**；**职业顺序无所谓**；**每场报名单独处理**；
@@ -227,6 +245,21 @@ CDP 探针   → OMNIA_DEBUG_PORT=9222，用 Runtime.evaluate 读计算样式/�
     判定叠加上下文的口径：`position+z-index≠auto` / `transform` / `filter` / `backdrop-filter` /
     `opacity<1` / `isolation:isolate` / `contain` / `perspective` / `will-change` 命中任意一个即是。
     A/B 对照（同一实例、同一状态，只切换这条规则）：**有 → 12/12 命中；反向覆盖 → 3/12**（被 `div.stat`/`th`/`td` 盖住）✓
+14. ⚠️ **`absolute` 的下拉/浮层在 `overflow` 容器里必然被裁 —— 调 z-index 没用，只能 portal 出去**（2026-10-16）：
+    `.sel__list` 挂在触发器旁边，落在 `overflow:auto` 的 `.table-wrap` 里；
+    容器一矮（搜索后只剩 1 行 → 75px）面板就被裁成一条 ✗。
+    正解：**portal 到 `body` + `position:fixed`**，边界改用窗口（`fixed` 也逃不出"有 `transform`/`filter`
+    的祖先"的裁剪与包含块，**portal 才是真的逃出去**）。
+    附带代价：面板离开了 `.sel` / `.pcard` 祖先链 → `.sel[open] .sel__opt{margin/hover/on}` 那几条要
+    **照抄一份**（`.sel__list--fixed .sel__opt…`），否则选中高亮会丢；外部点击关闭也要一并放行 portal 节点 ✓
+15. ⚠️ **`getComputedStyle()` 返回的是活对象**（2026-10-16 探针自己踩的）：先拿到引用、
+    **等元素被卸载之后**再读 `.position` / `parentElement`，会读到**空串 / null** ✗
+    （第一版就是这么把"修复成功"误报成"挂在 undefined"的）。要在**卸载前**把值取出来存好 ✓
+16. ⚠️ **窗口被遮挡时 Chromium 会暂停 rAF 回调**（2026-10-16，M3e 偶发项的真因）：
+    依赖 rAF 的交互（主档拖拽的落点判定）在自检窗口被别的窗口盖住时**永远不生效** →
+    探针红，而同代码窗口在最前面时是绿的。**单看红绿判断不了是不是回归** ——
+    要先看诊断行的 `rAF 回调=N`：**0 就是环境** ✓
+    缓解：`OMNIA_SMOKE=1` 时 `setBackgroundThrottling(false)`；跑自检前清掉自己起过的隔离实例窗口。
 
 ---
 

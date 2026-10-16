@@ -137,6 +137,13 @@ function createWindow(): void {
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
 
+  /* 自检时**关掉后台节流**（2026-10-16）。
+     起因：应用窗口开着时跑自检，自检那个窗口被挡在后面 → Chromium 判定"被遮挡"→
+     **rAF 被暂停** ✗ → 依赖 rAF 的交互（主档拖拽的落点判定就挂在 rAF 上）永远不生效，
+     M3e 探针报「落点标记=0」红 —— 而同代码、窗口在最前面时是绿的（历史偶发项的真因）。
+     只在 OMNIA_SMOKE=1 时关（日常使用照旧节流，省电）。 */
+  if (process.env.OMNIA_SMOKE === '1') mainWindow.webContents.setBackgroundThrottling(false);
+
   // 外链一律交给系统浏览器，不在应用内开窗
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) void shell.openExternal(url);

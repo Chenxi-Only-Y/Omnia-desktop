@@ -736,10 +736,19 @@ export class MatchRepo {
           ).run(slot, matchId, pid);
 
           if (occupant) {
-            // 新人原本没格（新加进来的）→ 被顶掉的人退到"未指定"末尾，不会凭空消失
+            /* 被顶掉的人往哪退：**只有"我的旧格号在目标队里确实空着"才用它**，
+               否则找目标队第一个空位。
+               原写法直接用 myOld —— 跨队拖动时 myOld 是**上一队**的格号，
+               在目标队很可能已经有人 → 两个人拿到同一个 slot_no ✗
+               → 看板一格只渲染一个人，另一个既不显示也不在「未分配」里（2026-10-23 用户问的"被吞"）。
+               实测（真实库副本）：一次普通拖动就能造出 `进攻一-1#1` 两人 / `#2` 三人。 */
+            const freeOld = myOld >= 0 && !this.db.prepare(
+              "SELECT 1 FROM participation WHERE match_id=? AND squad=? AND side='our' AND slot_no=? AND player_id<>?",
+            ).get(matchId, squad, myOld, occupant.player_id);
+            const to = freeOld ? myOld : this.nextFreeSlot(matchId, squad);
             this.db.prepare(
               "UPDATE participation SET slot_no=? WHERE match_id=? AND player_id=? AND side='our'",
-            ).run(myOld >= 0 ? myOld : this.nextFreeSlot(matchId, squad, slot), matchId, occupant.player_id);
+            ).run(to, matchId, occupant.player_id);
           }
         }
       }
@@ -751,13 +760,19 @@ export class MatchRepo {
     return playerIds.length;
   }
 
-  /** 找一个还没被占的格号（用于把被顶掉的人安置到空位） */
-  private nextFreeSlot(matchId: number, squad: string, exceptSlot: number): number {
+  /** 找一个还没被占的格号（用于把被顶掉的人安置到空位）
+   *
+   * ⚠️ 参数里**不能**排除"刚落位的那一格"：本方法是**在**新人占好目标格**之后**调的，
+   * 那一格此刻就是"已占用" ✓。原来把它从 taken 里排除掉，于是它可能**原样返回这一格** →
+   * 被顶掉的人又被放回同格 → 两个人共用一个 slot_no ✗（2026-10-23 用户问的"移动会重复"，
+   * 实测：把 A 拖到 防守一-1 第3格，心一丶又被打回第3格 → 那格变成两个人）。
+   */
+  private nextFreeSlot(matchId: number, squad: string): number {
     const taken = new Set(
       (this.db.prepare(
         `SELECT slot_no FROM participation
-          WHERE match_id=? AND squad=? AND side='our' AND slot_no>=0 AND slot_no<>?`,
-      ).all(matchId, squad, exceptSlot) as unknown as { slot_no: number }[]).map((r) => r.slot_no),
+          WHERE match_id=? AND squad=? AND side='our' AND slot_no>=0`,
+      ).all(matchId, squad) as unknown as { slot_no: number }[]).map((r) => r.slot_no),
     );
     let i = 0;
     while (taken.has(i)) i += 1;

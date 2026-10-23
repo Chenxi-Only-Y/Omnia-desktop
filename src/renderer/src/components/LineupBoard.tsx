@@ -348,21 +348,33 @@ const SquadRowView = memo(function SquadRowView({
     else noSlot.push(m);      // 未指定格号 / 越界 / 同格冲突 → 顺次补进空格
   }
   let cursor = 0;
+  /* ⚠️ 落不进格子的人（队已满 / 格号重复到没有空格）**不能丢** ✗ ——
+     2026-10-23 用户问到的"被吞"就是这里：以前直接不渲染，人既不在格子里、
+     也不在「未分配」区，看板上凭空少一个，数据其实还在库里。
+     现在追加到行尾并标黄，可以继续拖到别的格子/小队 ✓ */
+  const leftover: ParticipationRow[] = [];
   for (const m of noSlot) {
     while (cursor < squad.size && ordered[cursor] !== null) cursor += 1;
     if (cursor < squad.size) ordered[cursor] = m;
+    else leftover.push(m);
   }
   const tone = squad.kind === 'defend' ? 'defend' : 'attack';
 
   return (
     <div
-      className={`squadrow squadrow--${tone}${hovered ? ' squadrow--drop' : ''}`}
+      className={`squadrow squadrow--${tone}${hovered ? ' squadrow--drop' : ''}${leftover.length ? ' squadrow--over' : ''}`}
       data-squad={squad.name}
       {...dropProps(squad.name)}
     >
       <div className="squadrow__head">
         <span className="squadrow__name">{squad.name}</span>
         <span className="squadrow__count">{members.length}/{squad.size}</span>
+        {leftover.length > 0 && (
+          <span className="squadrow__over"
+                title={`${leftover.length} 人没落在格子里（队满或格号重复）—— 他们仍在名单里，拖到任意格子即可归位`}>
+            ⚠ {leftover.length} 人没落格
+          </span>
+        )}
         {/* 战术直接就地可改：看起来就是一行字，点开才出现选项，不加额外控件 */}
         {onChangeTactic ? (
           <Select
@@ -391,6 +403,13 @@ const SquadRowView = memo(function SquadRowView({
                       onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} onSkillNote={onSkillNote}
                       onChangeClass={onChangeClass}
                       dragProps={dragProps} dragging={!!r && draggingIds.includes(r.playerId)} />
+        ))}
+        {/* 没落进格子的人：照样渲染成卡片（能拖、能点 ID 移出），别静默丢弃 */}
+        {leftover.map((r) => (
+          <PlayerCard key={'ov-' + r.playerId} row={r} slotIndex={-1} squad={squad} classMap={classMap}
+                      onPickSlot={onPickSlot} onRemoveRow={onRemoveRow} onSkillNote={onSkillNote}
+                      onChangeClass={onChangeClass}
+                      dragProps={dragProps} dragging={draggingIds.includes(r.playerId)} />
         ))}
       </div>
     </div>

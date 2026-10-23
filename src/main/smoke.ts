@@ -1680,6 +1680,23 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const p2row = parts.data.find(r => r.gameId === 'smoke_dnd_2');
         steps.push('未分配的 拖拽乙.squad=' + JSON.stringify(p2row?.squad ?? ''));
 
+        /* 格号唯一性（用户 2026-10-23 问的"移动会重复导致被吞"）：
+           任何一次拖动都不许让两个人共用一个格号 —— 看板一格只画一个人，
+           另一个既不显示也不在「未分配」区 = 凭空消失。
+           原来 nextFreeSlot 会把"刚落位的那一格"从已占用集合里排除 → 原样返回它 →
+           被顶掉的人被打回同格 ✗（实测可复现）。 */
+        const playRows = parts.data.filter((r) => r.squad && r.state === 'PLAY');
+        const slotCount = {};
+        for (const r of playRows) {
+          if (r.slotNo === undefined || r.slotNo === null || r.slotNo < 0) continue;
+          const k = r.squad + '#' + r.slotNo;
+          slotCount[k] = (slotCount[k] || 0) + 1;
+        }
+        const dupSlots = Object.keys(slotCount).filter((k) => slotCount[k] > 1);
+        steps.push('格号唯一性: ' + (dupSlots.length
+          ? '重复 ' + dupSlots.map((k) => k + '(' + slotCount[k] + '人)').join(' ')
+          : '每格最多一人 ✓'));
+
         // 再把 拖拽乙 拖到「未分配」区应该没有效果（它本来就未分配）；
         // 改为验证 拖拽甲 拖回未分配区会被移除小队
         const chip = [...document.querySelectorAll('.board__chip')].find(c => c.textContent.includes('smoke_dnd_2'));
@@ -1695,7 +1712,8 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
           && p1row?.state === 'PLAY'
           && p2row?.squad === ''
           && !!chip
-          && (swapOk || !swapRow);   // 同队两个人时必须真的互换位置
+          && (swapOk || !swapRow)   // 同队两个人时必须真的互换位置
+          && dupSlots.length === 0; // 任何时刻都不许两个人共用一个格号
         return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针7');

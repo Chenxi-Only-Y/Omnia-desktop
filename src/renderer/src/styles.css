@@ -1218,6 +1218,17 @@ textarea.input {
   font-size:13px;
   font-weight:400;
   color:var(--text-faint)}
+/* 「N 人没落格」徽标（2026-10-23）：队满或格号重复时，多出来的人追加在行尾，
+   这里给个醒目提示 —— 以前是**静默丢弃**，用户会以为人被吞了 ✗ */
+.squadrow__over {
+  font-size:13px;
+  font-weight:600;
+  color:var(--warn);
+  background:color-mix(in srgb, var(--warn) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--warn) 38%, transparent);
+  border-radius:999px;
+  padding:1px 8px;
+  white-space:nowrap}
 .squadrow__tactic {
   font-size:13px;
   font-weight:400;

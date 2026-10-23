@@ -366,11 +366,18 @@ export default function MatchDetail({ matchId, classes, classMap, onBack, onChan
               rows={our}
               catalog={catalog}
               onPickSlot={(squad, slotIndex) => setCellPick({ squad, slotIndex })}
-              onAssign={async (playerIds, squad) => {
+              onAssign={async (playerIds, squad, slotIndex) => {
                 try {
-                  const res = await api.match.assignBulk({ matchId, playerIds, squad, allowOverfill: true });
+                  /* ⚠️ 必须把 slotIndex 带上（2026-10-23 用户报障「排表同队左右不能换」）：
+                     LineupBoard 的落点 = **离松手位置最近的那一格**（它算好当第 3 个参数传出来），
+                     这里原来只传了 squad → assignBulk 不知道"第几格" → 同队内拖动等于原地不动 ✗
+                     （跨队还能动，因为换队本身会生效）。点空格再选人那条路是带 slotIndex 的，
+                     所以才会出现"点着能放、拖着换不了"的不一致。 */
+                  const res = await api.match.assignBulk({ matchId, playerIds, squad, allowOverfill: true, slotIndex });
                   setError(null);
-                  setNotice(`已把 ${res.moved} 名队员移到「${squad}」`);
+                  setNotice(slotIndex === undefined
+                    ? `已把 ${res.moved} 名队员移到「${squad}」`
+                    : `已把 ${res.moved} 名队员放到「${squad}」第 ${slotIndex + 1} 格`);
                   await load();
                   onChanged();
                 } catch (err) {

@@ -1519,14 +1519,22 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         // 造两个人和一场对局：甲放进 防守一-1，乙留在未分配
         const p1 = await api.player.create({ gameId: 'smoke_dnd_1', name: '拖拽甲', mainClass: '神相' });
         const p2 = await api.player.create({ gameId: 'smoke_dnd_2', name: '拖拽乙', mainClass: '素问' });
-        if (!p1.ok || !p2.ok) throw new Error('建档失败');
+        /* 丙：和第一个人**同队**（用来验"同队左右换位"——用户 2026-10-23 报障的场景，
+           一个人一个队是测不出来的 ✗） */
+        const p3 = await api.player.create({ gameId: 'smoke_dnd_3', name: '拖拽丙', mainClass: '玄机' });
+        if (!p1.ok || !p2.ok || !p3.ok) throw new Error('建档失败');
         smokeMade('player', p1.data.id);
         smokeMade('player', p2.data.id);
+        smokeMade('player', p3.data.id);
         const m = await api.match.create({ date: '2026-04-01', ourSide: '我方', oppSide: '拖拽队', result: 'WIN' });
         if (!m.ok) throw new Error('建对局失败: ' + m.error);
         const mid = m.data.match.id;
         smokeMade('match', mid);
+        // 甲/丙 都放 防守一-1，且**指定格号** 0 / 1（这样同队互换才有两个位置可换）
         await api.match.upsertParticipation({ matchId: mid, playerId: p1.data.id, squad: '防守一-1', state: 'PLAY' });
+        await api.match.assignBulk({ matchId: mid, playerIds: [p1.data.id], squad: '防守一-1', slotIndex: 0, allowOverfill: true });
+        await api.match.upsertParticipation({ matchId: mid, playerId: p3.data.id, squad: '防守一-1', state: 'PLAY' });
+        await api.match.assignBulk({ matchId: mid, playerIds: [p3.data.id], squad: '防守一-1', slotIndex: 1, allowOverfill: true });
         await api.match.upsertParticipation({ matchId: mid, playerId: p2.data.id, state: 'PLAY' });
 
         // 进入对局的阵容编排页
@@ -1573,6 +1581,58 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         if (!dragCard) throw new Error('防守一-1 里找不到 smoke_dnd_1（拖拽甲的 ID）');
         steps.push('拖拽前 防守一-1 含 拖拽甲(ID)=' + !!dragCard);
 
+        /* ⚠️ 同队左右换位（用户 2026-10-23 报障：「排表同队左右不能换」）：
+           LineupBoard 的落点是**离松手位置最近的那一格**，算好当第 3 个参数传出去；
+           但对局详情那层曾经把这个参数**吞掉**（只传 squad）→ 同队内拖动等于原地不动 ✗，
+           跨队还能动 → 看起来"只有同队换不了"。
+           原来的探针 fire(toBlock, 'dragover') **不带坐标** → clientX=0 → 命中恒为第 1 格，
+           而且只断言"换队成功"，所以这个缺陷一直没被抓住 ✗。
+           这里补：同队两个有人的格子之间拖一次，断言两人的 slotNo **互换**。 */
+        const swapRow = [...document.querySelectorAll('.squadrow')]
+          .find((r) => r.querySelectorAll('.pcard:not(.pcard--empty)').length >= 2);
+        let swapOk = false;
+        let swapInfo = '同队只有 1 个有人（跳过互换断言）';
+        if (swapRow) {
+          const swapSquad = swapRow.dataset.squad;
+          const cellAt = (i) => swapRow.querySelectorAll('.squadrow__cards > *')[i];
+          const idAt = (i) => {
+            const c = cellAt(i);
+            const el = c && c.querySelector('.pcard__id');
+            return el ? el.textContent.trim() : null;
+          };
+          const filledIdx = [...swapRow.querySelectorAll('.squadrow__cards > *')]
+            .map((c, i) => (c.classList.contains('pcard--empty') ? -1 : i))
+            .filter((i) => i >= 0);
+          const i0 = filledIdx[0];
+          const i1 = filledIdx[1];
+          const idA = idAt(i0);
+          const idB = idAt(i1);
+          const srcCard = cellAt(i0);
+          const rB = cellAt(i1).getBoundingClientRect();
+          const hx = rB.left + rB.width / 2;
+          const hy = rB.top + rB.height / 2;
+          const dt2 = new DataTransfer();
+          const fire2 = (el, type, x, y) => el.dispatchEvent(new DragEvent(type, {
+            bubbles: true, cancelable: true, dataTransfer: dt2, clientX: x, clientY: y }));
+          fire2(srcCard, 'dragstart', hx, hy);
+          fire2(swapRow, 'dragover', hx, hy);
+          fire2(swapRow, 'drop', hx, hy);
+          fire2(srcCard, 'dragend', 0, 0);
+          await waitFor(() => {
+            const now = [...document.querySelectorAll('.squadrow')]
+              .find((r) => r.dataset.squad === swapSquad);
+            const c0 = now && now.querySelectorAll('.squadrow__cards > *')[i0];
+            return c0 && idB && c0.textContent.includes(idB) ? true : null;
+          }, '同队换位后第 ' + (i0 + 1) + ' 格变成 ' + idB);
+          const partsSwap = await api.match.participations(mid);
+          const rowA = partsSwap.data.find((r) => r.gameId === idA);
+          const rowB = partsSwap.data.find((r) => r.gameId === idB);
+          swapOk = !!rowA && !!rowB && rowA.slotNo === i1 && rowB.slotNo === i0;
+          swapInfo = swapSquad + ' 第' + (i0 + 1) + '格(' + idA + ') ⇄ 第' + (i1 + 1) + '格(' + idB
+            + ') → 库里 slot ' + rowA?.slotNo + '/' + rowB?.slotNo + (swapOk ? ' ✓' : ' ✗');
+        }
+        steps.push('同队左右换位: ' + swapInfo);
+
         // 目标：进攻一-1（整行是落点）
         const toBlock = blocks.find(b => b.dataset.squad === '进攻一-1');
         if (!toBlock) throw new Error('看板上找不到 进攻一-1');
@@ -1590,10 +1650,19 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
 
         const store = dt;
         const fire = (el, type) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: store }));
-        fire(dragCard, 'dragstart');
-        fire(toBlock, 'dragover');
-        fire(toBlock, 'drop');
-        fire(dragCard, 'dragend');
+        /* ⚠️ 上面刚验过「同队互换」，看板已重排 → 行和卡片都换了新节点，
+           拿旧引用 dispatch 打不中 React 的处理器（表现为"拖了但没反应"）✗
+           所以这里**重新查一次**。 */
+        const fromBlock2 = [...document.querySelectorAll('.squadrow')].find(b => b.dataset.squad === '防守一-1');
+        const toBlock2 = [...document.querySelectorAll('.squadrow')].find(b => b.dataset.squad === '进攻一-1');
+        if (!fromBlock2 || !toBlock2) throw new Error('互换后看板行找不到了');
+        const dragCard2 = [...fromBlock2.querySelectorAll('.pcard')]
+          .find(c => c.textContent.includes('smoke_dnd_1'));
+        if (!dragCard2) throw new Error('互换后 防守一-1 里找不到 smoke_dnd_1');
+        fire(dragCard2, 'dragstart');
+        fire(toBlock2, 'dragover');
+        fire(toBlock2, 'drop');
+        fire(dragCard2, 'dragend');
 
         const KEY = 'application/x-omnia-player';
         steps.push('dragstart 写入的载荷=' + store.getData(KEY));
@@ -1619,12 +1688,15 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         await api.match.remove(mid);
         await api.player.remove(p1.data.id);
         await api.player.remove(p2.data.id);
+        await api.player.remove(p3.data.id);
 
         const ok = store.getData(KEY).includes('smoke_dnd_1')
           && p1row?.squad === '进攻一-1'
           && p1row?.state === 'PLAY'
           && p2row?.squad === ''
-          && !!chip;        return { ok, steps };
+          && !!chip
+          && (swapOk || !swapRow);   // 同队两个人时必须真的互换位置
+        return { ok, steps };
       } catch (e) { return { ok: false, steps: steps.concat('ERR ' + String(e)) }; }
     })()`, '探针7');
     for (const s of dnd.steps) log('[smoke] 拖拽:', s);

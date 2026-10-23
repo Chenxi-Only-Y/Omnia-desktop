@@ -69,25 +69,28 @@ npm run smoke
 ## 3. 当前状态
 
 ```
-版本     0.2.1（package.json + package-lock.json 都已升；exe 里也是 0.2.1，读过 asar 确认 ✓）
-安装包   release\Omnia-Setup-0.2.1.exe   110.5 MB ✓（release/ 在 .gitignore 里，不入库）
-tag      v0.2.1 → 9547b14 ✓ 已推送 ✓（v0.2.0 → 46a5702 也在 ✓）
-GitHub   main 一条分支 ✓ 已推送 ✓（origin/main = a6b9021）
-Release  v0.2.1 ✓ draft=false ✓ asset = Omnia-Setup-0.2.1.exe 110.5 MB ✓（2026-10-10 已发布）
-         https://github.com/Chenxi-Only-Y/Omnia-desktop/releases/download/v0.2.1/Omnia-Setup-0.2.1.exe
+版本     0.2.2（package.json + package-lock.json 都已升；exe 里也是 0.2.2，读过 asar 确认 ✓）
+安装包   release\Omnia-Setup-0.2.2.exe   110.5 MB ✓（release/ 在 .gitignore 里，不入库）
+tag      v0.2.2 → cfb06e2 ✓ 已推送 ✓（v0.2.1 → 9547b14、v0.2.0 → 46a5702 都在 ✓）
+GitHub   main 一条分支 ✓ 已推送 ✓（origin/main = cfb06e2）
+Release  v0.2.2 ✓ draft=false ✓ asset = Omnia-Setup-0.2.2.exe 110.5 MB ✓（2026-10-23 发布）
+         https://github.com/Chenxi-Only-Y/Omnia-desktop/releases/download/v0.2.2/Omnia-Setup-0.2.2.exe
+桌面入口 C:\Users\OnlyY\Desktop\万象·Omnia.lnk
+         → node_modules\electron\dist\electron.exe + 参数 "<仓库路径>"
+         = 跑**仓库里的 dist/**（不是安装版；本机从没装过 —— 注册表无 uninstall 项、Programs 下也没有）
+         ⇒ 让它升级**不用重装**：重建 dist 即可（npm run build / npm run dist）✓
 自检     结果: PASS ✓   schema 版本: 19 ✓
-         （含：M3c 原子性 / 接龙解析 / 浮层层级 12-12 / 卡片角落 贴右上右下 / 目录穿越）
+         （含：M3c 原子性 / 接龙解析 / 浮层层级 12-12 / 卡片角落 / 下拉面板 / 同队左右换位）
 typecheck 通过 ✓
 ```
 
-**此步已于 2026-10-10 用 API 自动完成 ✓**（完整流程见根目录 `RELEASE.md`；下面是手动备用方式）：GitHub → Releases → 选标签 `v0.2.1` → 把
-`release\Omnia-Setup-0.2.1.exe` 拖到**页面最底部的 "Attach binaries"** 框
-（**不是**描述框 ✗ 拖描述框会报 "We don't support that file type"）。
-本机没装 `gh` CLI；装了之后可以一行代劳：
-`gh release create v0.2.1 release/Omnia-Setup-0.2.1.exe`。
-（v0.2.0 那次的 asset 是用户 2026-10-08 手动传的 ✓）
+**发布 Release + 传 asset 已全自动化**（v0.2.1 / v0.2.2 都是用 API 做的 ✓）：完整配方见根目录 `RELEASE.md`
+（取本机 Git Credential Manager 的令牌 → POST /releases → `curl.exe` 传 asset；**中文说明必须发 UTF-8 字节**、
+**必须写 `curl.exe`** 而不是 `curl`）。手动备用方式：GitHub → Releases → 选标签 → 把
+`release\Omnia-Setup-<版本>.exe` 拖到**页面最底部的 "Attach binaries"** 框（**不是**描述框 ✗）。
+（v0.1.1 / v0.2.0 的 asset 是用户在网页上手动传的 ✓）
 > ⚠️ v0.2.0 的安装包里**带着**「报名页签被藏」那个 bug（引入提交 7b528e7 是 v0.2.0 的祖先）
-> → 用 v0.2.0 的人点不到报名，建议尽快让大家都换到 v0.2.1。
+> → 用 v0.2.0 的人点不到报名；**建议所有人都换到 v0.2.2**（它还带了下拉面板/同队换位两个修复）。
 
 ---
 

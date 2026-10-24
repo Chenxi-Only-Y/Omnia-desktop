@@ -279,6 +279,12 @@ export class MatchRepo {
   }
 
   // ── 参战名单 ─────────────────────────────────────────────────
+  /** 清掉某场我方已保存的评分（战报 combat_stat 不动；返回删除条数） */
+  clearScores(matchId: number): number {
+    return this.db.prepare(`DELETE FROM score WHERE participation_id IN
+      (SELECT id FROM participation WHERE match_id = ? AND side = 'our')`).run(matchId).changes;
+  }
+
   participations(matchId: number): ParticipationRow[] {
     const rows = this.db.prepare(
       `SELECT p.*, pl.game_id, pl.name,
@@ -1025,6 +1031,7 @@ export class MatchRepo {
 }
 
 export { tacticKind };
+
 
 
 

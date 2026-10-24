@@ -96,6 +96,7 @@ const api = {
     importCommit: (matchId: number, preview: ImportPreview, opts?: { opp?: OppImportMode }) =>
       invoke('match:import:commit', matchId, preview, opts),
     runScore: (matchId: number, ruleSetId?: number) => invoke('match:score:run', matchId, ruleSetId),
+    clearScores: (matchId: number) => invoke('match:score:clear', matchId),
     scores: (matchId: number, ruleSetId?: number) => invoke('match:score:list', matchId, ruleSetId),
   },
   dashboard: {
@@ -140,4 +141,5 @@ const api = {
    一旦实现与契约不一致（少一个方法、返回类型变了），类型检查当场报错 ——
    这正是当初"手抄契约悄悄漂移"没被发现的原因。 */
 contextBridge.exposeInMainWorld('omnia', api satisfies OmniaApi);
+
 

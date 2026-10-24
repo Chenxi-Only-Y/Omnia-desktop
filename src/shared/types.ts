@@ -820,6 +820,7 @@ export interface OmniaApi {
       Promise<IpcResult<ImportCommitResult>>;
     /** 按规则集重算并保存某场分数 */
     runScore(matchId: number, ruleSetId?: number): Promise<IpcResult<ScoreRunSummary>>;
+  clearScores(matchId: number): Promise<IpcResult<number>>;
     /** 读取已保存的分数 */
     scores(matchId: number, ruleSetId?: number): Promise<IpcResult<SavedScore[]>>;
   };
@@ -956,6 +957,7 @@ export const IPC = {
   matchImportPreview: 'match:import:preview',
   matchImportCommit: 'match:import:commit',
   matchRunScore: 'match:score:run',
+  matchClearScores: 'match:score:clear',
   matchScores: 'match:score:list',
 
   // 帮会（一帮会一个库文件）
@@ -972,6 +974,7 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
 
 
 

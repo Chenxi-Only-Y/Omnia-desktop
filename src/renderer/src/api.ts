@@ -303,6 +303,8 @@ export const api = {
       unwrap(bridge().match.runScore(matchId, ruleSetId)),
     scores: (matchId: number, ruleSetId?: number): Promise<SavedScore[]> =>
       unwrap(bridge().match.scores(matchId, ruleSetId)),
+  clearScores: (matchId: number): Promise<number> =>
+    unwrap(bridge().match.clearScores(matchId)),
   },
 
   dashboard: {
@@ -355,3 +357,5 @@ export const api = {
     validate: (input: RuleSetInput): Promise<RuleSetValidation> => unwrap(bridge().rules.validate(input)),
   },
 };
+
+

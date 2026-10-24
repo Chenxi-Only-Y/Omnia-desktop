@@ -16,6 +16,7 @@ export default function ScorePage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const activeRule = useMemo(() => rules.find((r) => r.active) ?? null, [rules]);
 
@@ -53,6 +54,16 @@ export default function ScorePage() {
     } catch (e) { setError(errText(e)); } finally { setBusy(false); }
   };
 
+  const doClear = async (): Promise<void> => {
+    if (matchId == null) return;
+    setBusy(true); setMsg(null); setError(null);
+    try {
+      const n = await api.match.clearScores(matchId);
+      setMsg(`已删除本场评分 ${n} 条（战报数据保留）`);
+      setScores([]);
+    } catch (e) { setError(errText(e)); } finally { setBusy(false); setConfirmClear(false); }
+  };
+
   const sum = scores.reduce((s, x) => s + x.total, 0);
   const avg = scores.length ? sum / scores.length : 0;
   const teamAvg = scores.length ? scores.reduce((s, x) => s + x.teamScore, 0) / scores.length : 0;
@@ -78,6 +89,18 @@ export default function ScorePage() {
           <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>
             生效规则：{activeRule ? `${activeRule.name} v${activeRule.version}` : '（无）'}
           </span>
+          {/* 删除本场评分：两步确认，防止误点（用户 2026-10-24） */}
+          {scores.length > 0 && (
+            confirmClear ? (
+              <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ color: 'var(--warn)', fontSize: 12 }}>确定删除本场 {scores.length} 条评分？</span>
+                <button className="btn" disabled={busy} onClick={() => void doClear()}>确认删除</button>
+                <button className="btn" disabled={busy} onClick={() => setConfirmClear(false)}>取消</button>
+              </span>
+            ) : (
+              <button className="btn" disabled={busy} onClick={() => setConfirmClear(true)}>删除本场评分</button>
+            )
+          )}
         </div>
         {msg && <div className="msg" style={{ marginTop: 8 }}>{msg}</div>}
         {error && <div className="msg error" style={{ marginTop: 8 }}>{error}</div>}
@@ -123,3 +146,4 @@ export default function ScorePage() {
     </>
   );
 }
+

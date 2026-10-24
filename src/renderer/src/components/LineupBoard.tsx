@@ -482,7 +482,7 @@ const PlayerCard = memo(function PlayerCard({
             style={{ flex: '0 0 auto', fontSize: 11, opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}
             title={`历史 ${row.scoreCount ?? 0} 场平均总分`}
           >
-            {Math.round(row.scoreAvg)}
+            {row.scoreAvg.toFixed(2)}
           </span>
         )}
       </div>
@@ -563,5 +563,6 @@ const PlayerCard = memo(function PlayerCard({
     </div>
   );
 });
+
 
 

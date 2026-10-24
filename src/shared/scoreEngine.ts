@@ -271,6 +271,20 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     teamScoreBySquad.set(squad, r);
   }
 
+  /* 各阵组的平均重伤（按人头加权）：进攻 vs 防守 */
+  const groupOf = (tactic: string): 'attack' | 'defend' => (tactic === '防守' ? 'defend' : 'attack');
+  const gDeath = { attack: { sum: 0, n: 0 }, defend: { sum: 0, n: 0 } };
+  for (const p of players) {
+    const g = groupOf(p.tactic ?? '');
+    gDeath[g].sum += deriveEffective(p.stat).death;
+    gDeath[g].n += 1;
+  }
+  const overallAvgDeaths = players.length ? league.death / players.length : 0;
+  const avgDeathsByGroup = (tactic: string): number => {
+    const g = gDeath[groupOf(tactic)];
+    return g.n > 0 ? g.sum / g.n : overallAvgDeaths;
+  };
+
   const lines: ScoreLine[] = personalRaw.map(({ x, raw }) => {
     const role = x.row.role;
     const coef = coefOf(rule, x.row.classUsed);
@@ -289,7 +303,9 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     const bonus = rule.bonus[x.row.noteRole] ?? BONUS_POINTS[x.row.noteRole] ?? 0;
 
     // 死亡扣分：与全场上场者的平均死亡比较，超出部分按系数扣；**封顶**避免一场打崩扣穿地板
-    const avgDeaths = players.length ? league.death / players.length : 0;
+    /* 2026-10-24：基准改成**同阵组内平均**（进攻内部比、防守内部比）——
+       以前跟全场上场者平均比，但进攻天生冲脸、死得多，等于系统性多扣 ✗ */
+    const avgDeaths = avgDeathsByGroup(x.row.tactic);
     const deathPenalty = Math.min(
       rule.deathPenCap > 0 ? rule.deathPenCap : Number.POSITIVE_INFINITY,
       Math.max(0, (x.e.death - avgDeaths) * rule.deathPen),
@@ -381,6 +397,8 @@ function personalCurve(fn: number, ref: number, gamma: number): number {
   const v = g === 1 ? fn / r : Math.pow(fn / r, g);
   return v > 1 ? 1 : v;
 }
+
+
 
 
 

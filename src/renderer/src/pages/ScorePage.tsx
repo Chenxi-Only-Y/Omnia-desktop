@@ -29,7 +29,8 @@ export default function ScorePage() {
         const [m, r] = await Promise.all([api.match.list(), api.rules.list()]);
         setMatches(m);
         setRules(r);
-        const first = m[0];
+        /* 默认选最新一场（日期倒序；同一天取场次大的），避免一进来就落在没战报的老场次上 */
+        const first = [...m].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.indexInDay ?? 0) - (a.indexInDay ?? 0))[0];
         if (first) setMatchId(first.id);
       } catch (e) { setError(errText(e)); }
     })();
@@ -39,7 +40,16 @@ export default function ScorePage() {
     if (matchId == null) return;
     void (async () => {
       try {
-        setScores(await api.match.scores(matchId));
+        /* 分数与上场名单都要：名单驱动表格行，分数按 participationId 合并进来。
+           只取分数的话，没算过分的场次表格会是空的。 */
+        const [sc, ps] = await Promise.all([
+          api.match.scores(matchId),
+          api.match.participations(matchId),
+        ]);
+        setScores(sc);
+        setParts(ps.filter((p) => p.state === 'PLAY').sort((a, b) => (
+          (a.squad || '').localeCompare(b.squad || '') || (a.slotNo ?? 0) - (b.slotNo ?? 0)
+        )));
         setError(null);
       } catch (e) { setError(errText(e)); }
     })();
@@ -54,6 +64,9 @@ export default function ScorePage() {
       const r = await api.match.runScore(matchId);
       setMsg(`已重算 ${r.scored} 人（规则：${r.ruleSetName} · 引擎 ${r.engine}）`);
       setScores(await api.match.scores(matchId));
+      const ps = await api.match.participations(matchId);
+      setParts(ps.filter((p) => p.state === 'PLAY').sort((a, b) =>
+        (a.squad || '').localeCompare(b.squad || '') || (a.slotNo ?? 0) - (b.slotNo ?? 0)));
     } catch (e) { setError(errText(e)); } finally { setBusy(false); }
   };
 
@@ -184,6 +197,8 @@ export default function ScorePage() {
     </>
   );
 }
+
+
 
 
 

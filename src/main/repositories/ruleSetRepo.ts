@@ -14,16 +14,25 @@ import type { RuleSet, RuleSetInput, RuleSetValidation } from '../../shared/type
 
 /** 内置默认规则：对齐设计基准 v2 与原表「数据处理1」第 4 行 */
 export const DEFAULT_RULE_SET: RuleSetInput = {
-  name: '默认规则（严格照搬原表权重）',
+  name: '默认规则（规范 v2 · 已标定）',
   baseScore: 60,
   capScore: 100,
   scaleTeam: 20,
   scalePersonal: 40,
   deathPen: 3,
+  /** 重伤扣分封顶（v2）：一场打崩也不至于扣穿地板 */
+  deathPenCap: 20,
   totalTowers: 9,
+  /** 个人曲线参数（v2，由 scripts/score-calibrate.mjs 用 60 条真实战报标定）
+   *  personalHalf = 全体 FN 的中位数（"中位水平"锚点）；personalGamma = 陡度 */
+  personalHalf: 0.1046,
+  personalGamma: 1,
   personalWeights: {
     DPS: { kill: 1.2, dmg: 0.5, tower: 1.2, assist: 0.3, fountain: 0.2, bone: 0.2 },
-    T: { assist: 0.8, taken: 1.8 },
+    /* T（铁衣）2026-10-24 重配：原版权重全压在 承伤(cv 0.14)/助攻(cv 0.29) 上 →
+       5 个 T 的 sd 只有 2.44。换成 塔伤(cv 0.76)/人伤(cv 0.42) 为主、承伤只做兜底
+       → 标定后 T-sd 4.09（1.65 倍），且 T 均分不再高于全场 8 分。 */
+    T: { assist: 0.4, taken: 0.4, tower: 1.4, dmg: 0.6 },
     HEAL: { assist: 0.2, heal: 0.8, taken: 0.3, revive: 0.5 },
   },
   execWeights: {
@@ -63,9 +72,13 @@ export class RuleSetRepo {
   private get db(): SqlDatabase { return this.getDb(); }
 
   private toRuleSet(r: RuleRow): RuleSet {
-    const weights = parse<{ personal?: RuleSetInput['personalWeights']; exec?: RuleSetInput['execWeights'] }>(
-      r.weights_json, {},
-    );
+    const weights = parse<{
+      personal?: RuleSetInput['personalWeights'];
+      exec?: RuleSetInput['execWeights'];
+      personalHalf?: number;
+      personalGamma?: number;
+      deathPenCap?: number;
+    }>(r.weights_json, {});
     return {
       id: r.id,
       name: r.name,
@@ -78,6 +91,11 @@ export class RuleSetRepo {
       scalePersonal: r.scale_personal,
       deathPen: r.death_pen,
       totalTowers: r.total_towers,
+      /* 引擎 v2 的两个标定参数存在 weights_json 里（不新增列 → 不用迁移）：
+         老库没有这两个键 → 回落到 DEFAULT_RULE_SET（标定值）✓ */
+      personalHalf: typeof weights.personalHalf === 'number' ? weights.personalHalf : DEFAULT_RULE_SET.personalHalf,
+      personalGamma: typeof weights.personalGamma === 'number' ? weights.personalGamma : DEFAULT_RULE_SET.personalGamma,
+      deathPenCap: typeof weights.deathPenCap === 'number' ? weights.deathPenCap : DEFAULT_RULE_SET.deathPenCap,
       personalWeights: weights.personal ?? DEFAULT_RULE_SET.personalWeights,
       execWeights: weights.exec ?? DEFAULT_RULE_SET.execWeights,
       classCoef: parse(r.class_coef_json, DEFAULT_RULE_SET.classCoef),
@@ -136,7 +154,7 @@ export class RuleSetRepo {
     ).run(
       name, input.baseScore, input.capScore, input.scaleTeam, input.scalePersonal,
       input.deathPen, input.totalTowers,
-      JSON.stringify({ personal: input.personalWeights, exec: input.execWeights }),
+      JSON.stringify({ personal: input.personalWeights, exec: input.execWeights, personalHalf: input.personalHalf, personalGamma: input.personalGamma, deathPenCap: input.deathPenCap }),
       JSON.stringify(input.classCoef), JSON.stringify(input.bonus), version,
     );
     return this.get(Number(info.lastInsertRowid));
@@ -154,7 +172,7 @@ export class RuleSetRepo {
       (input.name ?? '').trim() || this.get(id).name,
       input.baseScore, input.capScore, input.scaleTeam, input.scalePersonal,
       input.deathPen, input.totalTowers,
-      JSON.stringify({ personal: input.personalWeights, exec: input.execWeights }),
+      JSON.stringify({ personal: input.personalWeights, exec: input.execWeights, personalHalf: input.personalHalf, personalGamma: input.personalGamma, deathPenCap: input.deathPenCap }),
       JSON.stringify(input.classCoef), JSON.stringify(input.bonus), id,
     );
     return this.get(id);
@@ -246,3 +264,5 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
+

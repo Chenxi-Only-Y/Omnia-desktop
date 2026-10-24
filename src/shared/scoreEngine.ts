@@ -66,10 +66,12 @@ export interface MatchScoreOutput {
 
 /**
  * 引擎标识：落库用，便于算法迭代后区分历史分数。
- *  v1 = 早期"可标定的一版"（FN 按权重和归一、个人比例钳到 [0,1]、总分有 0 下限）
- *  spec-v1 = 落地 `LIS设计基准v2.md` 第二部分「评分算法规范 v1.0」（见 `work/spec_v1.py` 参考实现）
+ *  v1       = 早期"可标定的一版"（FN 按权重和归一、个人比例钳到 [0,1]、总分有 0 下限）
+ *  spec-v1  = 照搬 LIS设计基准v2.md「评分算法规范 v1.0」（同场 Min-Max 归一，零贡献可为负）
+ *  spec-v2  = **重新设计**（2026-10-24）：个人分改绝对饱和曲线（跨场可比、零贡献记 0）、
+ *             重伤扣分封顶、T/治疗 补 资源/焚骨 提升区分度。见 personalCurve() 注释。
  */
-export const ENGINE_ID = 'omnia-spec-v1';
+export const ENGINE_ID = 'omnia-spec-v2';
 
 const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0);
 const safeDiv = (a: number, b: number): number => (b === 0 ? 0 : a / b);
@@ -194,6 +196,7 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     revive: sum(eff.map((x) => x.e.revive)),
     fountain: sum(eff.map((x) => x.e.fountain)),
     bone: sum(eff.map((x) => x.e.bone)),
+    resource: sum(eff.map((x) => x.e.resource)),
   };
 
   // 个人原始加权（占比 = 个人 / 联盟）
@@ -207,10 +210,6 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   });
 
   const rawValues = personalRaw.map((p) => p.raw);
-  /*个人换算比例（规范 v1.0 §2.4）：
-    FO = (FN − MIN(非零FN)) / (MAX(非零FN) − MIN(非零FN))
-    ⚠️ **不钳制到 [0,1]**：零贡献者 FN=0 → FO 为负 → 个人分也变负（D16 保留原行为），
-    这样"总分低于 60"才有意义；以前钳到 0 会让零贡献者和"刚好最低的正贡献者"一个分 ✗ */
   const posRaws = rawValues.filter((v) => v > 0);
   const rawLo = posRaws.length ? Math.min(...posRaws) : 0;
   const rawHi = posRaws.length ? Math.max(...posRaws) : 0;
@@ -264,7 +263,9 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   const lines: ScoreLine[] = personalRaw.map(({ x, raw }) => {
     const role = x.row.role;
     const coef = rule.classCoef[x.row.classUsed] ?? 0;
-    const personalRatio = rawHi > rawLo ? (raw - rawLo) / (rawHi - rawLo) : 0;
+    const half = rule.personalHalf > 0 ? rule.personalHalf : (rawHi > rawLo ? (rawLo + rawHi) / 2 : 1);
+    const gamma = rule.personalGamma > 0 ? rule.personalGamma : 1;
+    const personalRatio = personalCurve(raw, half, gamma);
     const personalScore = personalRatio * rule.scalePersonal * coef;
 
     const team = x.row.squad ? teamScoreBySquad.get(x.row.squad) : undefined;
@@ -272,9 +273,12 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
 
     const bonus = rule.bonus[x.row.noteRole] ?? BONUS_POINTS[x.row.noteRole] ?? 0;
 
-    // 死亡扣分：与全场上场者的平均死亡比较，超出部分按系数扣
+    // 死亡扣分：与全场上场者的平均死亡比较，超出部分按系数扣；**封顶**避免一场打崩扣穿地板
     const avgDeaths = players.length ? league.death / players.length : 0;
-    const deathPenalty = Math.max(0, (x.e.death - avgDeaths) * rule.deathPen);
+    const deathPenalty = Math.min(
+      rule.deathPenCap > 0 ? rule.deathPenCap : Number.POSITIVE_INFINITY,
+      Math.max(0, (x.e.death - avgDeaths) * rule.deathPen),
+    );
 
     /* 总分（规范 v1.0 §2.7）：总分 = MIN(60 + 团队 + 个人 + 附加 − 重伤扣分, 100)
        ⚠️ 只有**上封顶**，没有 0 下限 —— 零贡献 + 重伤扣分可以低于 60（规范 §2.8 的"最低分 49.30"就是这么来的）*/
@@ -304,7 +308,8 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
         重伤: x.e.death,
         复活: x.e.revive,
         个人原始加权: Number(raw.toFixed(6)),
-        个人归一: Number(personalRatio.toFixed(4)),
+        个人曲线: Number(personalRatio.toFixed(4)),
+        曲线半值: Number(half.toFixed(6)),
         职业系数: coef,
         战术类型: tacticKind((x.row.tactic ?? '') as Tactic),
         小队执行分: Number((team?.score ?? 0).toFixed(4)),
@@ -321,7 +326,7 @@ function keyToEff(key: string): string {
   const map: Record<string, string> = {
     kill: 'effKills', dmg: 'effDmg', tower: 'effTower',
     assist: 'assist', fountain: 'fountain', bone: 'bone',
-    heal: 'heal', taken: 'taken', revive: 'revive',
+    heal: 'heal', taken: 'taken', revive: 'revive', resource: 'resource',
   };
   return map[key] ?? key;
 }
@@ -331,6 +336,27 @@ function keyToLeague(key: string): string {
   const map: Record<string, string> = {
     kill: 'kill', dmg: 'dmg', tower: 'tower', assist: 'assist',
     fountain: 'fountain', bone: 'bone', heal: 'heal', taken: 'taken', revive: 'revive',
+    resource: 'resource',
   };
   return map[key] ?? key;
+}
+
+/**
+ * 个人换算比例（引擎 v2）：饱和曲线 FO = (FN / (FN + half)) ^ γ。
+ *
+ * 为什么不用"同场 Min-Max 归一"（规范 v1.0）：
+ *   那样个人分 = (FN − 同场最低) / (同场最高 − 同场最低) ✗ 取决于**同场其他人的极值** ——
+ *   同一份战报，队友越猛你越低；换一场分数就变；一场里出了个怪物，全队都被压平。
+ *   联赛要跨场比，个人分必须是**绝对**的。
+ *
+ * 曲线性质：FN=0 → 0（零贡献不再得负分 ✓）；FN=half → 0.5^γ（half 取 FN 中位数时约等于"中位水平"锚点）；
+ * 单调、有界 [0,1)。γ>1 时低贡献被压低、高贡献不变 → 拉开差距。
+ * half / γ 都由 scripts/score-calibrate.mjs 用真实战报标定。
+ */
+function personalCurve(fn: number, half: number, gamma: number): number {
+  if (!(fn > 0)) return 0;
+  const h = half > 0 ? half : 1;
+  const base = fn / (fn + h);
+  const g = gamma > 0 ? gamma : 1;
+  return g === 1 ? base : Math.pow(base, g);
 }

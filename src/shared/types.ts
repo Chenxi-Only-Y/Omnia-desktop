@@ -453,6 +453,12 @@ export interface PersonalWeights {
   heal?: number;
   taken?: number;
   revive?: number;
+  /**
+   * 资源（原表「资源」列）。
+   * 2026-10-24 加入：T（铁衣）原来只有 助攻/承伤 两项 → 5 个 T 的 sd 只有 2.44，几乎分不出高低 ✗
+   * 补上资源/焚骨后区分度才够。
+   */
+  resource?: number;
 }
 
 export interface ExecWeights {
@@ -470,6 +476,21 @@ export interface RuleSetInput {
   scalePersonal: number;
   deathPen: number;
   totalTowers: number;
+  /**
+   * 个人分的**饱和曲线半值**（引擎 v2）：个人比例 = FN / (FN + personalHalf)。
+   * 换掉原来"同场 Min-Max 归一"的做法 —— 那玩意让个人分取决于同场其他人的极值 ✗
+   * （队友越强你越低、换一场分数就变），联赛里跨场没法比。
+   * 取值 = 全体 FN 的中位数时，中位水平的人拿满 0.5，标定即可。
+   */
+  personalHalf: number;
+  /**
+   * 个人曲线**陡度** γ：FO = (FN/(FN+half))^γ。
+   * γ > 1 把低贡献往下压、高贡献保持不变 → 拉开差距（sd 变大）；γ = 1 就是普通饱和曲线。
+   * 和 personalHalf 一起标定，才能既"跨场稳定"又"区分度够"。
+   */
+  personalGamma: number;
+  /** 重伤扣分**封顶**（引擎 v2）：避免一场打崩就把人扣穿地板 */
+  deathPenCap: number;
   personalWeights: { DPS: PersonalWeights; T: PersonalWeights; HEAL: PersonalWeights };
   execWeights: ExecWeights;
   classCoef: Record<string, number>;

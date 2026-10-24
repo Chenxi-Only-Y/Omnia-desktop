@@ -230,7 +230,8 @@ npm run fix:electron              # 方案 B：手动跑修复脚本（已接在
 | `npm run css:audit` | 样式表审计（只报告）：重复选择器组 / 候选死选择器 |
 | `npm run css:stats` | 样式表实测统计（token 数、字号/圆角分布、玻璃与阴影处数） |
 | `npm run css:prune` | 预览「永不生效的旧声明」（`-- --apply` 才写文件，自带校验与备份） |
-| `npm run score:regress` | **评分算法回归**：60 条真实战报逐人比对「规范 v1.0」期望分（M1 的验收标准） |
+| `npm run score:regress` | **评分引擎回归**：12 项设计验收（跨场稳定性 / T 区分度 / 分布 / 零贡献不得负分） |
+| `npm run score:calibrate` | **评分权重标定**：用 60 条真实战报标定个人曲线与职业权重（`-- --apply` 才写回默认值） |
 | `npm run dist` | 打 Windows 安装包（NSIS） |
 | `npm run dist:dir` | 只产出免安装目录（`release/win-unpacked`） |
 
@@ -532,3 +533,4 @@ npm run dist
 | `player.intro` | v19 | 自定义介绍（第 1 屏 3 行小字） |
 
 IPC：`player:pick-bg` / `player:set-bg` / `player:clear-bg`（已进 types → preload → api）
+

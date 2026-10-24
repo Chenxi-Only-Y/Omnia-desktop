@@ -262,5 +262,7 @@ export function deriveEffective(s: CombatStat) {
     revive: s.revives,
     fountain: s.fountainKills,
     bone: s.boneBurn,
+    /** 资源（2026-10-24）：T/治疗 的区分度主要靠它，原来被丢掉了 */
+    resource: s.resource,
   };
 }

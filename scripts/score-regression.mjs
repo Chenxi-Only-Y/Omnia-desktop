@@ -113,7 +113,8 @@ const checks = {
   '均值 75~90': stats.mean >= 75 && stats.mean <= 90,
   'sd ≥9': stats.sd >= 9,
   '最低分 <62': stats.min < 62,
-  '触顶 1~20%（不能人人满分）': stats.capped >= 1 && stats.capped <= Math.round(fixture.rows.length * 0.2),
+  /* γ 提到 1.8 后顶部更集中，触顶比例放宽到 25%（仍不允许人人满分） */
+  '触顶 1~25%（不能人人满分）': stats.capped >= 1 && stats.capped <= Math.round(fixture.rows.length * 0.25),
   /* 新团队分（对局 30% + 表现 70%，比值归一）会**压缩**极端 0/1 跳变，
      所以看的是"够不够分高低"而不是越大越好 */
   '团队分极差 5~12（够分高低、又不靠 0/1 拉大）': stats.teamRange >= 5 && stats.teamRange <= 12,
@@ -154,6 +155,7 @@ if (bad.length) {
   process.exit(1);
 }
 console.log('\n评分回归 PASS ✅');
+
 
 
 

@@ -82,10 +82,10 @@ const ROLE_PERSONAL_REF: Record<'DPS' | 'T' | 'HEAL', number> = { DPS: 0.175, T:
  * 重算方式：`npm run score:refcal -- --csv <战报.csv> ...`
  */
 const CLASS_PERSONAL_REF: Record<string, number> = {
-  素问: 0.2135, 妙音: 0.1672,
-  惊鸿: 0.1857, 九灵: 0.2501, 神相: 0.1525, 玄机: 0.1345, 血河: 0.133,
-  龙吟: 0.157, 碎梦: 0.1927, 沧澜: 0.1465, 潮光: 0.1094,
-  铁衣: 0.1034,
+  素问: 0.1868, 妙音: 0.1463,
+  惊鸿: 0.1625, 九灵: 0.2188, 神相: 0.1334, 玄机: 0.1177, 血河: 0.1164,
+  龙吟: 0.1374, 碎梦: 0.1686, 沧澜: 0.1282, 潮光: 0.0957,
+  铁衣: 0.0905,
 };
 
 /** 展开成 12 个职业的参考值（缺的职业回落到同定位基准） */
@@ -128,7 +128,7 @@ export const DEFAULT_RULE_SET: RuleSetInput = {
    *    DPS  中位≈0.085 → 0.135 ｜ T 中位≈0.0365 → 0.058 ｜ 治疗 中位≈0.098 → 0.156
    *  （实测 60 条样本 + 10/17 真实局两个数据集）*/
   personalRef: buildClassPersonalRef(),
-  personalGamma: 1.5,
+  personalGamma: 1.8,
   /* 个人权重**按职业**（12 套）。初值 = 该职业所属定位的口径，之后每个职业可单独调
      （用户 2026-10-24：不再按 DPS/T/治疗 划分，而是按职业划分，和职业系数一起作用）。
      取值见文件末尾 ROLE_PERSONAL_WEIGHTS；这里用 CLASSES 展开成 12 条。 */
@@ -386,6 +386,8 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
+
 
 
 

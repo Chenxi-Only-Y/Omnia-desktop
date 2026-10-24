@@ -38,7 +38,7 @@ const canon = (cls) => ALIAS.get(String(cls ?? '').trim()) ?? '';
 const COEF = Object.fromEntries(CLASSES.map((c) => [c.name, c.coef]));
 const ROLE_REF = { DPS: 0.175, T: 0.075, HEAL: 0.2 };
 /* ANCHOR：让「该职业的 FN 中位」映射到个人分 13（系数 1.0 时）：40 × (1/ANCHOR)^1.5 = 13 */
-const ANCHOR = 2.12;
+const ANCHOR = 1.855;   // γ=1.8 时：40×(1/ANCHOR)^1.8 = 13
 const SHRINK_K = 5;
 
 const median = (a) => {
@@ -138,6 +138,7 @@ if (process.argv.includes('--apply')) {
     console.log('  ' + keys.slice(i, i + 4).map((k) => `${k}: ${ref[k]}`).join(', ') + ',');
   }
 }
+
 
 
 

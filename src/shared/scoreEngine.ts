@@ -64,7 +64,12 @@ export interface MatchScoreOutput {
   engine: string;
 }
 
-export const ENGINE_ID = 'omnia-default-v1';
+/**
+ * 引擎标识：落库用，便于算法迭代后区分历史分数。
+ *  v1 = 早期"可标定的一版"（FN 按权重和归一、个人比例钳到 [0,1]、总分有 0 下限）
+ *  spec-v1 = 落地 `LIS设计基准v2.md` 第二部分「评分算法规范 v1.0」（见 `work/spec_v1.py` 参考实现）
+ */
+export const ENGINE_ID = 'omnia-spec-v1';
 
 const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0);
 const safeDiv = (a: number, b: number): number => (b === 0 ? 0 : a / b);
@@ -76,7 +81,10 @@ const weightSum = (w: Record<string, number | undefined>): number =>
 /**
  * 按「权重 × 占比」求和。
  * 权重里没出现的键视为"该定位不使用这一项"（不参与计算）。
- * 若权重和不为 1，按权重和归一，避免规则未归一化时量级漂移。
+ *
+ * ⚠️ **不按权重和归一**（规范 v1.0 §2.4）：FN = Σ w_k × (个人有效值_k / 联盟有效值_k) 就是原式。
+ * 以前这里除以权重和，等于把三种定位的 FN 各自缩放到不同量级（DPS 权重和 3.6 / T 2.6 / 治疗 1.8），
+ * 而个人分是**跨定位**一起排的 Min-Max → 缩放不同就会改变不同职业之间的相对高低 ✗
  */
 function weighted(w: Record<string, number | undefined>, ratio: (key: string) => number): number {
   const total = weightSum(w);
@@ -86,17 +94,19 @@ function weighted(w: Record<string, number | undefined>, ratio: (key: string) =>
     if (typeof v !== 'number' || v === 0) continue;
     acc += v * ratio(k);
   }
-  return acc / total;
+  return acc;
 }
 
-/** Min-Max 归一（只在正值之间取范围；结果裁剪到 [0,1]） */
+/**
+ * Min-Max 归一（在**同一池**内取 min/max；池里所有值相等时给 0.5）。
+ * 规范 v1.0 §2.5 的 nrm()：不筛正值、不钳制 —— 筛正值会让"全队都 0"这种池直接塌成 0 ✗
+ */
 function minMax(value: number, values: number[]): number {
-  const pos = values.filter((v) => v > 0);
-  if (!pos.length || value <= 0) return 0;
-  const lo = Math.min(...pos);
-  const hi = Math.max(...pos);
-  if (hi <= lo) return 0;
-  return Math.max(0, Math.min(1, (value - lo) / (hi - lo)));
+  if (!values.length) return 0.5;
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  if (hi === lo) return 0.5;
+  return (value - lo) / (hi - lo);
 }
 
 /** 某一战术类型下的执行分（0~1） */
@@ -197,8 +207,13 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   });
 
   const rawValues = personalRaw.map((p) => p.raw);
-  const rawMin = Math.min(...rawValues.filter((v) => v > 0), 0);
-  const rawMax = Math.max(...rawValues, 1);
+  /*个人换算比例（规范 v1.0 §2.4）：
+    FO = (FN − MIN(非零FN)) / (MAX(非零FN) − MIN(非零FN))
+    ⚠️ **不钳制到 [0,1]**：零贡献者 FN=0 → FO 为负 → 个人分也变负（D16 保留原行为），
+    这样"总分低于 60"才有意义；以前钳到 0 会让零贡献者和"刚好最低的正贡献者"一个分 ✗ */
+  const posRaws = rawValues.filter((v) => v > 0);
+  const rawLo = posRaws.length ? Math.min(...posRaws) : 0;
+  const rawHi = posRaws.length ? Math.max(...posRaws) : 0;
 
   // 小队聚合（用于战术执行分）
   const bySquad = new Map<string, ScoreInputRow[]>();
@@ -249,9 +264,7 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   const lines: ScoreLine[] = personalRaw.map(({ x, raw }) => {
     const role = x.row.role;
     const coef = rule.classCoef[x.row.classUsed] ?? 0;
-    const personalRatio = rawMax > rawMin
-      ? Math.max(0, Math.min(1, (raw - rawMin) / (rawMax - rawMin)))
-      : 0;
+    const personalRatio = rawHi > rawLo ? (raw - rawLo) / (rawHi - rawLo) : 0;
     const personalScore = personalRatio * rule.scalePersonal * coef;
 
     const team = x.row.squad ? teamScoreBySquad.get(x.row.squad) : undefined;
@@ -263,8 +276,10 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     const avgDeaths = players.length ? league.death / players.length : 0;
     const deathPenalty = Math.max(0, (x.e.death - avgDeaths) * rule.deathPen);
 
+    /* 总分（规范 v1.0 §2.7）：总分 = MIN(60 + 团队 + 个人 + 附加 − 重伤扣分, 100)
+       ⚠️ 只有**上封顶**，没有 0 下限 —— 零贡献 + 重伤扣分可以低于 60（规范 §2.8 的"最低分 49.30"就是这么来的）*/
     const total = Math.min(
-      Math.max(rule.baseScore + teamScore + personalScore + bonus - deathPenalty, 0),
+      rule.baseScore + teamScore + personalScore + bonus - deathPenalty,
       rule.capScore,
     );
 

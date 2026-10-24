@@ -21,6 +21,7 @@
     "css:audit": "node scripts/css-audit.mjs",
     "css:stats": "node scripts/css-audit.mjs --only=stats",
     "css:prune": "node scripts/css-prune.mjs",
+    "score:regress": "npm run build:node && node scripts/score-regression.mjs",
     "dist": "npm run clean:release && npm run build && electron-builder --win --x64",
     "dist:dir": "npm run clean:release && npm run build && electron-builder --win --x64 --dir"
   },
@@ -70,3 +71,4 @@
     "ffmpeg-static@5.3.0": true
   }
 }
+

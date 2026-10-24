@@ -78,6 +78,7 @@ export default function ScorePage() {
     } catch (e) { setError(errText(e)); }
   };
 
+  const scoreMap = useMemo(() => new Map(scores.map((x) => [x.participationId, x])), [scores]);
   const sum = scores.reduce((s, x) => s + x.total, 0);
   const avg = scores.length ? sum / scores.length : 0;
   const teamAvg = scores.length ? scores.reduce((s, x) => s + x.teamScore, 0) / scores.length : 0;
@@ -127,76 +128,49 @@ export default function ScorePage() {
       </div>
 
       <div className="card">
-        <h3>分数明细{scores.length === 0 && '（这场还没算过，点上面的「按当前规则重算」）'}</h3>
+        <h3>分数明细{scores.length === 0 && '（还没算过 —— 点上面的「按当前规则重算」）'}</h3>
+        <div className="hint" style={{ marginBottom: 8 }}>
+          「手动」= 手动赋分（K龙补偿 / 阵容问题等，可正可负）；改完点该行「存」，再重算才进总分。
+          附加 = 备注角色的规则加分 + 手动赋分。
+        </div>
         <div className="table-wrap">
           <table className="grid">
             <thead>
               <tr>
                 <th>玩家</th><th>小队</th>
                 <th className="num">团队分</th><th className="num">个人分</th>
-                <th className="num">附加</th><th className="num">重伤扣分</th>
+                <th className="num">附加</th>
+                <th className="num" style={{ width: 150 }}>手动</th>
+                <th className="num">重伤扣分</th>
                 <th className="num">总分</th>
               </tr>
             </thead>
             <tbody>
-              {scores.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>暂无数据</td></tr>
-              )}
-              {scores.map((s) => (
-                <tr key={s.participationId}>
-                  <td>{s.playerName}</td>
-                  <td>{s.squad || '—'}</td>
-                  <td className="num">{s.teamScore.toFixed(2)}</td>
-                  <td className="num">{s.personalScore.toFixed(2)}</td>
-                  <td className="num">{s.bonus.toFixed(1)}</td>
-                  <td className="num">{s.deathPenalty.toFixed(2)}</td>
-                  <td className="num"><b>{s.total.toFixed(2)}</b></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className="card">
-        <h3>手动赋分（K龙 / 阵容问题）</h3>
-        <div className="hint" style={{ marginBottom: 8 }}>
-          正负均可（例如 +2 或 −1.5）。保存后要点上面的「按当前规则重算」才会进总分 ——
-          这笔分会加到「附加」里，与备注角色的规则加分分开记。
-        </div>
-        <div className="table-wrap">
-          <table className="grid">
-            <thead>
-              <tr>
-                <th>玩家</th><th>小队</th><th className="num">已存</th>
-                <th className="num" style={{ width: 110 }}>本次</th>
-                <th style={{ width: 220 }}>原因</th><th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
               {parts.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>选一场对局后显示上场名单</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>选一场对局后显示上场名单</td></tr>
               )}
               {parts.map((p) => {
+                const sc = scoreMap.get(p.id);
                 const d = draft[p.id] ?? { points: String(p.manualBonus ?? 0), reason: p.manualReason ?? '' };
                 return (
                   <tr key={p.id}>
                     <td>{p.gameId || p.name}</td>
                     <td>{p.squad || '—'}</td>
-                    <td className="num" style={{ color: (p.manualBonus ?? 0) !== 0 ? 'var(--warn)' : 'var(--text-faint)' }}>
-                      {(p.manualBonus ?? 0).toFixed(1)}
-                    </td>
+                    <td className="num">{sc ? sc.teamScore.toFixed(2) : '—'}</td>
+                    <td className="num">{sc ? sc.personalScore.toFixed(2) : '—'}</td>
+                    <td className="num">{sc ? sc.bonus.toFixed(2) : '—'}</td>
                     <td>
-                      <input className="input cell-num" type="number" step="0.5" value={d.points}
-                             onChange={(e) => setDraft({ ...draft, [p.id]: { ...d, points: e.target.value } })} />
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <input className="input cell-num" style={{ width: 56 }} type="number" step="0.5" value={d.points}
+                               onChange={(e) => setDraft({ ...draft, [p.id]: { ...d, points: e.target.value } })} />
+                        <input className="input" list="manual-reasons" style={{ minWidth: 0, width: 62 }} placeholder="原因"
+                               title={d.reason || '原因'} value={d.reason}
+                               onChange={(e) => setDraft({ ...draft, [p.id]: { ...d, reason: e.target.value } })} />
+                        <button className="btn" style={{ padding: '0 6px' }} onClick={() => void saveManual(p)}>存</button>
+                      </div>
                     </td>
-                    <td>
-                      <input className="input" list="manual-reasons" placeholder="K龙 / 阵容问题 / 其他"
-                             value={d.reason}
-                             onChange={(e) => setDraft({ ...draft, [p.id]: { ...d, reason: e.target.value } })} />
-                    </td>
-                    <td>
-                      <button className="btn" onClick={() => void saveManual(p)}>保存</button>
-                    </td>
+                    <td className="num">{sc ? sc.deathPenalty.toFixed(2) : '—'}</td>
+                    <td className="num"><b>{sc ? sc.total.toFixed(2) : '—'}</b></td>
                   </tr>
                 );
               })}
@@ -210,6 +184,7 @@ export default function ScorePage() {
     </>
   );
 }
+
 
 
 

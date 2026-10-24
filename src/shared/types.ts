@@ -488,7 +488,7 @@ export interface RuleSetInput {
    * 锚定口径：**同定位的中位水平 = 个人分 20（满量程的一半）**，即 ref = 该定位 FN 中位数 × 1.587。
    * 换掉"同场 Min-Max 归一"（那才是真正跨场不可比的那个）。
    */
-  personalRef: { DPS: number; T: number; HEAL: number };
+  personalRef: Record<string, number>;
   /** 个人曲线**陡度** γ：FO = min(1, (FN/personalRef)^γ)。γ<1 抬高中间段，γ>1 压低中间段 */
   personalGamma: number;
   /** 重伤扣分**封顶**（引擎 v2）：避免一场打崩就把人扣穿地板 */
@@ -968,6 +968,7 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
 
 
 

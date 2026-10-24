@@ -304,6 +304,7 @@ export default function RulesPage({ classes }: PageProps) {
                     <th style={{ width: 200 }}>职业（定位 · 系数）</th>
                     {PERSONAL_FIELDS.map((f) => <th key={f.key} className="num">{f.label}</th>)}
                     <th className="num" style={{ width: 90 }}>合计</th>
+                    <th className="num" style={{ width: 90 }}>参考值</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -340,6 +341,11 @@ export default function RulesPage({ classes }: PageProps) {
                         })}
                         <td className="num" style={{ color: Math.abs(total - 1) < 1e-6 ? 'var(--ok)' : 'var(--warn)' }}>
                           {total.toFixed(2)}
+                        </td>
+                        {/* 满量程参考值：FN 达到它就等于个人分满分（40）；
+                            按职业标定 —— 「个人分 = 同职业内排名」，见 ALGORITHM.md */}
+                        <td className="num" title="满量程参考值：FN 达到它就等于个人分满分">
+                          {editing.personalRef[cls.name] ?? '—'}
                         </td>
                       </tr>
                     );
@@ -437,4 +443,5 @@ export default function RulesPage({ classes }: PageProps) {
     </>
   );
 }
+
 

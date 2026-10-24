@@ -56,6 +56,43 @@ const CLASS_PERSONAL_TUNING: Record<string, RuleSetInput['personalWeights'][stri
   惊鸿: { kill: 1.0, dmg: 1.5, tower: 0.4, assist: 0.3, fountain: 0.2, bone: 0.2 },
 };
 
+/**
+ * 满量程参考值：**按定位**的基准（旧口径，也是按职业标定时的收缩中心）
+ * 锚定"同定位中位水平 ≈ 个人分 13 分"
+ */
+const ROLE_PERSONAL_REF: Record<'DPS' | 'T' | 'HEAL', number> = { DPS: 0.175, T: 0.075, HEAL: 0.2 };
+
+/**
+ * 满量程参考值：**按职业**（2026-10-24，用户选 A：个人分=同职业内排名）
+ *
+ * 标定口径（关键）：用**去掉职业系数后**的 FN 中位数，否则参考值会把系数的影响吃掉 ✗
+ *   ratio = 该职业 FN(去系数)中位 ÷ 同定位中位 ；shrink = n/(n+5) ；ref = ref_定位 × (1 + (ratio−1)×shrink)
+ * 数据：60 条夹具 + 2026-10-17 真实局，共 119 条（每职业 3~19 条）
+ * 重算方式：`npm run score:refcal -- --csv <战报.csv> ...`
+ */
+const CLASS_PERSONAL_REF: Record<string, number> = {
+  素问: 0.2, 妙音: 0.1947,
+  惊鸿: 0.193, 九灵: 0.2059, 神相: 0.1527, 玄机: 0.1623, 血河: 0.1324,
+  龙吟: 0.1868, 碎梦: 0.186, 沧澜: 0.2181, 潮光: 0.1633,
+  铁衣: 0.075,
+};
+
+/** 展开成 12 个职业的参考值（缺的职业回落到同定位基准） */
+export function buildClassPersonalRef(): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of CLASSES) out[c.name] = CLASS_PERSONAL_REF[c.name] ?? ROLE_PERSONAL_REF[c.role];
+  return out;
+}
+
+/** 兼容旧规则集：只有 DPS/T/HEAL 三键时按职业展开 */
+export function expandPersonalRef(raw: Record<string, number> | undefined): Record<string, number> {
+  if (!raw || !Object.keys(raw).length) return buildClassPersonalRef();
+  const out: Record<string, number> = {};
+  for (const c of CLASSES) out[c.name] = raw[c.name] ?? raw[c.role] ?? ROLE_PERSONAL_REF[c.role];
+  for (const [k, v] of Object.entries(raw)) if (!(k in out)) out[k] = v;
+  return out;
+}
+
 /** 展开成 12 个职业各一套（每套独立对象，改一个不会连带改别的职业） */
 export function buildClassPersonalWeights(): RuleSetInput['personalWeights'] {
   const out: RuleSetInput['personalWeights'] = {};
@@ -79,7 +116,7 @@ export const DEFAULT_RULE_SET: RuleSetInput = {
    *  锚定"同定位中位 = 个人分 20"，ref = 该定位 FN 中位数 × 1.587：
    *    DPS  中位≈0.085 → 0.135 ｜ T 中位≈0.0365 → 0.058 ｜ 治疗 中位≈0.098 → 0.156
    *  （实测 60 条样本 + 10/17 真实局两个数据集）*/
-  personalRef: { DPS: 0.175, T: 0.075, HEAL: 0.2 },
+  personalRef: buildClassPersonalRef(),
   personalGamma: 1.5,
   /* 个人权重**按职业**（12 套）。初值 = 该职业所属定位的口径，之后每个职业可单独调
      （用户 2026-10-24：不再按 DPS/T/治疗 划分，而是按职业划分，和职业系数一起作用）。
@@ -129,7 +166,7 @@ export class RuleSetRepo {
     const weights = parse<{
       personal?: RuleSetInput['personalWeights'];
       exec?: RuleSetInput['execWeights'];
-      personalRef?: { DPS: number; T: number; HEAL: number };
+      personalRef?: Record<string, number>;
       personalGamma?: number;
       deathPenCap?: number;
     }>(r.weights_json, {});
@@ -147,7 +184,7 @@ export class RuleSetRepo {
       totalTowers: r.total_towers,
       /* 引擎 v2 的两个标定参数存在 weights_json 里（不新增列 → 不用迁移）：
          老库没有这两个键 → 回落到 DEFAULT_RULE_SET（标定值）✓ */
-      personalRef: weights.personalRef ?? DEFAULT_RULE_SET.personalRef,
+      personalRef: expandPersonalRef(weights.personalRef),
       personalGamma: typeof weights.personalGamma === 'number' ? weights.personalGamma : DEFAULT_RULE_SET.personalGamma,
       deathPenCap: typeof weights.deathPenCap === 'number' ? weights.deathPenCap : DEFAULT_RULE_SET.deathPenCap,
       /* 兼容两种存法：
@@ -338,6 +375,8 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
+
 
 
 

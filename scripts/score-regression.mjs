@@ -109,6 +109,7 @@ const checks = {
   '个人分中位 8~25（不是人人满分）': pMedian >= 8 && pMedian <= 25,
   'T 区分度 ≥3.5': stats.tSd >= 3.5,
   'T/治疗 个人分中位≈全场（按定位标定后应齐平）': Math.abs(median(pers.filter((_, i) => out.lines[i].role !== 'DPS')) - pMedian) <= 4,
+
   '均值 75~90': stats.mean >= 75 && stats.mean <= 90,
   'sd ≥9': stats.sd >= 9,
   '最低分 <62': stats.min < 62,
@@ -135,6 +136,17 @@ console.log(`分布: 均值 ${stats.mean.toFixed(2)}  sd ${stats.sd.toFixed(2)} 
 console.log(`T: n=${stats.tN} 均分 ${stats.tMean.toFixed(2)}  sd ${stats.tSd.toFixed(2)}`);
 console.log(`跨场稳定性: 新口径 平均 ${driftNew.mean.toFixed(3)} / 最大 ${driftNew.max.toFixed(3)} 分  `
   + `｜ 旧同场MinMax 平均 ${driftOld.mean.toFixed(3)} / 最大 ${driftOld.max.toFixed(3)} 分`);
+/* 各职业个人分中位（信息项：参考值目前只标定了 2 场样本，个别职业跨场波动大，
+   等攒到 3~5 场再用 score:refcal 重标定；这里只打印，不做硬判据） */
+const byClsMed = new Map();
+for (const l of out.lines) {
+  const cls = INPUT.rows.find((r) => r.participationId === l.participationId)?.classUsed ?? '';
+  if (!byClsMed.has(cls)) byClsMed.set(cls, []);
+  byClsMed.get(cls).push(l.personalScore);
+}
+console.log('  各职业个人分中位: ' + [...byClsMed.entries()]
+  .map(([c, v]) => `${c} ${median(v).toFixed(1)}(n=${v.length})`).join('  '));
+
 const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([k]) => k);
 console.log('\n检查项: ' + Object.entries(checks).map(([k, ok]) => `${ok ? '✓' : '✗'} ${k}`).join('\n        '));
 if (bad.length) {
@@ -142,6 +154,9 @@ if (bad.length) {
   process.exit(1);
 }
 console.log('\n评分回归 PASS ✅');
+
+
+
 
 
 

@@ -274,8 +274,10 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   const lines: ScoreLine[] = personalRaw.map(({ x, raw }) => {
     const role = x.row.role;
     const coef = coefOf(rule, x.row.classUsed);
-    const refByRole = rule.personalRef?.[role] ?? 0;
-    const ref = refByRole > 0 ? refByRole : (rawHi > 0 ? rawHi : 1);
+    /* 满量程参考值按**职业**取（用户 2026-10-24 选 A：个人分 = 同职业内排名）；
+       老规则集只有 DPS/T/HEAL 三键 → 回落定位 ✓ */
+    const refForClass = rule.personalRef?.[x.row.classUsed] ?? rule.personalRef?.[role] ?? 0;
+    const ref = refForClass > 0 ? refForClass : (rawHi > 0 ? rawHi : 1);
     const gamma = rule.personalGamma > 0 ? rule.personalGamma : 1;
     const personalRatio = personalCurve(raw, ref, gamma);
     /* 系数已经在单项里作用过，这里不再乘（用户 2026-10-24） */
@@ -379,6 +381,7 @@ function personalCurve(fn: number, ref: number, gamma: number): number {
   const v = g === 1 ? fn / r : Math.pow(fn / r, g);
   return v > 1 ? 1 : v;
 }
+
 
 
 

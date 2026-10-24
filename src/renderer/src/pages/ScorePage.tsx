@@ -92,6 +92,50 @@ export default function ScorePage() {
   };
 
   const scoreMap = useMemo(() => new Map(scores.map((x) => [x.participationId, x])), [scores]);
+
+  /* 排序：小队（默认，按小队名+格号）｜职业｜总分。
+     点表头切换，再点一次反向。 */
+  const [sortKey, setSortKey] = useState<'squad' | 'class' | 'total'>('squad');
+  const [sortDir, setSortDir] = useState<1 | -1>(1);
+
+  const rows = useMemo(() => {
+    const list = parts.map((p) => ({
+      p,
+      sc: scoreMap.get(p.id),
+      cls: p.classUsed || p.mainClass || '',
+    }));
+    const missing = -Infinity;
+    return list.sort((a, b) => {
+      if (sortKey === 'total') {
+        const av = a.sc ? a.sc.total : missing;
+        const bv = b.sc ? b.sc.total : missing;
+        return (av - bv) * sortDir || (a.p.gameId || '').localeCompare(b.p.gameId || '');
+      }
+      if (sortKey === 'class') {
+        return a.cls.localeCompare(b.cls, 'zh') * sortDir
+          || ((b.sc?.total ?? missing) - (a.sc?.total ?? missing))
+          || (a.p.gameId || '').localeCompare(b.p.gameId || '');
+      }
+      return ((a.p.squad || '').localeCompare(b.p.squad || '', 'zh')
+        || (a.p.slotNo ?? 0) - (b.p.slotNo ?? 0)) * sortDir;
+    });
+  }, [parts, scoreMap, sortKey, sortDir]);
+
+  const toggleSort = (k: 'squad' | 'class' | 'total'): void => {
+    if (sortKey === k) { setSortDir(sortDir === 1 ? -1 : 1); return; }
+    setSortKey(k);
+    setSortDir(k === 'total' ? -1 : 1);   // 总分默认从高到低，其余默认正序
+  };
+  const arrow = (k: 'squad' | 'class' | 'total'): string =>
+    (sortKey === k ? (sortDir === 1 ? ' ▲' : ' ▼') : '');
+  const thSort = (k: 'squad' | 'class' | 'total', label: string, num = false) => (
+    <th className={num ? 'num' : undefined}
+        style={{ cursor: 'pointer', userSelect: 'none' }}
+        onClick={() => toggleSort(k)}
+        title={`按${label}排序（再点一次反向）`}>
+      {label}{arrow(k)}
+    </th>
+  );
   const sum = scores.reduce((s, x) => s + x.total, 0);
   const avg = scores.length ? sum / scores.length : 0;
   const teamAvg = scores.length ? scores.reduce((s, x) => s + x.teamScore, 0) / scores.length : 0;
@@ -150,25 +194,27 @@ export default function ScorePage() {
           <table className="grid">
             <thead>
               <tr>
-                <th>玩家</th><th>小队</th>
+                <th>玩家</th>
+                {thSort('squad', '小队')}
+                {thSort('class', '职业')}
                 <th className="num">团队分</th><th className="num">个人分</th>
                 <th className="num">附加</th>
                 <th className="num" style={{ width: 150 }}>手动</th>
                 <th className="num">重伤扣分</th>
-                <th className="num">总分</th>
+                {thSort('total', '总分', true)}
               </tr>
             </thead>
             <tbody>
-              {parts.length === 0 && (
-                <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>选一场对局后显示上场名单</td></tr>
+              {rows.length === 0 && (
+                <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>选一场对局后显示上场名单</td></tr>
               )}
-              {parts.map((p) => {
-                const sc = scoreMap.get(p.id);
+              {rows.map(({ p, sc, cls }) => {
                 const d = draft[p.id] ?? { points: String(p.manualBonus ?? 0), reason: p.manualReason ?? '' };
                 return (
                   <tr key={p.id}>
                     <td>{p.gameId || p.name}</td>
                     <td>{p.squad || '—'}</td>
+                    <td>{cls || '—'}</td>
                     <td className="num">{sc ? sc.teamScore.toFixed(2) : '—'}</td>
                     <td className="num">{sc ? sc.personalScore.toFixed(2) : '—'}</td>
                     <td className="num">{sc ? sc.bonus.toFixed(2) : '—'}</td>

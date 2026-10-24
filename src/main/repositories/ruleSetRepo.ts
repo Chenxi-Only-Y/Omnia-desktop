@@ -44,10 +44,24 @@ const ROLE_PERSONAL_WEIGHTS: Record<'DPS' | 'T' | 'HEAL', RuleSetInput['personal
   HEAL: { assist: 0.2, heal: 0.8, taken: 0.3, revive: 0.5 },
 };
 
+/**
+ * 职业级微调（用户 2026-10-24：「碎梦注重击杀 鸿音注重人伤」）
+ * 原则：**权重总和保持不变**（仍是 3.6），只改各分项的相对比重 ——
+ * 这样个人分的平均水平不漂，只有"看什么"变了。
+ */
+const CLASS_PERSONAL_TUNING: Record<string, RuleSetInput['personalWeights'][string]> = {
+  /* 碎梦：刺客定位，击杀权重翻 50%，塔伤让一半出来 */
+  碎梦: { kill: 1.8, dmg: 0.5, tower: 0.6, assist: 0.3, fountain: 0.2, bone: 0.2 },
+  /* 鸿音（= 惊鸿的 DPS 形态）：以玩家伤害见长，人伤权重 0.5 → 1.5 */
+  惊鸿: { kill: 1.0, dmg: 1.5, tower: 0.4, assist: 0.3, fountain: 0.2, bone: 0.2 },
+};
+
 /** 展开成 12 个职业各一套（每套独立对象，改一个不会连带改别的职业） */
 export function buildClassPersonalWeights(): RuleSetInput['personalWeights'] {
   const out: RuleSetInput['personalWeights'] = {};
-  for (const c of CLASSES) out[c.name] = { ...ROLE_PERSONAL_WEIGHTS[c.role] };
+  for (const c of CLASSES) {
+    out[c.name] = { ...(CLASS_PERSONAL_TUNING[c.name] ?? ROLE_PERSONAL_WEIGHTS[c.role]) };
+  }
   return out;
 }
 
@@ -303,6 +317,7 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
 
 
 

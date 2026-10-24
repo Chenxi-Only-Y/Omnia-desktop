@@ -472,8 +472,19 @@ const PlayerCard = memo(function PlayerCard({
     >
       {/* 只留三行：ID 名 / 职业 / 技能备注（用户口径，不要多余东西） */}
       <div className="pcard__id" onClick={() => onRemoveRow(row.id)}
+           style={{ display: 'flex', alignItems: 'baseline', gap: 6, justifyContent: 'space-between' }}
            title={`${row.name}（ID: ${row.gameId}）· 点击移出本场`}>
-        {row.gameId || row.name}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {row.gameId || row.name}
+        </span>
+        {row.scoreAvg != null && (
+          <span
+            style={{ flex: '0 0 auto', fontSize: 11, opacity: 0.7, fontVariantNumeric: 'tabular-nums' }}
+            title={`历史 ${row.scoreCount ?? 0} 场平均总分`}
+          >
+            {Math.round(row.scoreAvg)}
+          </span>
+        )}
       </div>
       {/* 职业：可就地改 —— 下拉里只放本场报名表的主职与副职（用户口径：
           排表时可以选择职业）。没有报名数据时退化为纯文字。
@@ -552,4 +563,5 @@ const PlayerCard = memo(function PlayerCard({
     </div>
   );
 });
+
 

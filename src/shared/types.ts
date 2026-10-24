@@ -223,6 +223,10 @@ export interface ParticipationRow {
   /** 上述平均分覆盖的场次数 */
   scoreCount?: number;
   stat: CombatStat;
+  /** 手动赋分（K龙补偿 / 阵容问题等，正负均可，直接加到附加分） */
+  manualBonus?: number;
+  /** 手动赋分的原因（自由文本，如 K龙 / 阵容问题） */
+  manualReason?: string;
   /** 战报是否已填写（用于列表里的完成度提示） */
   statFilled: boolean;
 }
@@ -821,6 +825,7 @@ export interface OmniaApi {
     /** 按规则集重算并保存某场分数 */
     runScore(matchId: number, ruleSetId?: number): Promise<IpcResult<ScoreRunSummary>>;
   clearScores(matchId: number): Promise<IpcResult<number>>;
+  setManualBonus(participationId: number, points: number, reason: string): Promise<IpcResult<number>>;
     /** 读取已保存的分数 */
     scores(matchId: number, ruleSetId?: number): Promise<IpcResult<SavedScore[]>>;
   };
@@ -958,6 +963,7 @@ export const IPC = {
   matchImportCommit: 'match:import:commit',
   matchRunScore: 'match:score:run',
   matchClearScores: 'match:score:clear',
+  matchSetManualBonus: 'match:manual:set',
   matchScores: 'match:score:list',
 
   // 帮会（一帮会一个库文件）
@@ -974,6 +980,7 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
 
 
 

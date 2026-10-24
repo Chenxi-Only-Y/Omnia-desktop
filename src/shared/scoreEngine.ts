@@ -28,6 +28,8 @@ export interface ScoreInputRow {
   teamRole: '防守' | '进攻' | '';
   /** 备注角色（指挥/统战/K龙…） */
   noteRole: string;
+  /** 手动赋分（K龙补偿、阵容问题等；正负均可，直接加到总分） */
+  manualBonus?: number;
   state: 'PLAY' | 'BENCH' | 'LEAVE';
   stat: CombatStat;
 }
@@ -300,7 +302,9 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     const team = x.row.squad ? teamScoreBySquad.get(x.row.squad) : undefined;
     const teamScore = (team?.score ?? 0) * rule.scaleTeam;
 
-    const bonus = rule.bonus[x.row.noteRole] ?? BONUS_POINTS[x.row.noteRole] ?? 0;
+    /* 附加分 = 规则给的（备注角色）+ 手动赋分（人为补的，可正可负） */
+    const manual = x.row.manualBonus ?? 0;
+    const bonus = (rule.bonus[x.row.noteRole] ?? BONUS_POINTS[x.row.noteRole] ?? 0) + manual;
 
     // 死亡扣分：与全场上场者的平均死亡比较，超出部分按系数扣；**封顶**避免一场打崩扣穿地板
     /* 2026-10-24：基准改成**同阵组内平均**（进攻内部比、防守内部比）——
@@ -342,6 +346,7 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
         个人曲线: Number(personalRatio.toFixed(4)),
         满量程FN: Number(ref.toFixed(6)),
         职业系数: coef,
+        手动赋分: manual,
         战术类型: tacticKind((x.row.tactic ?? '') as Tactic),
         小队执行分: Number((team?.score ?? 0).toFixed(4)),
         分会项: JSON.stringify(team?.parts ?? {}),
@@ -397,6 +402,7 @@ function personalCurve(fn: number, ref: number, gamma: number): number {
   const v = g === 1 ? fn / r : Math.pow(fn / r, g);
   return v > 1 ? 1 : v;
 }
+
 
 
 

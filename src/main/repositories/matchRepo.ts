@@ -59,6 +59,7 @@ interface PartRow {
   stat_id: number | null;
   signup_main_class: string | null; signup_sub_class: string | null;
   score_avg: number | null; score_count: number;
+  manual_bonus: number; manual_reason: string;
 }
 
 const n = (v: unknown): number => {
@@ -279,6 +280,15 @@ export class MatchRepo {
   }
 
   // ── 参战名单 ─────────────────────────────────────────────────
+  /** 手动赋分（K龙/阵容问题等）：写回参战记录，返回写入后的值；需重算才生效 */
+  setManualBonus(participationId: number, points: number, reason: string): number {
+    const v = Number.isFinite(points) ? points : 0;
+    this.db.prepare('UPDATE participation SET manual_bonus = ?, manual_reason = ? WHERE id = ?')
+      .run(v, String(reason ?? '').slice(0, 60), participationId);
+    this.db.prepare("UPDATE match SET score_stale = 1").run();
+    return v;
+  }
+
   /** 清掉某场我方已保存的评分（战报 combat_stat 不动；返回删除条数） */
   clearScores(matchId: number): number {
     return this.db.prepare(`DELETE FROM score WHERE participation_id IN
@@ -904,6 +914,7 @@ export class MatchRepo {
              COALESCE(NULLIF(p.class_used,''), sg.main_class, '') AS class_used,
              COALESCE(c.role, 'DPS') AS role,
              p.squad, p.tactic, p.team_role, p.note_role, p.state,
+             COALESCE(p.manual_bonus, 0) AS manual_bonus,
              cs.kills, cs.fountain_kills, cs.assists, cs.resource,
              cs.dmg_player, cs.dmg_player_armor, cs.dmg_building, cs.dmg_building_armor,
              cs.healing, cs.damage_taken, cs.deaths, cs.revives, cs.bone_burn
@@ -917,7 +928,7 @@ export class MatchRepo {
     `).all(matchId) as unknown as {
       participation_id: number; player_id: number; player_name: string;
       class_used: string; role: string; squad: string; tactic: string;
-      team_role: string; note_role: string; state: string;
+      team_role: string; note_role: string; state: string; manual_bonus: number;
       kills: number | null; fountain_kills: number | null; assists: number | null;
       resource: number | null; dmg_player: number | null; dmg_player_armor: number | null;
       dmg_building: number | null; dmg_building_armor: number | null; healing: number | null;
@@ -939,6 +950,7 @@ export class MatchRepo {
         tactic: (r.tactic || '') as MatchScoreInput['rows'][number]['tactic'],
         teamRole: (r.team_role === '防守' ? '防守' : r.team_role === '进攻' ? '进攻' : ''),
         noteRole: r.note_role || '',
+        manualBonus: n(r.manual_bonus),
         state: (r.state === 'BENCH' ? 'BENCH' : r.state === 'LEAVE' ? 'LEAVE' : 'PLAY'),
         stat: {
           kills: n(r.kills), fountainKills: n(r.fountain_kills), assists: n(r.assists),
@@ -1031,6 +1043,8 @@ export class MatchRepo {
 }
 
 export { tacticKind };
+
+
 
 
 

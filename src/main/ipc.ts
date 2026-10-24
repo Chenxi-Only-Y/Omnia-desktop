@@ -438,6 +438,9 @@ export function registerIpc(ctx: IpcContext): void {
   // ── 评分（M1） ─────────────────────────────────────────────────
   /* 清除某场评分（战报不动），供评分页「删除本场评分」使用 —— 用户 2026-10-24 */
   ipcMain.handle(IPC.matchClearScores, safe((matchId: number) => matches.clearScores(matchId)));
+  /* 手动赋分（K龙 / 阵容问题）：写入参战记录，需重算才反映到分数 */
+  ipcMain.handle(IPC.matchSetManualBonus, safe((participationId: number, points: number, reason: string) =>
+    matches.setManualBonus(participationId, points, reason)));
   ipcMain.handle(IPC.matchRunScore, safe((matchId: number, ruleSetId?: number) => {
     const rule = ruleSetId ? rules.get(ruleSetId) : rules.active();
     if (!rule) throw new Error('没有可用的规则集，请先在「权重与规则」里建一套');
@@ -806,5 +809,6 @@ export function registerIpc(ctx: IpcContext): void {
     };
   }));
 }
+
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Match, RuleSet, SavedScore } from '@shared/types';
+import type { Match, ParticipationRow, RuleSet, SavedScore } from '@shared/types';
 import { api, errText } from '../api';
 
 /**
@@ -17,6 +17,9 @@ export default function ScorePage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  /* 手动赋分（K龙 / 阵容问题）：直接写回参战记录，重算后进总分 */
+  const [parts, setParts] = useState<ParticipationRow[]>([]);
+  const [draft, setDraft] = useState<Record<number, { points: string; reason: string }>>({});
 
   const activeRule = useMemo(() => rules.find((r) => r.active) ?? null, [rules]);
 
@@ -62,6 +65,17 @@ export default function ScorePage() {
       setMsg(`已删除本场评分 ${n} 条（战报数据保留）`);
       setScores([]);
     } catch (e) { setError(errText(e)); } finally { setBusy(false); setConfirmClear(false); }
+  };
+
+  const saveManual = async (p: ParticipationRow): Promise<void> => {
+    const d = draft[p.id];
+    const pts = Number(d?.points ?? p.manualBonus ?? 0) || 0;
+    const reason = d?.reason ?? p.manualReason ?? '';
+    try {
+      await api.match.setManualBonus(p.id, pts, reason);
+      setParts((prev) => prev.map((x) => (x.id === p.id ? { ...x, manualBonus: pts, manualReason: reason } : x)));
+      setMsg('手动赋分已保存（记得点「按当前规则重算」才进总分）');
+    } catch (e) { setError(errText(e)); }
   };
 
   const sum = scores.reduce((s, x) => s + x.total, 0);
@@ -143,7 +157,59 @@ export default function ScorePage() {
           </table>
         </div>
       </div>
+      <div className="card">
+        <h3>手动赋分（K龙 / 阵容问题）</h3>
+        <div className="hint" style={{ marginBottom: 8 }}>
+          正负均可（例如 +2 或 −1.5）。保存后要点上面的「按当前规则重算」才会进总分 ——
+          这笔分会加到「附加」里，与备注角色的规则加分分开记。
+        </div>
+        <div className="table-wrap">
+          <table className="grid">
+            <thead>
+              <tr>
+                <th>玩家</th><th>小队</th><th className="num">已存</th>
+                <th className="num" style={{ width: 110 }}>本次</th>
+                <th style={{ width: 220 }}>原因</th><th style={{ width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {parts.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-faint)' }}>选一场对局后显示上场名单</td></tr>
+              )}
+              {parts.map((p) => {
+                const d = draft[p.id] ?? { points: String(p.manualBonus ?? 0), reason: p.manualReason ?? '' };
+                return (
+                  <tr key={p.id}>
+                    <td>{p.gameId || p.name}</td>
+                    <td>{p.squad || '—'}</td>
+                    <td className="num" style={{ color: (p.manualBonus ?? 0) !== 0 ? 'var(--warn)' : 'var(--text-faint)' }}>
+                      {(p.manualBonus ?? 0).toFixed(1)}
+                    </td>
+                    <td>
+                      <input className="input cell-num" type="number" step="0.5" value={d.points}
+                             onChange={(e) => setDraft({ ...draft, [p.id]: { ...d, points: e.target.value } })} />
+                    </td>
+                    <td>
+                      <input className="input" list="manual-reasons" placeholder="K龙 / 阵容问题 / 其他"
+                             value={d.reason}
+                             onChange={(e) => setDraft({ ...draft, [p.id]: { ...d, reason: e.target.value } })} />
+                    </td>
+                    <td>
+                      <button className="btn" onClick={() => void saveManual(p)}>保存</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <datalist id="manual-reasons">
+          <option value="K龙" /><option value="阵容问题" /><option value="替补补位" /><option value="其他" />
+        </datalist>
+      </div>
     </>
   );
 }
+
+
 

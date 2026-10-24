@@ -305,6 +305,8 @@ export const api = {
       unwrap(bridge().match.scores(matchId, ruleSetId)),
   clearScores: (matchId: number): Promise<number> =>
     unwrap(bridge().match.clearScores(matchId)),
+  setManualBonus: (participationId: number, points: number, reason: string): Promise<number> =>
+    unwrap(bridge().match.setManualBonus(participationId, points, reason)),
   },
 
   dashboard: {
@@ -357,5 +359,6 @@ export const api = {
     validate: (input: RuleSetInput): Promise<RuleSetValidation> => unwrap(bridge().rules.validate(input)),
   },
 };
+
 
 

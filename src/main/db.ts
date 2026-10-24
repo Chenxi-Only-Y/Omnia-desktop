@@ -715,6 +715,17 @@ const MIGRATIONS: Migration[] = [
       } catch { /* 列已存在 */ }
     },
   },
+  {
+    version: 20,
+    name: 'participation_manual_bonus',
+    up: (db) => {
+      /* 手动赋分（用户 2026-10-24）：K龙、阵容问题这类"该额外补分"的情况，
+         允许直接给某个参战记录加一笔分并记下原因。
+         与备注角色的附加分独立：附加分是规则给的，这里是人为补的。 */
+      try { db.exec(`ALTER TABLE participation ADD COLUMN manual_bonus REAL NOT NULL DEFAULT 0`); } catch { /* 列已存在 */ }
+      try { db.exec("ALTER TABLE participation ADD COLUMN manual_reason TEXT NOT NULL DEFAULT ''"); } catch { /* 列已存在 */ }
+    },
+  },
 ];
 
 export interface DbHandle {

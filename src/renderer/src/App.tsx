@@ -7,6 +7,7 @@ import RosterPage from './pages/RosterPage';
 import OverviewPage from './pages/OverviewPage';
 import MatchPage from './pages/MatchPage';
 import BoardPage from './pages/BoardPage';
+import ScorePage from './pages/ScorePage';
 import PlayerDetailPage from './pages/PlayerDetailPage';
 import LineupPage from './pages/LineupPage';
 import SettingsPage from './pages/SettingsPage';
@@ -32,7 +33,7 @@ export interface PageProps {
 type TopKey = 'overview' | 'guilds' | 'settings';
 
 /** 进入帮会之后的二级页签（用户口径：第一个是帮会首页介绍，其次这 4 个） */
-type GuildTab = 'home' | 'roster' | 'match' | 'lineup' | 'board';
+type GuildTab = 'home' | 'roster' | 'match' | 'lineup' | 'score' | 'board';
 /** 「帮会设置」是帮会页里的**第 6 个页签**（用户口径 2026-09-27：放在那排页签里），
     放改名 / 简介 / 封面 / 删除 —— 卡片上不放这些操作。 */
 type GuildView = GuildTab | 'settings';
@@ -58,6 +59,7 @@ const GUILD_TABS: { key: GuildView; label: string }[] = [
   { key: 'roster', label: '成员主档' },
   { key: 'match', label: '对局与战报' },
   { key: 'lineup', label: '排表' },
+  { key: 'score', label: '评分' },
   { key: 'board', label: '数据看板' },
   /* 「帮会设置」也放这排页签里（用户口径 2026-09-27：「帮会设置放在这里」），
      它是管理页而不是业务页，所以排在最后。 */
@@ -319,7 +321,8 @@ export default function App() {
                 )}
                 {guildTab === 'match' && <MatchPage {...props} />}
                 {guildTab === 'lineup' && <LineupPage {...props} />}
-                {guildTab === 'board' && <BoardPage />}
+                {guildTab === 'score' && <ScorePage />}
+        {guildTab === 'board' && <BoardPage />}
                 {guildTab === 'settings' && (
                   <GuildSettingsPage
                     guild={guild}
@@ -339,3 +342,4 @@ export default function App() {
     </div>
   );
 }
+

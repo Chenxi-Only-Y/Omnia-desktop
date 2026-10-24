@@ -74,6 +74,11 @@ export interface MatchScoreOutput {
 export const ENGINE_ID = 'omnia-spec-v2';
 
 const sum = (ns: number[]): number => ns.reduce((a, b) => a + b, 0);
+/** 职业系数（取规则集里的；未知职业按 1.0 中性处理，不把人的个人分打没） */
+const coefOf = (rule: RuleSet, cls: string): number => {
+  const c = rule.classCoef[cls];
+  return typeof c === 'number' && c > 0 ? c : 1;
+};
 const safeDiv = (a: number, b: number): number => (b === 0 ? 0 : a / b);
 
 /** 某一组权重（可能缺键）的和 */
@@ -205,7 +210,9 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     const w = (rule.personalWeights[x.row.classUsed]
       ?? rule.personalWeights[x.row.role]
       ?? {}) as PersonalWeights;
-    const ratio = (key: string): number => safeDiv(
+    /* 职业系数进**单项**（用户 2026-10-24：「系数只放在单项数据里，整体分数不再加系数」）：
+       每项 = 系数 × 个人有效值 ÷ 联盟该项总和 → 系数影响的是"自己的数据"，最后不再整体再乘一次 */
+    const ratio = (key: string): number => coefOf(rule, x.row.classUsed) * safeDiv(
       (x.e as unknown as Record<string, number>)[keyToEff(key)] ?? 0,
       league[keyToLeague(key)] ?? 0,
     );
@@ -264,12 +271,13 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
 
   const lines: ScoreLine[] = personalRaw.map(({ x, raw }) => {
     const role = x.row.role;
-    const coef = rule.classCoef[x.row.classUsed] ?? 0;
+    const coef = coefOf(rule, x.row.classUsed);
     const refByRole = rule.personalRef?.[role] ?? 0;
     const ref = refByRole > 0 ? refByRole : (rawHi > 0 ? rawHi : 1);
     const gamma = rule.personalGamma > 0 ? rule.personalGamma : 1;
     const personalRatio = personalCurve(raw, ref, gamma);
-    const personalScore = personalRatio * rule.scalePersonal * coef;
+    /* 系数已经在单项里作用过，这里不再乘（用户 2026-10-24） */
+    const personalScore = personalRatio * rule.scalePersonal;
 
     const team = x.row.squad ? teamScoreBySquad.get(x.row.squad) : undefined;
     const teamScore = (team?.score ?? 0) * rule.scaleTeam;
@@ -369,6 +377,8 @@ function personalCurve(fn: number, ref: number, gamma: number): number {
   const v = g === 1 ? fn / r : Math.pow(fn / r, g);
   return v > 1 ? 1 : v;
 }
+
+
 
 
 

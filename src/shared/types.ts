@@ -218,6 +218,10 @@ export interface ParticipationRow {
   slotNo: number;
   mic: Player['mic'];
   state: PartState;
+  /** 历史平均总分（跨场，只统计已保存评分；null = 还没有历史分数） */
+  scoreAvg?: number | null;
+  /** 上述平均分覆盖的场次数 */
+  scoreCount?: number;
   stat: CombatStat;
   /** 战报是否已填写（用于列表里的完成度提示） */
   statFilled: boolean;
@@ -968,6 +972,8 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
+
 
 
 

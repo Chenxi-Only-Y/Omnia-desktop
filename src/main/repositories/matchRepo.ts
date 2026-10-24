@@ -58,6 +58,7 @@ interface PartRow {
   revives: number | null; bone_burn: number | null;
   stat_id: number | null;
   signup_main_class: string | null; signup_sub_class: string | null;
+  score_avg: number | null; score_count: number;
 }
 
 const n = (v: unknown): number => {
@@ -281,6 +282,12 @@ export class MatchRepo {
   participations(matchId: number): ParticipationRow[] {
     const rows = this.db.prepare(
       `SELECT p.*, pl.game_id, pl.name,
+        (SELECT AVG(s.total) FROM score s
+           JOIN participation p2 ON p2.id = s.participation_id
+          WHERE p2.player_id = p.player_id) AS score_avg,
+        (SELECT COUNT(DISTINCT p3.match_id) FROM score s3
+           JOIN participation p3 ON p3.id = s3.participation_id
+          WHERE p3.player_id = p.player_id) AS score_count,
               sg.main_class AS signup_main_class, sg.sub_class AS signup_sub_class,
               cs.participation_id AS stat_id, cs.kills, cs.fountain_kills, cs.assists, cs.resource,
               cs.dmg_player, cs.dmg_player_armor, cs.dmg_building, cs.dmg_building_armor,
@@ -315,6 +322,8 @@ export class MatchRepo {
         skillNote: r.skill_note || '',
         slotNo: Number.isFinite(r.slot_no) ? r.slot_no : -1,
         mic: (r.mic || '') as ParticipationRow['mic'],
+      scoreAvg: r.score_avg == null ? null : Number(r.score_avg),
+      scoreCount: Number(r.score_count ?? 0),
         state: (r.state || 'PLAY') as PartState,
         stat,
         statFilled: hasAnyStat(stat),
@@ -1016,3 +1025,6 @@ export class MatchRepo {
 }
 
 export { tacticKind };
+
+
+

@@ -24,8 +24,17 @@ const root = join(here, '..');
 const { scoreMatch } = require(join(root, 'dist/shared/scoreEngine.js'));
 const { DEFAULT_RULE_SET, buildClassPersonalRef } = require(join(root, 'dist/main/repositories/ruleSetRepo.js'));
 const { CLASSES } = require(join(root, 'dist/shared/domain.js'));
+/* 鸿音→妙音/惊鸿 的分流口径，复用项目唯一实现（>500 万治疗按妙音） */
+const { resolveHongyin } = require(join(root, 'dist/shared/statImport.js'));
 
 const ROLE = Object.fromEntries(CLASSES.map((c) => [c.name, c.role]));
+/* 职业别名（鸿音→惊鸿 等）：战报里写的是游戏内的形态名，个人权重/参考值都按主名归口 */
+const ALIAS = new Map();
+for (const c of CLASSES) {
+  ALIAS.set(c.name, c.name);
+  for (const a of (c.aliases ?? [])) ALIAS.set(a, c.name);
+}
+const canon = (cls) => ALIAS.get(String(cls ?? '').trim()) ?? '';
 const COEF = Object.fromEntries(CLASSES.map((c) => [c.name, c.coef]));
 const ROLE_REF = { DPS: 0.175, T: 0.075, HEAL: 0.2 };
 const SHRINK_K = 5;
@@ -75,10 +84,20 @@ for (const p of csvs) {
   /* 只用来算 FN：凑一个人造对局（塔数/胜负取中性值，不影响 FN 的口径） */
   const fake = scoreMatch({
     matchId: 2, ourTowersLeft: 5, oppTowersLeft: 4, result: 'WIN',
-    rows: rows.map((r, i) => ({ participationId: i + 1, playerId: i + 1, playerName: r.name, classUsed: r.cls,
-      role: roleOf(r.cls), squad: `s${i % 6}`, tactic: '塔后拆', teamRole: '', noteRole: '', state: 'PLAY', stat: st(r) })),
+    rows: rows.map((r, i) => {
+      /* 鸿音先按奶量分流，再归口到主名（权重/参考值都按主名配） */
+      const resolved = canon(resolveHongyin(String(r.cls ?? '').trim(), r.heal));
+      return { participationId: i + 1, playerId: i + 1, playerName: r.name, classUsed: resolved,
+        role: roleOf(resolved), squad: `s${i % 6}`, tactic: '塔后拆', teamRole: '', noteRole: '', state: 'PLAY', stat: st(r) };
+    }),
   }, { ...DEFAULT_RULE_SET, id: 0, version: 0, active: true, createdAt: '' });
-  fake.lines.forEach((l, i) => samples.push({ cls: rows[i].cls, fn: Number(l.detail['个人原始加权']) }));
+  let skipped = 0;
+  fake.lines.forEach((l, i) => {
+    const cls = canon(resolveHongyin(String(rows[i].cls ?? '').trim(), rows[i].heal));
+    if (!cls) { skipped += 1; return; }
+    samples.push({ cls, fn: Number(l.detail['个人原始加权']) });
+  });
+  if (skipped) console.log(`  ⚠ ${p}: 有 ${skipped} 人的职业不在字典里，已跳过`);
   console.log(`${p}: ${rows.length} 条`);
 }
 
@@ -115,3 +134,5 @@ if (process.argv.includes('--apply')) {
     console.log('  ' + keys.slice(i, i + 4).map((k) => `${k}: ${ref[k]}`).join(', ') + ',');
   }
 }
+
+

@@ -67,13 +67,13 @@ const ROLE_PERSONAL_REF: Record<'DPS' | 'T' | 'HEAL', number> = { DPS: 0.175, T:
  *
  * 标定口径（关键）：用**去掉职业系数后**的 FN 中位数，否则参考值会把系数的影响吃掉 ✗
  *   ratio = 该职业 FN(去系数)中位 ÷ 同定位中位 ；shrink = n/(n+5) ；ref = ref_定位 × (1 + (ratio−1)×shrink)
- * 数据：60 条夹具 + 2026-10-17 真实局，共 119 条（每职业 3~19 条）
+ * 数据：60 条夹具 + 3 场真实局（2026-09-23 ×2、2026-10-17），共 239 条（每职业 6~39 条）
  * 重算方式：`npm run score:refcal -- --csv <战报.csv> ...`
  */
 const CLASS_PERSONAL_REF: Record<string, number> = {
-  素问: 0.2, 妙音: 0.1947,
-  惊鸿: 0.193, 九灵: 0.2059, 神相: 0.1527, 玄机: 0.1623, 血河: 0.1324,
-  龙吟: 0.1868, 碎梦: 0.186, 沧澜: 0.2181, 潮光: 0.1633,
+  素问: 0.2157, 妙音: 0.167,
+  惊鸿: 0.1919, 九灵: 0.2366, 神相: 0.1595, 玄机: 0.168, 血河: 0.1201,
+  龙吟: 0.2099, 碎梦: 0.1996, 沧澜: 0.2059, 潮光: 0.1344,
   铁衣: 0.075,
 };
 
@@ -375,6 +375,7 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
 
 
 

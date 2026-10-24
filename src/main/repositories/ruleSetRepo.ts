@@ -85,10 +85,14 @@ export const DEFAULT_RULE_SET: RuleSetInput = {
      （用户 2026-10-24：不再按 DPS/T/治疗 划分，而是按职业划分，和职业系数一起作用）。
      取值见文件末尾 ROLE_PERSONAL_WEIGHTS；这里用 CLASSES 展开成 12 条。 */
   personalWeights: buildClassPersonalWeights(),
+  /* 团队分（方案 D，2026-10-24）：30% 对局加成（全场共享，只抬水平）+ 70% 小队表现（池内比值）
+     —— 旧版把 55%~60% 压在推塔进度/守塔率/大旗上，那些每队一样，等于压掉队间差异 ✗ */
   execWeights: {
-    push: { progress: 0.6 * (7 / 9), flag: 0.6 * (2 / 9), tower: 0.25, kill: 0.15 },
-    guard: { kill: 0.5, taken: 0.3, lowDeath: 0.2 },
-    defend: { keepRate: 0.55, kill: 0.25, lowDeath: 0.2 },
+    anchorShare: 0.3,
+    anchor: { pushProgress: 0.45, keepRate: 0.35, flag: 0.2 },
+    push: { tower: 0.5, kill: 0.35, lowDeath: 0.15 },
+    guard: { kill: 0.45, taken: 0.35, lowDeath: 0.2 },
+    defend: { kill: 0.5, lowDeath: 0.5 },
   },
   classCoef: {
     素问: 0.95, 妙音: 1.05, 惊鸿: 1.0, 九灵: 1.0, 神相: 1.2, 玄机: 1.1,
@@ -291,8 +295,25 @@ export function validate(input: RuleSetInput): RuleSetValidation {
     }
   }
 
-  // 战术权重：三类各应为 1
+  // 对局加成比重（0~1）
+  const share = input.execWeights.anchorShare;
+  if (typeof share === 'number' && (share < 0 || share > 1)) {
+    push('error', 'execWeights.anchorShare', '对局加成比重必须在 0~1 之间');
+  }
+  // 对局加成构成：应为 1
+  const anchorW = input.execWeights.anchor;
+  if (anchorW) {
+    const vals = Object.values(anchorW).filter((v) => typeof v === 'number');
+    const sum = vals.reduce((a, b) => a + b, 0);
+    if (vals.some((v) => v < 0)) push('error', 'execWeights.anchor', '对局加成权重不能为负');
+    else if (sum > 0 && !near(sum, 1)) {
+      push('warn', 'execWeights.anchor', `对局加成权重和为 ${sum.toFixed(3)}，不等于 1`);
+    }
+  }
+  // 战术权重：三类各应为 1（anchorShare / anchor 是数字与对象，不是战术项，跳过）
   for (const [kind, w] of Object.entries(input.execWeights)) {
+    if (kind === 'anchor' || kind === 'anchorShare') continue;
+    if (!w || typeof w !== 'object') continue;
     const vals = Object.values(w).filter((v) => typeof v === 'number');
     const sum = vals.reduce((a, b) => a + b, 0);
     if (vals.some((v) => v < 0)) push('error', `execWeights.${kind}`, `${kind} 权重不能为负`);
@@ -317,6 +338,8 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
+
 
 
 

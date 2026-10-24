@@ -105,18 +105,35 @@ function weighted(w: Record<string, number | undefined>, ratio: (key: string) =>
 }
 
 /**
- * Min-Max 归一（在**同一池**内取 min/max；池里所有值相等时给 0.5）。
- * 规范 v1.0 §2.5 的 nrm()：不筛正值、不钳制 —— 筛正值会让"全队都 0"这种池直接塌成 0 ✗
+ * 池内**比值**归一（2026-10-24 换掉 min-max）：`r(v) = v ÷ 池内最大值`，落在 [0,1]。
+ *
+ * 为什么不用 min-max：小池子（保镖只有 2 队）会退化成 0 / 1 二值 ✗
+ * 实测：两队承伤只差 2.6%（8666 万 vs 8898 万），min-max 却给出 0.00 vs 1.00
+ * → 承伤权重 0.30 × 20 = 直接 6 分的鸿沟 ✗。比值归一则是 0.974 vs 1.000 ✓
  */
-function minMax(value: number, values: number[]): number {
-  if (!values.length) return 0.5;
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  if (hi === lo) return 0.5;
-  return (value - lo) / (hi - lo);
+function ratioNorm(value: number, values: number[]): number {
+  const mx = values.length ? Math.max(...values) : 0;
+  if (!(mx > 0)) return 0;
+  return Math.max(0, Math.min(1, value / mx));
 }
 
-/** 某一战术类型下的执行分（0~1） */
+/**
+ * "少死"折算成 [0,1]：以**全场平均死亡**为锚（绝对基准，不随池变）。
+ * d̄ = 0 → 1 ｜ d̄ = 平均 → 0.5 ｜ d̄ ≥ 2×平均 → 0
+ */
+function lowDeathScore(avgDeaths: number, matchAvgDeaths: number): number {
+  if (!(matchAvgDeaths > 0)) return 0.5;
+  return Math.max(0, Math.min(1, 1 - avgDeaths / (2 * matchAvgDeaths)));
+}
+
+/**
+ * 某一战术类型的执行分（0~1）= 对局加成（全场共享）+ 小队表现（池内比值）
+ *
+ * 2026-10-24 重做（方案 D）：
+ *   以前 55%~60% 的权重压在推塔进度/守塔率/大旗上 —— 这些对**每支小队完全一样**，
+ *   只抬水平、不区分高低 ✗ 现在把"对局事实"压到 30%，70% 交给小队自己的数据，
+ *   并用**比值**而不是 min-max 归一（避免小池子退化成 0/1）。
+ */
 function execScore(
   kind: 'push' | 'guard' | 'defend',
   w: ExecWeights,
@@ -124,55 +141,38 @@ function execScore(
     pushProgress: number;
     flag: number;
     keepRate: number;
+    matchAvgDeaths: number;
     squad: { kill: number; tower: number; taken: number; avgDeaths: number };
-    ranges: {
-      kill: number[]; tower: number[]; taken: number[]; avgDeaths: number[];
-    };
+    ranges: { kill: number[]; tower: number[]; taken: number[]; avgDeaths: number[] };
   },
 ): { score: number; parts: Record<string, number> } {
-  const norm = (v: number, arr: number[], invert = false): number => {
-    const n = minMax(v, arr);
-    return invert ? 1 - n : n;
-  };
+  /* ── 对局加成：全场共享（每队同一份） ── */
+  const aw = w.anchor ?? {};
+  const anchorSum = (aw.pushProgress ?? 0) + (aw.keepRate ?? 0) + (aw.flag ?? 0);
+  const anchorRaw = (aw.pushProgress ?? 0) * ctx.pushProgress
+    + (aw.keepRate ?? 0) * ctx.keepRate
+    + (aw.flag ?? 0) * ctx.flag;
+  const anchor = anchorSum > 0 ? anchorRaw / anchorSum : 0;
+
+  /* ── 小队表现：池内比值 ── */
+  const wk = w[kind] as unknown as Record<string, number | undefined>;
   const parts: Record<string, number> = {};
-  let score = 0;
+  const add = (label: string, weight: number | undefined, v: number): void => {
+    if (typeof weight === 'number' && weight !== 0) parts[label] = weight * v;
+  };
+  add('小队击杀', wk['kill'], ratioNorm(ctx.squad.kill, ctx.ranges.kill));
+  if (kind !== 'defend') add('小队塔伤', wk['tower'], ratioNorm(ctx.squad.tower, ctx.ranges.tower));
+  if (kind === 'guard' || kind === 'defend') add('小队承伤', wk['taken'], ratioNorm(ctx.squad.taken, ctx.ranges.taken));
+  add('低死亡', wk['lowDeath'], lowDeathScore(ctx.squad.avgDeaths, ctx.matchAvgDeaths));
 
-  if (kind === 'push') {
-    const wp = w.push;
-    const f1 = ctx.pushProgress;
-    const f2 = ctx.flag;
-    const f3 = norm(ctx.squad.tower, ctx.ranges.tower);
-    const f4 = norm(ctx.squad.kill, ctx.ranges.kill);
-    parts['推塔进度'] = (wp.progress ?? 0) * f1;
-    parts['大旗'] = (wp.flag ?? 0) * f2;
-    parts['小队塔伤'] = (wp.tower ?? 0) * f3;
-    parts['小队击杀'] = (wp.kill ?? 0) * f4;
-    score = sum(Object.values(parts));
-  } else if (kind === 'guard') {
-    const wg = w.guard;
-    const f1 = norm(ctx.squad.kill, ctx.ranges.kill);
-    const f2 = norm(ctx.squad.taken, ctx.ranges.taken);
-    const f3 = norm(ctx.squad.avgDeaths, ctx.ranges.avgDeaths, true);
-    parts['小队击杀'] = (wg.kill ?? 0) * f1;
-    parts['小队承伤'] = (wg.taken ?? 0) * f2;
-    parts['低死亡'] = (wg.lowDeath ?? 0) * f3;
-    score = sum(Object.values(parts));
-  } else {
-    const wd = w.defend;
-    const f1 = ctx.keepRate;
-    const f2 = norm(ctx.squad.kill, ctx.ranges.kill);
-    const f3 = norm(ctx.squad.avgDeaths, ctx.ranges.avgDeaths, true);
-    parts['守塔率'] = (wd.keepRate ?? 0) * f1;
-    parts['小队击杀'] = (wd.kill ?? 0) * f2;
-    parts['低死亡'] = (wd.lowDeath ?? 0) * f3;
-    score = sum(Object.values(parts));
-  }
+  const wSum = Object.values(wk).reduce<number>((a, b) => a + (typeof b === 'number' ? b : 0), 0);
+  const perf = wSum > 0 ? sum(Object.values(parts)) / wSum : 0;
 
-  // 权重和不为 1 时归一
-  const total = weightSum(
-    kind === 'push' ? w.push : kind === 'guard' ? w.guard : w.defend,
-  );
-  return { score: total > 0 ? score / total : 0, parts };
+  const share = typeof w.anchorShare === 'number' ? Math.max(0, Math.min(1, w.anchorShare)) : 0.3;
+  parts['对局加成'] = share * anchor;
+  parts['小队表现'] = (1 - share) * perf;
+  const score = Math.max(0, Math.min(1, share * anchor + (1 - share) * perf));
+  return { score, parts };
 }
 
 /**
@@ -264,7 +264,9 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
     const agg = squadAgg.get(squad)!;
     const ranges = rangeByKind.get(kind)!;
     const r = execScore(kind, rule.execWeights, {
-      pushProgress, flag, keepRate, squad: agg, ranges,
+      pushProgress, flag, keepRate,
+      matchAvgDeaths: players.length ? league.death / players.length : 0,
+      squad: agg, ranges,
     });
     teamScoreBySquad.set(squad, r);
   }
@@ -377,6 +379,9 @@ function personalCurve(fn: number, ref: number, gamma: number): number {
   const v = g === 1 ? fn / r : Math.pow(fn / r, g);
   return v > 1 ? 1 : v;
 }
+
+
+
 
 
 

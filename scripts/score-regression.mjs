@@ -113,7 +113,20 @@ const checks = {
   'sd ≥9': stats.sd >= 9,
   '最低分 <62': stats.min < 62,
   '触顶 1~20%（不能人人满分）': stats.capped >= 1 && stats.capped <= Math.round(fixture.rows.length * 0.2),
-  '团队分极差 ≥12': stats.teamRange >= 12,
+  /* 新团队分（对局 30% + 表现 70%，比值归一）会**压缩**极端 0/1 跳变，
+     所以看的是"够不够分高低"而不是越大越好 */
+  '团队分极差 5~12（够分高低、又不靠 0/1 拉大）': stats.teamRange >= 5 && stats.teamRange <= 12,
+  /* 三种战术类型的平均团队分不能系统性差（旧版保镖恒 10.00、与防守差 3.9 ✗） */
+  '组间差 ≤2.5（三种战术平均分相当）': (() => {
+    const byKind = { push: [], guard: [], defend: [] };
+    for (const l of out.lines) {
+      const k = String(l.detail['战术类型'] ?? 'push');
+      const bucket = byKind[k] ?? byKind.push;
+      bucket.push(l.teamScore);
+    }
+    const means = Object.values(byKind).filter((a) => a.length).map(mean);
+    return means.length > 1 && Math.max(...means) - Math.min(...means) <= 2.5;
+  })(),
 };
 
 console.log(`引擎: ${ENGINE_ID}   样本: ${fixture.rows.length} 条真实战报`);
@@ -129,6 +142,7 @@ if (bad.length) {
   process.exit(1);
 }
 console.log('\n评分回归 PASS ✅');
+
 
 
 

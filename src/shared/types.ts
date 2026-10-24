@@ -462,10 +462,14 @@ export interface PersonalWeights {
 }
 
 export interface ExecWeights {
-  /** 推塔型：对局共享项（塔进度 + 大旗）与小队表现项 */
-  push: { progress?: number; flag?: number; tower?: number; kill?: number };
+  /** 对局加成（全场共享项）占团队分的比重，默认 0.3 */
+  anchorShare?: number;
+  /** 对局加成的构成（全场共享，内部归一）：推塔进度 / 守塔率 / 大旗 */
+  anchor?: { pushProgress?: number; keepRate?: number; flag?: number };
+  /** 小队表现项（池内**比值**归一，权重内部归一） */
+  push: { tower?: number; kill?: number; lowDeath?: number; progress?: number; flag?: number };
   guard: { kill?: number; taken?: number; lowDeath?: number };
-  defend: { keepRate?: number; kill?: number; lowDeath?: number };
+  defend: { kill?: number; lowDeath?: number; taken?: number; keepRate?: number };
 }
 
 export interface RuleSetInput {
@@ -964,6 +968,7 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
 
 
 

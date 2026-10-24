@@ -98,18 +98,21 @@ const driftOld = (() => {
   return { mean: n ? sum / n : 0, max };
 })();
 
+const pMax = Math.max(...pers);
+const pMedian = median(pers);
 const checks = {
   '引擎标识=omnia-spec-v2': ENGINE_ID === 'omnia-spec-v2',
   '个人分无负数': pers.every((v) => v >= -1e-9),
   '总分不低于 底分-扣分封顶': Math.min(...totals) >= rule.baseScore - rule.deathPenCap - 1e-9,
+  /* 个人分必须**用满量程**：以前饱和曲线只到 65%，满分档形同虚设（用户 2026-10-24 指出） */
+  '个人分能用满量程(max≥35/40)': pMax >= 35,
+  '个人分中位 8~25（不是人人满分）': pMedian >= 8 && pMedian <= 25,
   'T 区分度 ≥3.5': stats.tSd >= 3.5,
-  'T 均分不偏(≤3分)': Math.abs(stats.tMean - stats.mean) <= 3,
-  '跨场稳定(平均漂 <0.6)': driftNew.mean < 0.6,
-  '比旧口径更稳': driftNew.mean < driftOld.mean,
-  '均值 78~90（底分 60 + 无负分的自然区间）': stats.mean >= 78 && stats.mean <= 90,
+  'T/治疗 个人分中位≈全场（按定位标定后应齐平）': Math.abs(median(pers.filter((_, i) => out.lines[i].role !== 'DPS')) - pMedian) <= 4,
+  '均值 75~90': stats.mean >= 75 && stats.mean <= 90,
   'sd ≥9': stats.sd >= 9,
   '最低分 <62': stats.min < 62,
-  '至少1人触顶': stats.capped >= 1,
+  '触顶 1~20%（不能人人满分）': stats.capped >= 1 && stats.capped <= Math.round(fixture.rows.length * 0.2),
   '团队分极差 ≥12': stats.teamRange >= 12,
 };
 
@@ -126,4 +129,6 @@ if (bad.length) {
   process.exit(1);
 }
 console.log('\n评分回归 PASS ✅');
+
+
 

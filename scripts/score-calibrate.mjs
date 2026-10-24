@@ -41,7 +41,7 @@ const BONUS = { 指挥: 2.5, 统战: 5, K龙: 5 };
 const rule = (over) => ({
   id: 1, version: 1, active: true, createdAt: '', name: 'calib',
   baseScore: 60, capScore: 100, scaleTeam: 20, scalePersonal: 40,
-  deathPen: 3, totalTowers: 9, personalHalf: 0.5, personalGamma: 1, deathPenCap: 20,
+  deathPen: 3, totalTowers: 9, personalRef: 0.195, personalGamma: 1.5, deathPenCap: 20,
   personalWeights: {
     DPS: { kill: 1.2, dmg: 0.5, tower: 1.2, assist: 0.3, fountain: 0.2, bone: 0.2 },
     T: { assist: 0.8, taken: 1.8 },
@@ -261,5 +261,6 @@ export const SCORE_PRESET: ScorePreset = {
   writeFileSync(join(root, 'src/shared/scorePreset.ts'), src, 'utf8');
   console.log('\n已写入 src/shared/scorePreset.ts');
 }
+
 
 

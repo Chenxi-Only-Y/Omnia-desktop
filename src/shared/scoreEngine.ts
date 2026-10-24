@@ -210,9 +210,8 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   });
 
   const rawValues = personalRaw.map((p) => p.raw);
-  const posRaws = rawValues.filter((v) => v > 0);
-  const rawLo = posRaws.length ? Math.min(...posRaws) : 0;
-  const rawHi = posRaws.length ? Math.max(...posRaws) : 0;
+  /* 满量程参考值的兜底：规则集没给就用本场最大 FN（仅为不发生除零，正常都走规则集） */
+  const rawHi = rawValues.length ? Math.max(...rawValues, 0) : 0;
 
   // 小队聚合（用于战术执行分）
   const bySquad = new Map<string, ScoreInputRow[]>();
@@ -263,9 +262,10 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
   const lines: ScoreLine[] = personalRaw.map(({ x, raw }) => {
     const role = x.row.role;
     const coef = rule.classCoef[x.row.classUsed] ?? 0;
-    const half = rule.personalHalf > 0 ? rule.personalHalf : (rawHi > rawLo ? (rawLo + rawHi) / 2 : 1);
+    const refByRole = rule.personalRef?.[role] ?? 0;
+    const ref = refByRole > 0 ? refByRole : (rawHi > 0 ? rawHi : 1);
     const gamma = rule.personalGamma > 0 ? rule.personalGamma : 1;
-    const personalRatio = personalCurve(raw, half, gamma);
+    const personalRatio = personalCurve(raw, ref, gamma);
     const personalScore = personalRatio * rule.scalePersonal * coef;
 
     const team = x.row.squad ? teamScoreBySquad.get(x.row.squad) : undefined;
@@ -309,7 +309,7 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
         复活: x.e.revive,
         个人原始加权: Number(raw.toFixed(6)),
         个人曲线: Number(personalRatio.toFixed(4)),
-        曲线半值: Number(half.toFixed(6)),
+        满量程FN: Number(ref.toFixed(6)),
         职业系数: coef,
         战术类型: tacticKind((x.row.tactic ?? '') as Tactic),
         小队执行分: Number((team?.score ?? 0).toFixed(4)),
@@ -342,21 +342,30 @@ function keyToLeague(key: string): string {
 }
 
 /**
- * 个人换算比例（引擎 v2）：饱和曲线 FO = (FN / (FN + half)) ^ γ。
+ * 个人换算比例（引擎 v2.1）：比例曲线 FO = min(1, (FN / personalRef) ^ γ)。
+ *
+ * **为什么从饱和曲线改成比例曲线**（2026-10-24 用户指出"个人分这么算的"）：
+ *   FN 的实际取值范围只有 0~0.195（两个真实数据集实测：P50≈0.09、P90≈0.15、max≈0.19），
+ *   而饱和曲线 FN/(FN+half) 在 half=0.1 时把所有 FN 映射到 0.17~0.61 ✗ ——
+ *   结果个人分永远只用到 0~40 里的 7~26 分，**满分档形同虚设** ✗。
+ *   比例曲线以"参考值"为满量程：FN = personalRef → 满 1.0；超过就封顶（说明"已到顶尖水平"）。
+ *   仍然**绝对**（参考值是规则集里的常数，不看同场其他人）→ 跨场可比 ✓
  *
  * 为什么不用"同场 Min-Max 归一"（规范 v1.0）：
  *   那样个人分 = (FN − 同场最低) / (同场最高 − 同场最低) ✗ 取决于**同场其他人的极值** ——
  *   同一份战报，队友越猛你越低；换一场分数就变；一场里出了个怪物，全队都被压平。
  *   联赛要跨场比，个人分必须是**绝对**的。
  *
- * 曲线性质：FN=0 → 0（零贡献不再得负分 ✓）；FN=half → 0.5^γ（half 取 FN 中位数时约等于"中位水平"锚点）；
- * 单调、有界 [0,1)。γ>1 时低贡献被压低、高贡献不变 → 拉开差距。
- * half / γ 都由 scripts/score-calibrate.mjs 用真实战报标定。
+ * 性质：FN=0 → 0（零贡献不得负分 ✓）；FN=personalRef → 1（满量程）；单调、有界 [0,1]；
+ * γ<1 抬高中间段、γ>1 压低中间段。参考值与 γ 由 scripts/score-calibrate.mjs 用真实战报标定。
  */
-function personalCurve(fn: number, half: number, gamma: number): number {
+function personalCurve(fn: number, ref: number, gamma: number): number {
   if (!(fn > 0)) return 0;
-  const h = half > 0 ? half : 1;
-  const base = fn / (fn + h);
+  const r = ref > 0 ? ref : 1;
   const g = gamma > 0 ? gamma : 1;
-  return g === 1 ? base : Math.pow(base, g);
+  const v = g === 1 ? fn / r : Math.pow(fn / r, g);
+  return v > 1 ? 1 : v;
 }
+
+
+

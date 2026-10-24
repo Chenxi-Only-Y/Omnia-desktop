@@ -477,17 +477,15 @@ export interface RuleSetInput {
   deathPen: number;
   totalTowers: number;
   /**
-   * 个人分的**饱和曲线半值**（引擎 v2）：个人比例 = FN / (FN + personalHalf)。
-   * 换掉原来"同场 Min-Max 归一"的做法 —— 那玩意让个人分取决于同场其他人的极值 ✗
-   * （队友越强你越低、换一场分数就变），联赛里跨场没法比。
-   * 取值 = 全体 FN 的中位数时，中位水平的人拿满 0.5，标定即可。
+   * 个人分的**满量程参考值**（引擎 v2.1），**按定位各一个**：FO = min(1, (FN / personalRef[role]) ^ γ)。
+   *
+   * 为什么必须分定位：实测 FN 量级差 3 倍 —— DPS P50≈0.085、治疗 ≈0.098、**T 只有 0.036**
+   * （T 不刷伤害，靠承伤/助攻）。用一个全局参考值 → T 全员被压到 6 分左右 ✗（实测 T 均分比全场低 3.84）。
+   * 锚定口径：**同定位的中位水平 = 个人分 20（满量程的一半）**，即 ref = 该定位 FN 中位数 × 1.587。
+   * 换掉"同场 Min-Max 归一"（那才是真正跨场不可比的那个）。
    */
-  personalHalf: number;
-  /**
-   * 个人曲线**陡度** γ：FO = (FN/(FN+half))^γ。
-   * γ > 1 把低贡献往下压、高贡献保持不变 → 拉开差距（sd 变大）；γ = 1 就是普通饱和曲线。
-   * 和 personalHalf 一起标定，才能既"跨场稳定"又"区分度够"。
-   */
+  personalRef: { DPS: number; T: number; HEAL: number };
+  /** 个人曲线**陡度** γ：FO = min(1, (FN/personalRef)^γ)。γ<1 抬高中间段，γ>1 压低中间段 */
   personalGamma: number;
   /** 重伤扣分**封顶**（引擎 v2）：避免一场打崩就把人扣穿地板 */
   deathPenCap: number;
@@ -961,3 +959,5 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
+

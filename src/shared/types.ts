@@ -489,7 +489,12 @@ export interface RuleSetInput {
   personalGamma: number;
   /** 重伤扣分**封顶**（引擎 v2）：避免一场打崩就把人扣穿地板 */
   deathPenCap: number;
-  personalWeights: { DPS: PersonalWeights; T: PersonalWeights; HEAL: PersonalWeights };
+  /**
+   * 个人权重：**按职业**配（键 = 职业名，如 神相/铁衣/素问），和职业系数一起作用。
+   * 引擎取值顺序：职业名 → 定位名（DPS/T/HEAL，老数据的兼容键）→ 空。
+   * 用户 2026-10-24：「不再按 DPS 和 T 和治疗划分，而是按职业划分」。
+   */
+  personalWeights: Record<string, PersonalWeights>;
   execWeights: ExecWeights;
   classCoef: Record<string, number>;
   bonus: Record<string, number>;
@@ -959,5 +964,6 @@ export const IPC = {
   // M6 看板
   dashboardData: 'dashboard:data',
 } as const;
+
 
 

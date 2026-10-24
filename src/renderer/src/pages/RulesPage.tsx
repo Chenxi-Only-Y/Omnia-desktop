@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useToastAutoClear } from '../lib/useToast';
 import type { PersonalWeights, RuleSet, RuleSetInput, RuleSetValidation } from '@shared/types';
+import { CLASSES } from '@shared/domain';
 import { api, errText } from '../api';
 import type { PageProps } from '../App';
 
@@ -295,23 +296,29 @@ export default function RulesPage({ classes }: PageProps) {
           </div>
 
           <div className="card">
-            <h3>个人权重（按定位；每行权重之和应为 1）</h3>
+            <h3>个人权重（**按职业**；每行权重之和应为 1，和职业系数一起作用）</h3>
             <div className="table-wrap">
               <table className="grid">
                 <thead>
                   <tr>
-                    <th style={{ width: 170 }}>定位</th>
+                    <th style={{ width: 200 }}>职业（定位 · 系数）</th>
                     {PERSONAL_FIELDS.map((f) => <th key={f.key} className="num">{f.label}</th>)}
                     <th className="num" style={{ width: 90 }}>合计</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(['DPS', 'T', 'HEAL'] as Role[]).map((role) => {
-                    const w = editing.personalWeights[role] ?? {};
+                  {CLASSES.map((cls) => {
+                    const w = editing.personalWeights[cls.name] ?? {};
                     const total = sum(w as Record<string, number | undefined>);
+                    const role = cls.role as Role;
                     return (
-                      <tr key={role}>
-                        <td>{ROLE_LABEL[role]}</td>
+                      <tr key={cls.name}>
+                        <td>
+                          <span style={{ color: cls.color, fontWeight: 600 }}>{cls.name}</span>
+                          <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>
+                            {ROLE_LABEL[role].split(' /')[0]} · ×{cls.coef}
+                          </span>
+                        </td>
                         {PERSONAL_FIELDS.map((f) => {
                           const v = (w as Record<string, number | undefined>)[f.key];
                           const show = v !== undefined;
@@ -430,3 +437,4 @@ export default function RulesPage({ classes }: PageProps) {
     </>
   );
 }
+

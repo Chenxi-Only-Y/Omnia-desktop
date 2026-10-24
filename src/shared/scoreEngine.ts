@@ -201,7 +201,10 @@ export function scoreMatch(input: MatchScoreInput, rule: RuleSet): MatchScoreOut
 
   // 个人原始加权（占比 = 个人 / 联盟）
   const personalRaw = eff.map((x) => {
-    const w = (rule.personalWeights[x.row.role] ?? {}) as PersonalWeights;
+    /* 权重按**职业**取（用户 2026-10-24）；老规则集只有 DPS/T/HEAL 三档 → 回落定位 ✓ */
+    const w = (rule.personalWeights[x.row.classUsed]
+      ?? rule.personalWeights[x.row.role]
+      ?? {}) as PersonalWeights;
     const ratio = (key: string): number => safeDiv(
       (x.e as unknown as Record<string, number>)[keyToEff(key)] ?? 0,
       league[keyToLeague(key)] ?? 0,
@@ -366,6 +369,7 @@ function personalCurve(fn: number, ref: number, gamma: number): number {
   const v = g === 1 ? fn / r : Math.pow(fn / r, g);
   return v > 1 ? 1 : v;
 }
+
 
 
 

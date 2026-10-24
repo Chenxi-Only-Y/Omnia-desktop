@@ -11,8 +11,46 @@
  */
 import type { SqlDatabase } from '../db';
 import type { RuleSet, RuleSetInput, RuleSetValidation } from '../../shared/types';
+import { CLASSES } from '../../shared/domain';
+
+/**
+ * 把 personalWeights 归一成「按职业」的 12 条。
+ *  - 新格式：键是职业名 → 原样返回（缺的职业补初值）
+ *  - 旧格式：键只有 DPS/T/HEAL（三档）→ 按各职业的定位展开
+ * 这样老库不用迁移就能用，改一个职业也不会牵动别的职业。
+ */
+export function expandPersonalWeights(
+  raw: Record<string, RuleSetInput['personalWeights'][string]> | undefined,
+): RuleSetInput['personalWeights'] {
+  if (!raw || !Object.keys(raw).length) return buildClassPersonalWeights();
+  const out: RuleSetInput['personalWeights'] = {};
+  for (const c of CLASSES) {
+    out[c.name] = { ...(raw[c.name] ?? raw[c.role] ?? ROLE_PERSONAL_WEIGHTS[c.role]) };
+  }
+  /* 规则集里可能还有自定义职业名（字典外）：原样带上，不丢数据 */
+  for (const [k, v] of Object.entries(raw)) {
+    if (!(k in out) && !['DPS', 'T', 'HEAL'].includes(k)) out[k] = { ...v };
+  }
+  return out;
+}
 
 /** 内置默认规则：对齐设计基准 v2 与原表「数据处理1」第 4 行 */
+/** 定位级口径（职业权重的初值来源；每个职业之后可各自微调） */
+const ROLE_PERSONAL_WEIGHTS: Record<'DPS' | 'T' | 'HEAL', RuleSetInput['personalWeights'][string]> = {
+  DPS: { kill: 1.2, dmg: 0.5, tower: 1.2, assist: 0.3, fountain: 0.2, bone: 0.2 },
+  /* T（铁衣）2026-10-24 重配：原版权重全压在 承伤(cv 0.14)/助攻(cv 0.29) 上 →
+     5 个 T 的 sd 只有 2.44。换成 塔伤(cv 0.76)/人伤(cv 0.42) 为主、承伤只做兜底。 */
+  T: { assist: 0.4, taken: 0.4, tower: 1.4, dmg: 0.6 },
+  HEAL: { assist: 0.2, heal: 0.8, taken: 0.3, revive: 0.5 },
+};
+
+/** 展开成 12 个职业各一套（每套独立对象，改一个不会连带改别的职业） */
+export function buildClassPersonalWeights(): RuleSetInput['personalWeights'] {
+  const out: RuleSetInput['personalWeights'] = {};
+  for (const c of CLASSES) out[c.name] = { ...ROLE_PERSONAL_WEIGHTS[c.role] };
+  return out;
+}
+
 export const DEFAULT_RULE_SET: RuleSetInput = {
   name: '默认规则（规范 v2 · 已标定）',
   baseScore: 60,
@@ -29,14 +67,10 @@ export const DEFAULT_RULE_SET: RuleSetInput = {
    *  （实测 60 条样本 + 10/17 真实局两个数据集）*/
   personalRef: { DPS: 0.175, T: 0.075, HEAL: 0.2 },
   personalGamma: 1.5,
-  personalWeights: {
-    DPS: { kill: 1.2, dmg: 0.5, tower: 1.2, assist: 0.3, fountain: 0.2, bone: 0.2 },
-    /* T（铁衣）2026-10-24 重配：原版权重全压在 承伤(cv 0.14)/助攻(cv 0.29) 上 →
-       5 个 T 的 sd 只有 2.44。换成 塔伤(cv 0.76)/人伤(cv 0.42) 为主、承伤只做兜底
-       → 标定后 T-sd 4.09（1.65 倍），且 T 均分不再高于全场 8 分。 */
-    T: { assist: 0.4, taken: 0.4, tower: 1.4, dmg: 0.6 },
-    HEAL: { assist: 0.2, heal: 0.8, taken: 0.3, revive: 0.5 },
-  },
+  /* 个人权重**按职业**（12 套）。初值 = 该职业所属定位的口径，之后每个职业可单独调
+     （用户 2026-10-24：不再按 DPS/T/治疗 划分，而是按职业划分，和职业系数一起作用）。
+     取值见文件末尾 ROLE_PERSONAL_WEIGHTS；这里用 CLASSES 展开成 12 条。 */
+  personalWeights: buildClassPersonalWeights(),
   execWeights: {
     push: { progress: 0.6 * (7 / 9), flag: 0.6 * (2 / 9), tower: 0.25, kill: 0.15 },
     guard: { kill: 0.5, taken: 0.3, lowDeath: 0.2 },
@@ -98,7 +132,10 @@ export class RuleSetRepo {
       personalRef: weights.personalRef ?? DEFAULT_RULE_SET.personalRef,
       personalGamma: typeof weights.personalGamma === 'number' ? weights.personalGamma : DEFAULT_RULE_SET.personalGamma,
       deathPenCap: typeof weights.deathPenCap === 'number' ? weights.deathPenCap : DEFAULT_RULE_SET.deathPenCap,
-      personalWeights: weights.personal ?? DEFAULT_RULE_SET.personalWeights,
+      /* 兼容两种存法：
+         - 新：键是职业名（12 条）
+         - 旧：键只有 DPS/T/HEAL（三档）→ 按职业的定位展开，职业级改动从此独立 */
+      personalWeights: expandPersonalWeights(weights.personal),
       execWeights: weights.exec ?? DEFAULT_RULE_SET.execWeights,
       classCoef: parse(r.class_coef_json, DEFAULT_RULE_SET.classCoef),
       bonus: parse(r.bonus_json, DEFAULT_RULE_SET.bonus),
@@ -266,6 +303,8 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
+
 
 
 

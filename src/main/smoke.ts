@@ -2131,9 +2131,10 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const d = def.data;
         steps.push('默认值 基础=' + d.baseScore + ' 封顶=' + d.capScore
           + ' 团队x' + d.scaleTeam + ' 个人x' + d.scalePersonal + ' 死亡扣' + d.deathPen + ' 塔=' + d.totalTowers);
-        steps.push('默认个人权重和 DPS=' + psum(d.personalWeights.DPS).toFixed(3)
-          + ' T=' + psum(d.personalWeights.T).toFixed(3)
-          + ' HEAL=' + psum(d.personalWeights.HEAL).toFixed(3));
+        steps.push('默认个人权重（按职业 12 套）合计: 神相=' + psum(d.personalWeights['神相']).toFixed(3)
+          + ' 铁衣=' + psum(d.personalWeights['铁衣']).toFixed(3)
+          + ' 素问=' + psum(d.personalWeights['素问']).toFixed(3)
+          + '（职业数=' + Object.keys(d.personalWeights).length + '）');
         steps.push('默认战术权重和 push=' + psum(d.execWeights.push).toFixed(4)
           + ' (应=1) guard=' + psum(d.execWeights.guard).toFixed(2)
           + ' defend=' + psum(d.execWeights.defend).toFixed(2));
@@ -2146,11 +2147,11 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
 
         const bad = JSON.parse(JSON.stringify(d));
         bad.capScore = 50;
-        bad.personalWeights.DPS.kill = 9;
+        bad.personalWeights['神相'].kill = 9;
         bad.classCoef['神相'] = -1;
         const badVal = await api.rules.validate(bad);
         const hasErr = badVal.data.issues.some(i => i.level === 'error' && i.field === 'capScore');
-        const hasWarn = badVal.data.issues.some(i => i.level === 'warn' && i.field.indexOf('personalWeights.DPS') === 0);
+        const hasWarn = badVal.data.issues.some(i => i.level === 'warn' && i.field.indexOf('personalWeights.神相') === 0);
         steps.push('错误值校验 ok=' + badVal.data.ok + ' 封顶错误被拦=' + hasErr + ' 权重和警告=' + hasWarn);
 
         const before = await api.rules.list();
@@ -2213,9 +2214,13 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const ok = d.baseScore === 60 && d.capScore === 100 && d.scaleTeam === 20 && d.scalePersonal === 40
           && d.deathPen === 3 && d.totalTowers === 9
           && Math.abs(psum(d.execWeights.push) - 1) < 1e-9
-          && Math.abs(psum(d.personalWeights.DPS) - 3.6) < 1e-9
+          && Object.keys(d.personalWeights).length === 12          /* 个人权重按职业 12 套 */
+          && Math.abs(psum(d.personalWeights['神相']) - 3.6) < 1e-9   /* 神相 = DPS 口径 */
+          && Math.abs(psum(d.personalWeights['铁衣']) - 2.8) < 1e-9   /* 铁衣 = T 口径 1.4+0.6+0.4+0.4 */
           && okVal.data.ok === true
-          && okVal.data.issues.every(i => i.level === 'warn') && okVal.data.issues.length === 3
+          && okVal.data.issues.every(i => i.level === 'warn')
+          /* 个人权重改成按职业 12 套 → 权重和不为 1 的警告变成 12 条（缺省口径本来就不是归一的）*/
+          && okVal.data.issues.filter(i => i.field.indexOf('personalWeights.') === 0).length === 12
           && badVal.data.ok === false && hasErr && hasWarn
           && created.data.version === maxV + 1 && dup.data.version === maxV + 2
           && edited.data.version === created.data.version && edited.data.deathPen === 4.5
@@ -3078,3 +3083,6 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
     app.exit(pass ? 0 : 1);
   });
 }
+
+
+

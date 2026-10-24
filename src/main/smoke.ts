@@ -2211,7 +2211,7 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
         const after = await api.rules.list();
         steps.push('清理后规则集数=' + after.data.length);
 
-        const ok = d.baseScore === 60 && d.capScore === 100 && d.scaleTeam === 20 && d.scalePersonal === 40
+        const ok = d.baseScore === 55 && d.capScore === 100 && d.scaleTeam === 20 && d.scalePersonal === 40
           && d.deathPen === 3 && d.totalTowers === 9
           && Math.abs(psum(d.execWeights.push) - 1) < 1e-9
           && Object.keys(d.personalWeights).length === 12          /* 个人权重按职业 12 套 */
@@ -3083,6 +3083,7 @@ export async function runSmokeTest(win: BrowserWindow, deps: SmokeDeps): Promise
     app.exit(pass ? 0 : 1);
   });
 }
+
 
 
 

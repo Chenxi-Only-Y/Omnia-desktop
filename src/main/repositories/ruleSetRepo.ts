@@ -115,7 +115,7 @@ export function buildClassPersonalWeights(): RuleSetInput['personalWeights'] {
 
 export const DEFAULT_RULE_SET: RuleSetInput = {
   name: '默认规则（规范 v2 · 已标定）',
-  baseScore: 60,
+  baseScore: 55,
   capScore: 100,
   scaleTeam: 20,
   scalePersonal: 40,
@@ -386,6 +386,7 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
 
 
 

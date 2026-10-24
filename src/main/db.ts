@@ -249,7 +249,7 @@ const MIGRATIONS: Migration[] = [
         `INSERT INTO rule_set (id, season_id, name, weights_json, class_coef_json, bonus_json, version)
          VALUES (1, 1, '默认规则（算法待定）', '{}', ?, ?, 1)
          ON CONFLICT(id) DO NOTHING`,
-      ).run(coefs, JSON.stringify({ 指挥: 2.5, 统战: 5, K龙: 5 }));
+      ).run(coefs, JSON.stringify({ 指挥: 1.5, 统战: 3, K龙: 3 }));
 
       db.prepare(
         `INSERT INTO app_setting (key, value) VALUES ('activeSeasonId', '1')
@@ -818,3 +818,4 @@ export function inTransaction<T>(db: SqlDatabase, name: string, fn: () => T): T 
     throw err;
   }
 }
+

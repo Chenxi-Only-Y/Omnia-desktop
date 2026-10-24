@@ -146,7 +146,7 @@ export const DEFAULT_RULE_SET: RuleSetInput = {
     素问: 0.95, 妙音: 1.05, 惊鸿: 1.0, 九灵: 1.0, 神相: 1.2, 玄机: 1.1,
     血河: 1.1, 铁衣: 1.1, 龙吟: 1.0, 碎梦: 1.4, 沧澜: 0.95, 潮光: 0.95,
   },
-  bonus: { 指挥: 2.5, 统战: 5, K龙: 5 },
+  bonus: { 指挥: 1.5, 统战: 3, K龙: 3 },
 };
 
 interface RuleRow {
@@ -386,6 +386,7 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
 
 
 

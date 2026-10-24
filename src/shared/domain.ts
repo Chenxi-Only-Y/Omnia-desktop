@@ -165,9 +165,9 @@ export const NOTE_ROLE_VALUES: readonly Exclude<NoteRole, ''>[] = [
 ] as const;
 
 export const BONUS_POINTS: Record<string, number> = {
-  指挥: 2.5,
-  统战: 5,
-  K龙: 5,
+  指挥: 1.5,
+  统战: 3,
+  K龙: 3,
 };
 
 // ── 参战状态 ─────────────────────────────────────────────────────
@@ -266,3 +266,4 @@ export function deriveEffective(s: CombatStat) {
     resource: s.resource,
   };
 }
+

@@ -50,10 +50,21 @@ const ROLE_PERSONAL_WEIGHTS: Record<'DPS' | 'T' | 'HEAL', RuleSetInput['personal
  * 这样个人分的平均水平不漂，只有"看什么"变了。
  */
 const CLASS_PERSONAL_TUNING: Record<string, RuleSetInput['personalWeights'][string]> = {
-  /* 碎梦：刺客定位，击杀权重翻 50%，塔伤让一半出来 */
-  碎梦: { kill: 1.8, dmg: 0.5, tower: 0.6, assist: 0.3, fountain: 0.2, bone: 0.2 },
-  /* 鸿音（= 惊鸿的 DPS 形态）：以玩家伤害见长，人伤权重 0.5 → 1.5 */
-  惊鸿: { kill: 1.0, dmg: 1.5, tower: 0.4, assist: 0.3, fountain: 0.2, bone: 0.2 },
+  /* 治疗：治疗/复活是主业，承伤只做兜底 */
+  素问: { heal: 0.9, revive: 0.5, assist: 0.2, taken: 0.3 },
+  妙音: { heal: 0.8, revive: 0.6, assist: 0.3, taken: 0.3 },
+  /* 主坦：承伤 + 塔伤 双主业（实测 T 的承伤 cv 只有 0.14，所以塔伤权重不能小） */
+  铁衣: { taken: 1.0, tower: 1.0, assist: 0.4, dmg: 0.4 },
+  /* 输出系：按"招牌数据"配，权重集中在能拉开差距的项上 */
+  惊鸿: { dmg: 1.5, kill: 1.0, tower: 0.4, assist: 0.3, fountain: 0.2, bone: 0.2 },  // 鸿音：人伤见长
+  九灵: { dmg: 1.2, kill: 0.9, tower: 0.5, assist: 0.5, bone: 0.3 },
+  神相: { dmg: 1.0, tower: 1.0, kill: 0.8, assist: 0.3, bone: 0.2 },
+  玄机: { assist: 0.8, tower: 1.0, dmg: 0.8, kill: 0.6 },
+  血河: { kill: 1.4, dmg: 0.8, tower: 0.6, assist: 0.3 },                        // 近战爆发：击杀优先
+  龙吟: { kill: 1.1, dmg: 0.8, tower: 0.8, assist: 0.4 },
+  碎梦: { kill: 2.0, dmg: 0.6, tower: 0.4, assist: 0.3 },                         // 刺杀：人头优先
+  沧澜: { taken: 0.9, tower: 0.9, kill: 0.6, assist: 0.3 },                       // 坦克输出
+  潮光: { heal: 0.7, fountain: 0.6, revive: 0.5, assist: 0.4 },                   // 辅助/复活
 };
 
 /**
@@ -71,10 +82,10 @@ const ROLE_PERSONAL_REF: Record<'DPS' | 'T' | 'HEAL', number> = { DPS: 0.175, T:
  * 重算方式：`npm run score:refcal -- --csv <战报.csv> ...`
  */
 const CLASS_PERSONAL_REF: Record<string, number> = {
-  素问: 0.211, 妙音: 0.1662,
-  惊鸿: 0.1913, 九灵: 0.2301, 神相: 0.1667, 玄机: 0.1651, 血河: 0.1254,
-  龙吟: 0.2065, 碎梦: 0.1958, 沧澜: 0.2103, 潮光: 0.1389,
-  铁衣: 0.075,
+  素问: 0.2135, 妙音: 0.1672,
+  惊鸿: 0.1857, 九灵: 0.2501, 神相: 0.1525, 玄机: 0.1345, 血河: 0.133,
+  龙吟: 0.157, 碎梦: 0.1927, 沧澜: 0.1465, 潮光: 0.1094,
+  铁衣: 0.1034,
 };
 
 /** 展开成 12 个职业的参考值（缺的职业回落到同定位基准） */
@@ -375,6 +386,9 @@ export function validate(input: RuleSetInput): RuleSetValidation {
 
   return { ok: !issues.some((i) => i.level === 'error'), issues };
 }
+
+
+
 
 
 

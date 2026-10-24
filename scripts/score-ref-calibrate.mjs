@@ -37,6 +37,8 @@ for (const c of CLASSES) {
 const canon = (cls) => ALIAS.get(String(cls ?? '').trim()) ?? '';
 const COEF = Object.fromEntries(CLASSES.map((c) => [c.name, c.coef]));
 const ROLE_REF = { DPS: 0.175, T: 0.075, HEAL: 0.2 };
+/* ANCHOR：让「该职业的 FN 中位」映射到个人分 13（系数 1.0 时）：40 × (1/ANCHOR)^1.5 = 13 */
+const ANCHOR = 2.12;
 const SHRINK_K = 5;
 
 const median = (a) => {
@@ -119,11 +121,13 @@ for (const c of CLASSES) {
   if (!list.length) { ref[c.name] = ROLE_REF[c.role]; console.log(`  ${c.name.padEnd(4)}${c.role.padEnd(5)} 0     —（回落到定位值 ${ROLE_REF[c.role]}）`); continue; }
   const mc = median(list);
   const mr = median(byRole.get(c.role));
-  const ratio = mr > 0 ? mc / mr : 1;
   const shrink = list.length / (list.length + SHRINK_K);
-  const v = ROLE_REF[c.role] * (1 + (ratio - 1) * shrink);
+  /* 绝对锚定（2026-10-24 修正）：ref = ANCHOR × 该职业 FN(去系数)中位（样本少时向同定位中位收缩）。
+     这样「中位水平 = 个人分 13×系数^1.5」恒成立，且权重一改参考值自动跟着走 ✓
+     旧做法按「同定位比值」缩放 —— T 定位只有一个职业时比值恒为 1，权重改了参考值不动 ✗ */
+  const v = ANCHOR * ((1 - shrink) * mr + shrink * mc);
   ref[c.name] = +v.toFixed(4);
-  console.log(`  ${c.name.padEnd(4)}${c.role.padEnd(5)} ${String(list.length).padStart(2)}  ${mc.toFixed(4).padStart(10)}  ${mr.toFixed(4).padStart(10)}  ${ratio.toFixed(2).padStart(5)}  ${(shrink * 100).toFixed(0).padStart(3)}%  → ${v.toFixed(4)}`);
+  console.log(`  ${c.name.padEnd(4)}${c.role.padEnd(5)} ${String(list.length).padStart(2)}  ${mc.toFixed(4).padStart(10)}  ${mr.toFixed(4).padStart(10)}  ${((mr > 0 ? mc / mr : 1)).toFixed(2).padStart(5)}  ${(shrink * 100).toFixed(0).padStart(3)}%  → ${v.toFixed(4)}`);
 }
 console.log('\n当前生效值: ' + JSON.stringify(buildClassPersonalRef()));
 console.log('新标定值  : ' + JSON.stringify(ref));
@@ -134,5 +138,7 @@ if (process.argv.includes('--apply')) {
     console.log('  ' + keys.slice(i, i + 4).map((k) => `${k}: ${ref[k]}`).join(', ') + ',');
   }
 }
+
+
 
 
